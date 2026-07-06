@@ -1,6 +1,7 @@
 package com.pettrip.pet.model;
 
 import com.pettrip.common.model.BaseEntity;
+import jakarta.persistence.AttributeOverride;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -13,6 +14,7 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "pets")
+@AttributeOverride(name = "id", column = @Column(name = "pet_id"))
 public class Pet extends BaseEntity {
 
   @Column(name = "user_id")

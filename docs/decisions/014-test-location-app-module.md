@@ -1,4 +1,4 @@
-# 012. 테스트 코드 배치: 프로덕션은 도메인 모듈, 테스트는 app 모듈
+# 014. 테스트 코드 배치: 프로덕션은 도메인 모듈, 테스트는 app 모듈
 
 ## 상태
 - [x] 확정됨 (Accepted)
@@ -17,4 +17,4 @@
 - 도메인 모듈에 `spring-boot-starter-test` 등 테스트 의존성을 추가하지 마라. 이미 `app`에 있다.
 - Repository 테스트는 pgvector 등 PostgreSQL 전용 타입을 쓰지 않는 한 H2(`app`의 `testRuntimeOnly 'com.h2database:h2'`)로 충분하다. PostgreSQL 전용 기능이 필요해지면 Testcontainers 도입을 재검토하라.
 - `app/src/test/resources/application.yml`은 `app/src/main/resources/application.yml`의 필수 환경변수(`${DB_URL}` 등)를 테스트용 더미 값으로 덮어쓴다. 새 환경변수가 메인 설정에 추가되면 이 파일에도 더미 값을 함께 추가하라.
-- `app/src/main/resources/data.sql`은 `spring.sql.init.mode: always`(로컬 프로필 한정)일 때만 실행된다. 테스트(H2, 임베디드)에서는 `spring.sql.init.mode: never`로 꺼져 있으니, `data.sql`에 PostgreSQL 전용 함수(`uuid_generate_v7()` 등)를 추가해도 테스트가 깨지지 않는다 — 이 분리를 유지하라.
+- 스키마/시드 데이터는 Flyway 마이그레이션(`app/src/main/resources/db/migration/`, decision 011)으로 관리한다. 테스트(H2, 임베디드)에서는 `spring.flyway.enabled: false` + `ddl-auto: create-drop`으로 Flyway를 건너뛴다 — Flyway 마이그레이션은 PostgreSQL 전용 함수(`uuid_generate_v7()` 등)를 쓰므로 H2에서 그대로 실행하면 깨진다. 이 분리를 유지하라.

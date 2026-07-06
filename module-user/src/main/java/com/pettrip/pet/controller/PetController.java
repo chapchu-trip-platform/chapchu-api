@@ -1,5 +1,6 @@
 package com.pettrip.pet.controller;
 
+import com.pettrip.common.service.TempAuthContext;
 import com.pettrip.pet.model.Pet;
 import com.pettrip.pet.service.PetService;
 import jakarta.validation.Valid;
@@ -20,10 +21,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/pets")
 public class PetController {
 
-  // docs/decisions/011 참고: 실제 인증(OAuth2 Resource Server) 붙기 전까지 쓰는 임시 고정 유저.
-  // auth 도메인 구현 시 @AuthenticationPrincipal 기반 추출로 교체 필요.
-  private static final UUID TEMP_USER_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
-
   private final PetService petService;
 
   public PetController(PetService petService) {
@@ -32,7 +29,9 @@ public class PetController {
 
   @GetMapping
   public List<PetResponse> listPets() {
-    return petService.listPets(TEMP_USER_ID).stream().map(PetResponse::from).toList();
+    return petService.listPets(TempAuthContext.TEMP_USER_ID).stream()
+        .map(PetResponse::from)
+        .toList();
   }
 
   @PostMapping
@@ -40,7 +39,11 @@ public class PetController {
   public PetResponse createPet(@RequestBody @Valid PetCreateRequest request) {
     Pet pet =
         petService.createPet(
-            TEMP_USER_ID, request.breedId(), request.petName(), request.size(), request.age());
+            TempAuthContext.TEMP_USER_ID,
+            request.breedId(),
+            request.petName(),
+            request.size(),
+            request.age());
     return PetResponse.from(pet);
   }
 
@@ -49,7 +52,7 @@ public class PetController {
       @PathVariable UUID petId, @RequestBody @Valid PetUpdateRequest request) {
     Pet pet =
         petService.updatePet(
-            TEMP_USER_ID,
+            TempAuthContext.TEMP_USER_ID,
             petId,
             request.breedId(),
             request.petName(),
@@ -61,6 +64,6 @@ public class PetController {
   @DeleteMapping("/{petId}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   public void deletePet(@PathVariable UUID petId) {
-    petService.deletePet(TEMP_USER_ID, petId);
+    petService.deletePet(TempAuthContext.TEMP_USER_ID, petId);
   }
 }

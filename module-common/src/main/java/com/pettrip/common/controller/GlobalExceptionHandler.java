@@ -1,6 +1,7 @@
 package com.pettrip.common.controller;
 
 import com.pettrip.common.model.ErrorResponse;
+import com.pettrip.common.service.ConflictException;
 import com.pettrip.common.service.NotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,6 +16,12 @@ public class GlobalExceptionHandler {
   public ResponseEntity<ErrorResponse> handleNotFound(NotFoundException exception) {
     return ResponseEntity.status(HttpStatus.NOT_FOUND)
         .body(new ErrorResponse("NOT_FOUND", exception.getMessage()));
+  }
+
+  @ExceptionHandler(ConflictException.class)
+  public ResponseEntity<ErrorResponse> handleConflict(ConflictException exception) {
+    return ResponseEntity.status(HttpStatus.CONFLICT)
+        .body(new ErrorResponse("CONFLICT", exception.getMessage()));
   }
 
   @ExceptionHandler(MethodArgumentNotValidException.class)

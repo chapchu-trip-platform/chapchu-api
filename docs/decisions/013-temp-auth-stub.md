@@ -1,4 +1,4 @@
-# 011. 임시 인증 스텁 (실제 OAuth2 Resource Server 붙기 전)
+# 013. 임시 인증 스텁 (실제 OAuth2 Resource Server 붙기 전)
 
 ## 상태
 - [x] 확정됨 (Accepted, 임시)
@@ -6,10 +6,18 @@
 ## 결정
 - `auth`/`user` 도메인의 실제 JWT 인증(decision 008, chapchu-auth 연동)이 구현되기 전까지:
   - `app/src/main/java/com/pettrip/config/SecurityConfig.java`에 모든 요청을 `permitAll()` 처리하는 임시 `SecurityFilterChain`을 둔다.
-  - 인증이 필요한 Controller는 `@AuthenticationPrincipal` 대신 고정 상수 `TEMP_USER_ID`(예: `PetController.TEMP_USER_ID`)를 현재 유저로 사용한다.
+  - 인증이 필요한 Controller는 `@AuthenticationPrincipal` 대신 `com.pettrip.common.service.TempAuthContext.TEMP_USER_ID`(모든 도메인이 공유하는 고정 상수)를 현재 유저로 사용한다.
 
 ## 이유
 - pet 등 유저 소유 리소스 도메인을 auth 도메인보다 먼저 구현하게 되어, 실제 인증 없이도 소유권 로직/TDD/REST Docs 패턴을 검증할 수 있어야 했음.
+
+## 로컬 개발 시 주의
+- `users` 테이블에 `TEMP_USER_ID`(`11111111-1111-1111-1111-111111111111`)와 일치하는 row가 없으면 `GET/PATCH /users/me`, `POST /pets` 등이 404로 실패한다.
+- 이 row는 실제 서비스에 나타나면 안 되는 가짜 데이터라 Flyway 마이그레이션에 넣지 않았다. 로컬에서 직접 아래 SQL을 실행해 만들어라:
+  ```sql
+  INSERT INTO users (user_id, email, google_user_id)
+  VALUES ('11111111-1111-1111-1111-111111111111', 'temp-local@example.com', 'temp-local');
+  ```
 
 ## 에이전트 행동 지침
 - auth 도메인(JWT 검증)이 구현되면:
