@@ -1,0 +1,52 @@
+= PetTrip API
+:doctype: book
+:icons: font
+:source-highlighter: highlightjs
+:toc: left
+:toclevels: 2
+:sectlinks:
+:snippets: ../../../build/generated-snippets
+
+== 개요
+
+PetTrip 반려동물 동반 여행 플랫폼 REST API 명세입니다.
+
+== 공통
+
+=== 요청 헤더
+
+[source,http]
+----
+Authorization: Bearer {access_token}
+Content-Type: application/json
+----
+
+=== 응답 코드
+
+|===
+| 상태 코드 | 설명
+
+| `200 OK` | 성공
+| `201 Created` | 생성 성공
+| `400 Bad Request` | 요청 파라미터 오류
+| `401 Unauthorized` | 인증 필요
+| `403 Forbidden` | 권한 없음
+| `404 Not Found` | 리소스 없음
+| `500 Internal Server Error` | 서버 오류
+|===
+
+== 유저 API
+// include::{snippets}/user-register/http-request.adoc[]
+// include::{snippets}/user-register/http-response.adoc[]
+
+== 반려동물 API
+
+== 장소 API
+
+== 여행 API
+
+== 앨범 API
+
+== 리뷰 API
+
+== 추천 API

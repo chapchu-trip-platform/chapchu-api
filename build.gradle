@@ -3,6 +3,8 @@ plugins {
     id 'com.diffplug.spotless' version '6.25.0' apply false
     id 'org.springframework.boot' version '3.4.5' apply false
     id 'io.spring.dependency-management' version '1.1.7' apply false
+    // org.asciidoctor.jvm.convert 3.3.2 — Gradle 9 미지원 (docs/failures/004 참고)
+    // HTML 생성은 CI에서 asciidoctor CLI 직접 실행
 }
 
 allprojects {
