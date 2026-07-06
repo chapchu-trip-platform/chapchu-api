@@ -33,7 +33,34 @@
 ### [Step 2] 동료 코드 보호 및 스코프 제한
 현재 사용자(나)가 지시한 과제와 직접적인 관련이 없는 동료의 코드를 '리팩토링' 명목으로 임의 수정하지 마라. 기존 퍼블릭 메서드 서명은 함부로 바꾸지 말고 안전하게 확장하라.
 
-## 5. 테스트 전략: TDD(Red-Green) + Spring REST Docs
+## 5. 엔티티 PK 정책 (UUID v7)
+- 모든 Entity는 반드시 `BaseEntity`를 상속하라. 직접 `@Id` 필드를 선언하지 마라.
+- `@GeneratedValue` 절대 금지. JPA 자동 생성 전략(IDENTITY, SEQUENCE, AUTO)을 사용하지 마라.
+- `UUID.randomUUID()` 절대 금지 — B-Tree 인덱스 페이지 스플릿을 유발한다.
+- UUID는 `uuid-creator` 라이브러리의 `UuidCreator.getTimeOrderedEpoch()`로 생성하며, `BaseEntity` 필드 초기화에서만 한다.
+- DB DDL PK 컬럼: `UUID PRIMARY KEY DEFAULT uuid_generate_v7()` (pg_uuidv7 확장 필수).
+
+## 6. 패키지 명명 규칙
+- 모든 클래스는 `com.pettrip.{domain}.{layer}` 2단계 하위 패키지에 위치시켜라.
+  - 올바른 예: `com.pettrip.user.controller.UserController`
+  - 잘못된 예: `com.pettrip.user.api.UserApi`, `com.pettrip.user.entity.User`
+- 허용되는 레이어명: `controller` / `service` / `repository` / `model` 이 4가지뿐.
+  `domain`, `api`, `entity`, `dto`, `impl` 등 다른 이름을 레이어 패키지로 사용하지 마라.
+- `model` 패키지 클래스에서 `controller`, `service`, `repository` 패키지를 import하지 마라.
+- 공통 클래스는 `com.pettrip.common.{layer}` 또는 `module-common` 모듈에 위치시켜라.
+
+## 7. 기술 스택 제약
+- **파일 저장**: 사진 URL은 S3 경로로 DB에 저장하라. 로컬 파일 경로를 저장하지 마라.
+- **벡터 임베딩**: Spring AI `EmbeddingModel` 인터페이스를 사용하라. 임베딩 차원은 상수 `EMBEDDING_DIMENSION = 3072`로 관리하라. pgvector 컬럼은 `vector(3072)`으로 선언하라.
+- **인증**: chapchu는 OAuth2 Resource Server 전용이다. 토큰 발급 로직을 이 레포에 추가하지 마라. 토큰 발급은 `chapchu-auth`(별도 레포) 전담이다.
+- **Spring AI**: `module-recommendation/build.gradle`에 주석으로 보존된 Spring AI 의존성은 RAG 구현 착수 전 Maven Central에서 최신 GA 버전을 확인한 뒤 활성화하라. 지금 당장 활성화하지 마라.
+
+## 8. 멀티모듈 의존성 제약
+- `app` 모듈에 비즈니스 로직(Service, Repository, Entity)을 추가하지 마라. `app`은 조립 진입점이다.
+- `module-recommendation`은 다른 도메인 모듈을 참조할 수 있지만, 다른 도메인 모듈이 `module-recommendation`을 참조하는 역방향 의존성은 금지한다.
+- 모듈 간 순환 의존성을 만들지 마라. ArchUnit이 빌드 시 감지한다.
+
+## 9. 테스트 전략: TDD(Red-Green) + Spring REST Docs  <!-- docs/decisions/010 -->
 - **Red-Green TDD 필수:** 새 기능 구현 시 반드시 실패 테스트를 먼저 작성하고, 그 테스트를 통과하는 최소한의 구현을 해라.
 - **Controller는 `@WebMvcTest` + REST Docs 세트로 작성하라:** Controller를 구현하면 반드시 해당 엔드포인트의 MockMvc 테스트와 REST Docs 스니펫 생성 코드를 함께 작성해야 한다. 테스트 없이 Controller를 구현하지 마라.
 - **API 문서 동기화:** 새 엔드포인트 추가 시 `app/src/docs/asciidoc/index.adoc`에 해당 섹션과 스니펫 include를 추가하라.
@@ -43,6 +70,6 @@
   - Service: 순수 JUnit 5 + Mockito
   - Repository: `@DataJpaTest`
 
-## 6. 가비지 컬렉션 및 드리프트 방지 규칙 (Anti-Drift Protocol)
+## 10. 가비지 컬렉션 및 드리프트 방지 규칙 (Anti-Drift Protocol)
 - **임시 파일 금지:** 디버깅 목적의 임시 파일(`*temp*`, `*_old.java`, `*.bak`)을 만들지 마라.
 - **죽은 코드 제거:** 안 쓰는 메서드나 변수는 주석으로 남기지 말고 삭제하라.
