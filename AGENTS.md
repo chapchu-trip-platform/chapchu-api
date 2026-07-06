@@ -33,6 +33,16 @@
 ### [Step 2] 동료 코드 보호 및 스코프 제한
 현재 사용자(나)가 지시한 과제와 직접적인 관련이 없는 동료의 코드를 '리팩토링' 명목으로 임의 수정하지 마라. 기존 퍼블릭 메서드 서명은 함부로 바꾸지 말고 안전하게 확장하라.
 
-## 5. 가비지 컬렉션 및 드리프트 방지 규칙 (Anti-Drift Protocol)
+## 5. 테스트 전략: TDD(Red-Green) + Spring REST Docs
+- **Red-Green TDD 필수:** 새 기능 구현 시 반드시 실패 테스트를 먼저 작성하고, 그 테스트를 통과하는 최소한의 구현을 해라.
+- **Controller는 `@WebMvcTest` + REST Docs 세트로 작성하라:** Controller를 구현하면 반드시 해당 엔드포인트의 MockMvc 테스트와 REST Docs 스니펫 생성 코드를 함께 작성해야 한다. 테스트 없이 Controller를 구현하지 마라.
+- **API 문서 동기화:** 새 엔드포인트 추가 시 `app/src/docs/asciidoc/index.adoc`에 해당 섹션과 스니펫 include를 추가하라.
+- **Swagger 금지:** SpringDoc, Swagger 등 프로덕션 코드에 어노테이션이 침투하는 문서 도구를 사용하지 마라.
+- **레이어별 테스트 분리:**
+  - Controller: `@WebMvcTest` (MockMvc + REST Docs 스니펫)
+  - Service: 순수 JUnit 5 + Mockito
+  - Repository: `@DataJpaTest`
+
+## 6. 가비지 컬렉션 및 드리프트 방지 규칙 (Anti-Drift Protocol)
 - **임시 파일 금지:** 디버깅 목적의 임시 파일(`*temp*`, `*_old.java`, `*.bak`)을 만들지 마라.
 - **죽은 코드 제거:** 안 쓰는 메서드나 변수는 주석으로 남기지 말고 삭제하라.
