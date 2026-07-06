@@ -1,0 +1,21 @@
+#!/bin/sh
+MEMORY_FILE=".harness/last_pull_summary.md"
+mkdir -p .harness
+echo "# 최근 Git Pull 변경 요약 ($(date '+%Y-%m-%d %H:%M:%S'))" > $MEMORY_FILE
+echo "AI 에이전트는 본 요약본을 참고하여 최근 업데이트된 아키텍처 맥락을 동기화하라." >> $MEMORY_FILE
+echo "" >> $MEMORY_FILE
+echo "## 1. 최근 병합된 커밋 목록 (Top 5)" >> $MEMORY_FILE
+echo "\`\`\`" >> $MEMORY_FILE
+git log -n 5 --oneline ORIG_HEAD..HEAD >> $MEMORY_FILE
+echo "\`\`\`" >> $MEMORY_FILE
+echo "" >> $MEMORY_FILE
+echo "## 2. 변경된 하네스 룰 및 지식 저장소 문서 (필독)" >> $MEMORY_FILE
+echo "\`\`\`" >> $MEMORY_FILE
+git diff --name-status ORIG_HEAD..HEAD | grep -E 'AGENTS\.md|docs/|config/|\.gradle' >> $MEMORY_FILE
+echo "\`\`\`" >> $MEMORY_FILE
+echo "" >> $MEMORY_FILE
+echo "## 3. 변경된 주요 Java 소스 및 테스트 파일" >> $MEMORY_FILE
+echo "\`\`\`" >> $MEMORY_FILE
+git diff --name-status ORIG_HEAD..HEAD | grep '\.java$' >> $MEMORY_FILE
+echo "\`\`\`" >> $MEMORY_FILE
+echo "[Harness Sync] 최근 변경 사항이 $MEMORY_FILE 에 기록되었습니다."

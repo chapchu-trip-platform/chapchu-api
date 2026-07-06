@@ -1,0 +1,9 @@
+dependencies {
+    implementation project(':module-common')
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+
+    // RAG 파이프라인 구현 시 활성화 (Spring AI BOM 버전 확인 후 추가)
+    // implementation 'org.springframework.ai:spring-ai-anthropic-spring-boot-starter'
+    // implementation 'org.springframework.ai:spring-ai-openai-spring-boot-starter'
+    // implementation 'org.springframework.ai:spring-ai-pgvector-store-spring-boot-starter'
+}

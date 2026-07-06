@@ -1,0 +1,85 @@
+plugins {
+    id 'com.github.spotbugs' version '6.0.0' apply false
+    id 'com.diffplug.spotless' version '6.25.0' apply false
+    id 'org.springframework.boot' version '3.4.5' apply false
+    id 'io.spring.dependency-management' version '1.1.7' apply false
+}
+
+allprojects {
+    group = 'com.pettrip'
+    version = '0.0.1-SNAPSHOT'
+    repositories { mavenCentral() }
+}
+
+subprojects {
+    apply plugin: 'java'
+    apply plugin: 'checkstyle'
+    apply plugin: 'pmd'
+    apply plugin: 'com.github.spotbugs'
+    apply plugin: 'com.diffplug.spotless'
+    apply plugin: 'io.spring.dependency-management'
+
+    java {
+        toolchain { languageVersion = JavaLanguageVersion.of(25) }
+    }
+
+    dependencyManagement {
+        imports {
+            mavenBom "org.springframework.boot:spring-boot-dependencies:3.4.5"
+            // mavenBom "org.springframework.ai:spring-ai-bom:1.0.0"  // RAG 구현 시 버전 확인 후 활성화
+            mavenBom "software.amazon.awssdk:bom:2.26.0"
+        }
+    }
+
+    dependencies {
+        compileOnly 'org.projectlombok:lombok'
+        annotationProcessor 'org.projectlombok:lombok'
+    }
+
+    checkstyle {
+        maxWarnings = 0
+        configFile = rootProject.file("config/checkstyle/checkstyle-rules.xml")
+    }
+
+    pmd {
+        consoleOutput = true
+        ruleSets = []
+        ruleSetFiles = rootProject.files("config/pmd/pmd-gc-rules.xml")
+        ignoreFailures = false
+    }
+
+    spotbugs {
+        toolVersion = '4.9.3'
+        ignoreFailures = false
+        reportLevel = 'high'
+        showProgress = true
+    }
+
+    spotless {
+        java {
+            googleJavaFormat('1.17.0')
+            removeUnusedImports()
+            trimTrailingWhitespace()
+            endWithNewline()
+        }
+    }
+
+    tasks.named('test') { useJUnitPlatform() }
+
+    tasks.withType(Checkstyle).configureEach {
+        if (name != 'checkstyleMain') enabled = false
+    }
+    tasks.withType(Pmd).configureEach {
+        if (name != 'pmdMain') enabled = false
+    }
+    tasks.withType(com.github.spotbugs.snom.SpotBugsTask).configureEach {
+        reports { xml.required = false; text.required = true; html.required = false }
+        if (name != 'spotbugsMain') enabled = false
+    }
+
+    configurations.named('spotbugs') {
+        resolutionStrategy.eachDependency { details ->
+            if (details.requested.group == 'org.ow2.asm') { details.useVersion '9.8' }
+        }
+    }
+}
