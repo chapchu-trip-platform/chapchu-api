@@ -40,6 +40,10 @@ subprojects {
         toolchain { languageVersion = JavaLanguageVersion.of(25) }
     }
 
+    tasks.withType(JavaCompile).configureEach {
+        options.compilerArgs << '-parameters'
+    }
+
     dependencyManagement {
         imports {
             mavenBom "org.springframework.boot:spring-boot-dependencies:3.4.5"
@@ -74,7 +78,7 @@ subprojects {
 
     spotless {
         java {
-            googleJavaFormat('1.17.0')
+            googleJavaFormat('1.35.0')
             removeUnusedImports()
             trimTrailingWhitespace()
             endWithNewline()
