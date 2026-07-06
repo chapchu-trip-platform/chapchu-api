@@ -1,3 +1,6 @@
+import java.time.LocalDate
+import java.time.temporal.IsoFields
+
 plugins {
     id 'com.github.spotbugs' version '6.0.0' apply false
     id 'com.diffplug.spotless' version '6.25.0' apply false
@@ -7,9 +10,21 @@ plugins {
     // HTML 생성은 CI에서 asciidoctor CLI 직접 실행
 }
 
+// HeadVer: {Head}.{YearWeek}.{Build}
+// Head    — 수동. 사용자 대상 릴리스 횟수. 배포 시 팀 합의 후 증가.
+// YearWeek — 자동. ISO 연도 2자리 + 주차 2자리 (예: 2627 = 2026년 27주)
+// Build   — 자동. CI 환경변수 BUILD_NUMBER 사용. 로컬 빌드는 0.
+// CI에서 HEAD_VER_HEAD 환경변수로 자동 주입. 로컬은 0 (버전 의미 없음)
+def headVerHead = System.getenv('HEAD_VER_HEAD') ? (System.getenv('HEAD_VER_HEAD') as int) : 0
+def now         = LocalDate.now()
+def yearWeek    = String.format('%02d%02d',
+        now.get(IsoFields.WEEK_BASED_YEAR) % 100,
+        now.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR))
+def buildNumber = System.getenv('BUILD_NUMBER') ?: '0'
+
 allprojects {
-    group = 'com.pettrip'
-    version = '0.0.1-SNAPSHOT'
+    group   = 'com.pettrip'
+    version = "${headVerHead}.${yearWeek}.${buildNumber}"
     repositories { mavenCentral() }
 }
 

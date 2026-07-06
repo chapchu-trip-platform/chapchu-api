@@ -1,0 +1,55 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  release:
+    name: HeadVer Tag & Build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 전체 태그 히스토리 필요 (Head 계산)
+
+      - name: Compute HeadVer Head
+        id: headver
+        run: |
+          # 기존 release/* 태그 수 + 1 = 이번 Head
+          EXISTING=$(git tag -l 'release/*' | wc -l | tr -d ' ')
+          HEAD=$((EXISTING + 1))
+          echo "head=$HEAD" >> $GITHUB_OUTPUT
+          echo "HeadVer Head: $HEAD (기존 릴리스 $EXISTING 회)"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build & verify
+        env:
+          HEAD_VER_HEAD: ${{ steps.headver.outputs.head }}
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: ./gradlew check bootJar
+
+      - name: Create release tag
+        env:
+          HEAD: ${{ steps.headver.outputs.head }}
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          # ISO YearWeek (연도 2자리 + 주차 2자리)
+          YEAR_WEEK=$(date -u +%g%V)
+          VERSION="${HEAD}.${YEAR_WEEK}.${BUILD_NUMBER}"
+          echo "Tagging release/${VERSION}"
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "release/${VERSION}"
+          git push origin "release/${VERSION}"

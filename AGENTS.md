@@ -70,6 +70,14 @@
   - Service: 순수 JUnit 5 + Mockito
   - Repository: `@DataJpaTest`
 
-## 10. 가비지 컬렉션 및 드리프트 방지 규칙 (Anti-Drift Protocol)
+## 10. DB 스키마 버전 관리 (Flyway)
+- 스키마 변경 시 반드시 새 Flyway 마이그레이션 파일을 생성하라. DDL을 직접 DB에서 실행하지 마라.
+- 파일 위치: `app/src/main/resources/db/migration/`
+- 파일명 형식: `V{n}__{snake_case_설명}.sql` (예: `V2__add_user_profile_image.sql`)
+- **기존 마이그레이션 파일을 절대 수정하지 마라.** Flyway는 체크섬으로 변조를 감지해 서버 기동을 막는다.
+- `docs/schema/init.sql`은 전체 스키마 참고용 스냅샷이다. 마이그레이션 파일과 별개로 함께 최신 상태로 유지하라.
+- `ddl-auto`는 항상 `validate`로 유지하라. `create`, `update`는 금지.
+
+## 11. 가비지 컬렉션 및 드리프트 방지 규칙 (Anti-Drift Protocol)
 - **임시 파일 금지:** 디버깅 목적의 임시 파일(`*temp*`, `*_old.java`, `*.bak`)을 만들지 마라.
 - **죽은 코드 제거:** 안 쓰는 메서드나 변수는 주석으로 남기지 말고 삭제하라.
