@@ -1,0 +1,10 @@
+rootProject.name = 'chapchu'
+
+include 'app'
+include 'module-common'
+include 'module-user'
+include 'module-place'
+include 'module-trip'
+include 'module-album'
+include 'module-review'
+include 'module-recommendation'

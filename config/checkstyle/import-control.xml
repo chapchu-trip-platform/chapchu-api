@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<!DOCTYPE import-control PUBLIC "-//Checkstyle//DTD ImportControl 1.4//EN" "https://checkstyle.org/dtds/import_control_1_4.dtd">
+<import-control pkg="com.pettrip">
+    <!-- allow 먼저, catch-all disallow 마지막 (first match wins) -->
+    <allow pkg="java"/>
+    <allow pkg="javax"/>
+    <allow pkg="jakarta"/>
+    <allow pkg="org.springframework"/>
+    <allow pkg="com.pettrip"/>
+    <allow pkg="com.github.f4b6a3"/>
+    <allow pkg="software.amazon"/>
+    <allow pkg="io.awspring"/>
+    <disallow pkg=".*" regex="true"/>
+    <!--
+        도메인-중심 패키지 구조: com.pettrip.{domain}.{layer}
+        예) com.pettrip.user.controller.UserController
+        regex="true" 로 임의의 도메인명에 모두 적용
+    -->
+    <subpackage name=".*" regex="true">
+        <subpackage name="controller">
+            <allow pkg="com.pettrip"/>
+        </subpackage>
+        <subpackage name="service">
+            <allow pkg="com.pettrip"/>
+        </subpackage>
+        <subpackage name="repository">
+            <allow pkg="com.pettrip"/>
+        </subpackage>
+        <!-- model: 외부 레이어 참조 금지 (부모의 disallow 상속, 추가 규칙 없음) -->
+    </subpackage>
+</import-control>
