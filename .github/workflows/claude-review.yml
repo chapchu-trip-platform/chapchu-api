@@ -84,28 +84,37 @@ jobs:
 
             ## 절차
             1. `/tmp/review.md` 읽기
-            2. 🔴 항목에 해당하는 코드 파일 수정
-            3. 수정 완료 후 git commit (메시지: `fix: Claude 리뷰 필수수정 반영`)
-            4. `git push origin $(cat /tmp/fix_branch.txt)`
+            2. 🔴 항목에 해당하는 코드 파일 Edit/Write 도구로 수정
+            3. 수정한 파일 목록을 `/tmp/changed_files.txt`에 한 줄씩 저장
 
+            git commit, git push, gh 명령은 실행하지 마라. 파일 수정만 하라.
             수정 범위: 🔴 필수수정 항목만. 🟡 권장은 건드리지 않는다.
 
-      - name: Open fix PR
+      - name: Commit and open fix PR
         if: steps.post-review.outputs.has_critical == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if [ -f /tmp/fix_branch.txt ]; then
-            FIX_BRANCH=$(cat /tmp/fix_branch.txt)
-            BASE_BRANCH="${{ github.event.pull_request.head.ref }}"
-            gh pr create \
-              --repo ${{ github.repository }} \
-              --head "$FIX_BRANCH" \
-              --base "$BASE_BRANCH" \
-              --title "fix: Claude 리뷰 필수수정 반영 (PR #${{ github.event.pull_request.number }})" \
-              --body "PR #${{ github.event.pull_request.number }} 리뷰에서 발견된 🔴 필수수정 항목을 자동으로 수정한 PR입니다.
+          FIX_BRANCH=$(cat /tmp/fix_branch.txt 2>/dev/null || echo "")
+          if [ -z "$FIX_BRANCH" ]; then exit 0; fi
 
-            원본 리뷰 내용은 PR #${{ github.event.pull_request.number }} 코멘트를 확인하세요.
-
-            > ⚠️ 자동 생성된 PR입니다. 머지 전 반드시 내용을 확인하세요."
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
           fi
+
+          git commit -m "fix: Claude 리뷰 필수수정 반영"
+          git push origin "$FIX_BRANCH"
+
+          BASE_BRANCH="${{ github.event.pull_request.head.ref }}"
+          gh pr create \
+            --repo ${{ github.repository }} \
+            --head "$FIX_BRANCH" \
+            --base "$BASE_BRANCH" \
+            --title "fix: Claude 리뷰 필수수정 반영 (PR #${{ github.event.pull_request.number }})" \
+            --body "PR #${{ github.event.pull_request.number }} 리뷰에서 발견된 🔴 필수수정 항목 자동 수정.
+
+          원본 리뷰: PR #${{ github.event.pull_request.number }} 코멘트 참고.
+
+          > ⚠️ 자동 생성 PR입니다. 머지 전 내용을 확인하세요."
