@@ -82,9 +82,8 @@
 - **임시 파일 금지:** 디버깅 목적의 임시 파일(`*temp*`, `*_old.java`, `*.bak`)을 만들지 마라.
 - **죽은 코드 제거:** 안 쓰는 메서드나 변수는 주석으로 남기지 말고 삭제하라.
 
-## 12. Claude AI 자동 리뷰 및 Fix PR 파이프라인  <!-- docs/decisions/013 -->
+## 12. Claude AI 자동 PR 리뷰 파이프라인  <!-- docs/decisions/013 -->
 - **리뷰 결과 저장:** PR 리뷰 결과는 `/tmp/review.md`에 Write 도구로 저장하라. `gh pr comment` 직접 실행 금지.
-- **필수수정 시그널:** 🔴 필수수정 항목 있으면 `/tmp/has_critical.txt`에 "true" 저장하라.
-- **Fix PR 브랜치명:** `fix/claude-{pr번호}-{timestamp}` 형식.
-- **루프 방지:** `fix/claude-*` 브랜치 PR은 자동 리뷰 대상에서 제외된다. 이 브랜치로 PR 작성 시 리뷰 워크플로우가 트리거되지 않는다.
-- **보안 원칙:** Claude는 분석·파일저장만 담당. GitHub 게시(코멘트/PR 생성)는 항상 별도 shell 스텝이 담당.
+- **보안 원칙:** Claude는 분석·파일저장만 담당. GitHub 게시(코멘트)는 항상 별도 shell 스텝이 담당.
+- **🔴 필수수정 발견 시:** Actions 코멘트에 내용이 게시된다. 개발자가 이 Claude Code 세션에서 "PR #N 리뷰 반영해줘"로 요청하면 직접 수정·커밋한다.
+- **자동 fix PR 없음:** CI에서 자동으로 수정 커밋을 생성하지 않는다. 수정은 항상 개발자가 Claude Code CLI를 통해 직접 수행한다.
