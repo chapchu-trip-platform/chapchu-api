@@ -1,0 +1,31 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:test
+    username: sa
+    password:
+  flyway:
+    enabled: false
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:9000
+  ai:
+    anthropic:
+      api-key: test
+    openai:
+      api-key: test
+  cloud:
+    aws:
+      region:
+        static: ap-northeast-2
+      credentials:
+        access-key: test
+        secret-key: test
+
+app:
+  s3:
+    bucket: test-bucket
