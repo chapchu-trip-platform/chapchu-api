@@ -57,6 +57,26 @@ include::{snippets}/user-update-me/request-fields.adoc[]
 include::{snippets}/user-update-me/http-response.adoc[]
 include::{snippets}/user-update-me/response-fields.adoc[]
 
+=== 선호 사항 조회
+
+include::{snippets}/user-preferences-get/http-request.adoc[]
+include::{snippets}/user-preferences-get/http-response.adoc[]
+include::{snippets}/user-preferences-get/response-fields.adoc[]
+
+=== 선호 사항 등록
+
+include::{snippets}/user-preferences-register/http-request.adoc[]
+include::{snippets}/user-preferences-register/request-fields.adoc[]
+include::{snippets}/user-preferences-register/http-response.adoc[]
+include::{snippets}/user-preferences-register/response-fields.adoc[]
+
+=== 선호 사항 수정
+
+include::{snippets}/user-preferences-update/http-request.adoc[]
+include::{snippets}/user-preferences-update/request-fields.adoc[]
+include::{snippets}/user-preferences-update/http-response.adoc[]
+include::{snippets}/user-preferences-update/response-fields.adoc[]
+
 == 반려동물 API
 
 === 반려견 목록 조회
