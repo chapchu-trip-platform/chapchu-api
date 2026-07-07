@@ -21,17 +21,14 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          show_full_output: "true"
           claude_args: "--dangerously-skip-permissions"
           prompt: |
-            이것은 비대화형(non-interactive) 자동화 CI 리뷰다. 확인을 묻지 말고 아래 절차를 즉시 실행하라.
+            PR #${{ github.event.pull_request.number }} 하네스 엔지니어링 리뷰를 수행하고 결과를 /tmp/review.md 파일에 저장하라.
 
-            ## 절차 (순서대로 실행)
+            ## 절차
             1. `gh pr diff ${{ github.event.pull_request.number }} --repo ${{ github.repository }}` 로 diff 가져오기
             2. `docs/decisions/`, `docs/failures/`, `AGENTS.md` 읽기
-            3. 아래 하네스 기준으로 리뷰 작성
-            4. 리뷰 완료 즉시 아래 명령으로 PR에 코멘트 게시:
-               `gh pr comment ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --body "리뷰내용"`
+            3. 리뷰 작성 후 Write 도구로 `/tmp/review.md`에 저장
 
             ## 리뷰 기준
             1. **레이어 규칙**: Controller → Service → Repository → Model 단방향 의존성 위반
@@ -41,8 +38,17 @@ jobs:
             5. **Flyway**: 기존 마이그레이션 파일 수정 절대 금지
             6. **코드 품질**: 버그 가능성, 예외 처리, 성능
 
-            ## 코멘트 형식
+            ## 출력 형식 (한국어)
             - 심각도: 🔴 필수수정 / 🟡 권장 / 🟢 참고
-            - 전체 요약 한 번 + 항목별 상세
+            - 전체 요약 + 항목별 상세
 
-            확인을 묻거나 중간에 멈추지 말고 코멘트 게시까지 완료하라.
+      - name: Post review comment
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -f /tmp/review.md ]; then
+            gh pr comment ${{ github.event.pull_request.number }} \
+              --repo ${{ github.repository }} \
+              --body-file /tmp/review.md
+          fi
