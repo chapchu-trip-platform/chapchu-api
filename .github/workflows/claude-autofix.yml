@@ -1,0 +1,74 @@
+name: Claude Auto Fix
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+jobs:
+  auto-fix:
+    if: github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: read
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_branch }}
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Get failed job logs
+        id: get-logs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          LOGS=$(gh run view ${{ github.event.workflow_run.id }} --log-failed 2>&1 | head -300)
+          echo "logs<<LOGEOF" >> $GITHUB_OUTPUT
+          echo "$LOGS" >> $GITHUB_OUTPUT
+          echo "LOGEOF" >> $GITHUB_OUTPUT
+
+      - name: Find associated PR number
+        id: find-pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR=$(gh pr list --json number,headRefName \
+            --jq ".[] | select(.headRefName == \"${{ github.event.workflow_run.head_branch }}\") | .number" \
+            | head -1)
+          echo "number=$PR" >> $GITHUB_OUTPUT
+
+      - uses: anthropics/claude-code-action@beta
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          pr_number: ${{ steps.find-pr.outputs.number }}
+          direct_prompt: |
+            CI 하네스 체크가 실패했어. 아래 에러 로그를 분석해서 원인을 파악하고 코드를 수정한 뒤 커밋해줘.
+
+            ## 에러 로그
+            ${{ steps.get-logs.outputs.logs }}
+
+            ## 수정 기준
+            - **Spotless**: 포맷 오류 → `./gradlew spotlessApply` 후 변경사항 커밋
+            - **Checkstyle**: import 순서, 스타일 규칙 위반 → 직접 수정
+            - **PMD**: 미사용 변수·메서드·파라미터 → 제거
+            - **SpotBugs**: 버그 패턴 → 코드 수정
+            - **ArchUnit**: 레이어 의존성 방향 위반 → 올바른 레이어로 이동
+
+            ## 주의사항
+            - 수정 후 반드시 커밋까지 완료할 것
+            - 커밋 메시지: `fix: CI 하네스 체크 오류 수정`
+            - 레이어 규칙: Controller → Service → Repository → Model 단방향만 허용
+            - PK: @GeneratedValue 금지, UUID.randomUUID() 금지, BaseEntity 상속 필수
