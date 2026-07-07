@@ -105,6 +105,22 @@ include::{snippets}/pet-delete/http-request.adoc[]
 include::{snippets}/pet-delete/path-parameters.adoc[]
 include::{snippets}/pet-delete/http-response.adoc[]
 
+== 사진 API
+
+=== 사진 업로드 URL 발급
+
+include::{snippets}/photo-upload-url/http-request.adoc[]
+include::{snippets}/photo-upload-url/request-fields.adoc[]
+include::{snippets}/photo-upload-url/http-response.adoc[]
+include::{snippets}/photo-upload-url/response-fields.adoc[]
+
+=== 사진 저장
+
+include::{snippets}/photo-create/http-request.adoc[]
+include::{snippets}/photo-create/request-fields.adoc[]
+include::{snippets}/photo-create/http-response.adoc[]
+include::{snippets}/photo-create/response-fields.adoc[]
+
 == 장소 API
 
 == 여행 API
