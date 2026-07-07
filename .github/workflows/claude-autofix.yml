@@ -13,7 +13,6 @@ jobs:
       contents: write
       pull-requests: write
       actions: read
-      id-token: write
 
     steps:
       - uses: actions/checkout@v4
@@ -50,23 +49,47 @@ jobs:
             | head -1)
           echo "number=$PR" >> $GITHUB_OUTPUT
 
-      - uses: anthropics/claude-code-action@v1
-        with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          prompt: |
-            CI 하네스 체크가 실패했어. 아래 에러 로그를 분석해서 원인을 파악하고 코드를 수정한 뒤 커밋해줘.
+      - name: Claude Auto Fix
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LOGS: ${{ steps.get-logs.outputs.logs }}
+          PR_NUMBER: ${{ steps.find-pr.outputs.number }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          PAYLOAD=$(jq -n \
+            --arg logs "$LOGS" \
+            '{
+              model: "claude-sonnet-4-6",
+              max_tokens: 8096,
+              messages: [{
+                role: "user",
+                content: ("CI 하네스 체크가 실패했어. 에러 로그를 분석해서 어떤 파일의 몇 번째 줄을 어떻게 수정해야 하는지 정확히 알려줘.\n\n## 에러 로그\n" + $logs + "\n\n## 수정 기준\n- Spotless: 포맷 오류\n- Checkstyle: import 순서, 스타일 규칙\n- PMD: 미사용 변수·메서드\n- SpotBugs: 버그 패턴\n- ArchUnit: 레이어 의존성 위반\n\n응답 형식: 수정할 파일 경로와 구체적인 변경 내용만 출력")
+              }]
+            }')
 
-            ## 에러 로그
-            ${{ steps.get-logs.outputs.logs }}
+          ANALYSIS=$(curl -sf https://api.anthropic.com/v1/messages \
+            -H "x-api-key: $ANTHROPIC_API_KEY" \
+            -H "anthropic-version: 2023-06-01" \
+            -H "content-type: application/json" \
+            -d "$PAYLOAD" | jq -r '.content[0].text // "분석 실패"')
 
-            ## 수정 기준
-            - **Spotless**: 포맷 오류 → `./gradlew spotlessApply` 후 변경사항 커밋
-            - **Checkstyle**: import 순서, 스타일 규칙 위반 → 직접 수정
-            - **PMD**: 미사용 변수·메서드·파라미터 → 제거
-            - **SpotBugs**: 버그 패턴 → 코드 수정
-            - **ArchUnit**: 레이어 의존성 방향 위반 → 올바른 레이어로 이동
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
-            수정 후 반드시 커밋까지 완료할 것.
-            커밋 메시지: `fix: CI 하네스 체크 오류 수정`
-            레이어 규칙: Controller → Service → Repository → Model 단방향만 허용
-            PK: @GeneratedValue 금지, UUID.randomUUID() 금지, BaseEntity 상속 필수
+          ./gradlew spotlessApply 2>/dev/null || true
+
+          if [[ -n $(git status --porcelain) ]]; then
+            git add -A
+            git commit -m "fix: CI 하네스 체크 오류 자동 수정 (Spotless)"
+            git push origin $BRANCH
+          fi
+
+          if [[ -n "$PR_NUMBER" ]]; then
+            gh pr comment $PR_NUMBER --body "## 🤖 Claude Auto Fix
+
+          ### 분석 결과
+          $ANALYSIS
+
+          Spotless 포맷 오류는 자동 수정 후 커밋했어. 그 외 오류는 위 분석 내용을 참고해서 수정해줘."
+          fi

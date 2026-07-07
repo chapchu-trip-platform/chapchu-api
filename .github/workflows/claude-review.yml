@@ -11,31 +11,41 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-      id-token: write
 
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
-      - uses: anthropics/claude-code-action@v1
-        with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          prompt: |
-            REPO: ${{ github.repository }}
-            PR NUMBER: ${{ github.event.pull_request.number }}
+      - name: Claude Code Review
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          DIFF=$(gh pr diff $PR_NUMBER --patch 2>/dev/null | head -500)
 
-            이 PR의 변경된 코드를 아래 하네스 엔지니어링 기준으로 리뷰해줘. 한국어로 작성해.
+          PAYLOAD=$(jq -n \
+            --arg diff "$DIFF" \
+            --arg pr "$PR_NUMBER" \
+            '{
+              model: "claude-sonnet-4-6",
+              max_tokens: 4096,
+              messages: [{
+                role: "user",
+                content: ("PR #" + $pr + " 변경된 코드를 아래 하네스 엔지니어링 기준으로 리뷰해줘. 한국어로 작성해.\n\n## 필수 체크 항목\n1. 레이어 규칙: Controller → Service → Repository → Model 단방향 위반 여부\n2. 패키지 위치: com.pettrip.{domain}.{controller|service|repository|model}\n3. PK 정책: @GeneratedValue 금지, UUID.randomUUID() 금지, BaseEntity 상속 필수\n4. TDD: Controller 추가 시 @WebMvcTest + REST Docs 스니펫 여부\n5. Flyway: 기존 마이그레이션 파일 수정 금지\n6. 코드 품질: 버그, 예외 처리 누락, 성능 이슈\n\n## 리뷰 방식\n- 심각도: 🔴 필수수정 / 🟡 권장 / 🟢 참고\n- 문제 없으면 ✅ LGTM 한 줄로\n\n## PR Diff\n" + $diff)
+              }]
+            }')
 
-            ## 필수 체크 항목
-            1. **레이어 규칙**: Controller → Service → Repository → Model 단방향 의존성 위반 여부
-            2. **패키지 위치**: com.pettrip.{domain}.{controller|service|repository|model} 준수 여부
-            3. **PK 정책**: @GeneratedValue 사용 금지, UUID.randomUUID() 사용 금지, BaseEntity 상속 여부
-            4. **TDD**: Controller 추가 시 @WebMvcTest 테스트 + REST Docs 스니펫 여부
-            5. **Flyway**: 기존 마이그레이션 파일 수정 여부 (절대 금지)
-            6. **일반 코드 품질**: 버그 가능성, 예외 처리 누락, 성능 이슈
+          RESPONSE=$(curl -sf https://api.anthropic.com/v1/messages \
+            -H "x-api-key: $ANTHROPIC_API_KEY" \
+            -H "anthropic-version: 2023-06-01" \
+            -H "content-type: application/json" \
+            -d "$PAYLOAD")
 
-            ## 리뷰 방식
-            - 문제 있는 코드 라인에 인라인 코멘트
-            - 심각도: 🔴 필수수정 / 🟡 권장 / 🟢 참고
-            - 전체 요약은 PR 상단 코멘트로 한 번만
+          REVIEW=$(echo "$RESPONSE" | jq -r '.content[0].text // "리뷰 생성 실패"')
+
+          gh pr comment $PR_NUMBER --body "## 🤖 Claude 코드 리뷰
+
+          $REVIEW"
