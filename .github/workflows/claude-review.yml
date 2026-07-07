@@ -26,20 +26,9 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           claude_args: "--dangerously-skip-permissions"
           prompt: |
-            다음 명령을 순서대로 실행하라. 파일 읽기는 하지 마라.
-
-            1. Bash 도구로 아래 명령 실행하여 diff 가져오기:
-               gh pr diff ${{ github.event.pull_request.number }} --repo ${{ github.repository }}
-
-            2. diff에서 변경된 파일만 아래 6가지 규칙으로 체크:
-               R1. 레이어: Controller→Service→Repository 단방향만 허용
-               R2. 패키지: com.pettrip.{domain}.{controller|service|repository|model} 4종만
-               R3. PK: @GeneratedValue·UUID.randomUUID() 금지, BaseEntity 상속 필수
-               R4. TDD: Controller 추가 시 @WebMvcTest 테스트 없으면 위반
-               R5. Flyway: 기존 V{n}__*.sql 수정 금지
-               R6. 품질: NullPointer 위험·예외 미처리·명백한 버그
-
-            3. 결과를 Write 도구로 `/tmp/review.md`에 저장 (형식: 🔴필수수정/🟡권장/🟢참고)
+            1. `gh pr diff ${{ github.event.pull_request.number }} --repo ${{ github.repository }}` 실행
+            2. diff를 코드 리뷰하라 — 로직 버그, 예외 처리 누락, 잠재적 NPE, 성능 문제 위주
+            3. 결과를 Write 도구로 `/tmp/review.md`에 저장 (🔴필수수정/🟡권장/🟢참고)
             4. 🔴 항목 있으면 `/tmp/has_critical.txt`에 "true" 저장
 
       - name: Post review comment
