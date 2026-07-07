@@ -50,14 +50,10 @@ jobs:
             | head -1)
           echo "number=$PR" >> $GITHUB_OUTPUT
 
-      - uses: anthropics/claude-code-action@beta
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      - uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          pr_number: ${{ steps.find-pr.outputs.number }}
-          direct_prompt: |
+          prompt: |
             CI 하네스 체크가 실패했어. 아래 에러 로그를 분석해서 원인을 파악하고 코드를 수정한 뒤 커밋해줘.
 
             ## 에러 로그
@@ -70,8 +66,10 @@ jobs:
             - **SpotBugs**: 버그 패턴 → 코드 수정
             - **ArchUnit**: 레이어 의존성 방향 위반 → 올바른 레이어로 이동
 
-            ## 주의사항
-            - 수정 후 반드시 커밋까지 완료할 것
-            - 커밋 메시지: `fix: CI 하네스 체크 오류 수정`
-            - 레이어 규칙: Controller → Service → Repository → Model 단방향만 허용
-            - PK: @GeneratedValue 금지, UUID.randomUUID() 금지, BaseEntity 상속 필수
+            수정 후 반드시 커밋까지 완료할 것.
+            커밋 메시지: `fix: CI 하네스 체크 오류 수정`
+            레이어 규칙: Controller → Service → Repository → Model 단방향만 허용
+            PK: @GeneratedValue 금지, UUID.randomUUID() 금지, BaseEntity 상속 필수
+
+          claude_args: |
+            --allowedTools "Bash(./gradlew:*),Bash(git:*),Edit,Write,Read"
