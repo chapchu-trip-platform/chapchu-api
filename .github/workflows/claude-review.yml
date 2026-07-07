@@ -89,6 +89,7 @@ jobs:
 
             git commit, git push, gh 명령은 실행하지 마라. 파일 수정만 하라.
             수정 범위: 🔴 필수수정 항목만. 🟡 권장은 건드리지 않는다.
+            `.github/workflows/` 파일은 절대 수정하지 마라 (push 권한 없음).
 
       - name: Commit and open fix PR
         if: steps.post-review.outputs.has_critical == 'true'
