@@ -7,17 +7,15 @@ on:
 
 jobs:
   review:
-    # fix/claude-* 브랜치는 Claude가 만든 수정 PR — 재리뷰 루프 방지
-    if: "!startsWith(github.event.pull_request.head.ref, 'fix/claude-')"
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
       pull-requests: write
 
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
       - uses: anthropics/claude-code-action@v1
         with:
@@ -31,7 +29,6 @@ jobs:
             1. `gh pr diff ${{ github.event.pull_request.number }} --repo ${{ github.repository }}` 로 diff 가져오기
             2. `docs/decisions/`, `docs/failures/`, `AGENTS.md` 읽기
             3. 리뷰 작성 후 Write 도구로 `/tmp/review.md`에 저장
-            4. 🔴 필수수정 항목이 있으면 `/tmp/has_critical.txt` 파일에 "true" 저장, 없으면 저장하지 않음
 
             ## 리뷰 기준
             1. **레이어 규칙**: Controller → Service → Repository → Model 단방향 의존성 위반
@@ -46,7 +43,6 @@ jobs:
             - 전체 요약 + 항목별 상세
 
       - name: Post review comment
-        id: post-review
         if: always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -56,66 +52,3 @@ jobs:
               --repo ${{ github.repository }} \
               --body-file /tmp/review.md
           fi
-          if [ -f /tmp/has_critical.txt ]; then
-            echo "has_critical=true" >> $GITHUB_OUTPUT
-          else
-            echo "has_critical=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Auto-fix critical issues
-        if: steps.post-review.outputs.has_critical == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          FIX_BRANCH="fix/claude-${{ github.event.pull_request.number }}-$(date +%s)"
-          git config user.name "claude[bot]"
-          git config user.email "claude[bot]@users.noreply.github.com"
-          git checkout -b "$FIX_BRANCH" origin/${{ github.event.pull_request.head.ref }}
-          echo "$FIX_BRANCH" > /tmp/fix_branch.txt
-
-      - uses: anthropics/claude-code-action@v1
-        if: steps.post-review.outputs.has_critical == 'true'
-        with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          claude_args: "--dangerously-skip-permissions"
-          prompt: |
-            `/tmp/review.md`에 기록된 🔴 필수수정 항목들을 코드에서 직접 수정하라.
-
-            ## 절차
-            1. `/tmp/review.md` 읽기
-            2. 🔴 항목에 해당하는 코드 파일 Edit/Write 도구로 수정
-            3. 수정한 파일 목록을 `/tmp/changed_files.txt`에 한 줄씩 저장
-
-            git commit, git push, gh 명령은 실행하지 마라. 파일 수정만 하라.
-            수정 범위: 🔴 필수수정 항목만. 🟡 권장은 건드리지 않는다.
-            `.github/workflows/` 파일은 절대 수정하지 마라 (push 권한 없음).
-
-      - name: Commit and open fix PR
-        if: steps.post-review.outputs.has_critical == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          FIX_BRANCH=$(cat /tmp/fix_branch.txt 2>/dev/null || echo "")
-          if [ -z "$FIX_BRANCH" ]; then exit 0; fi
-
-          git add -A
-          if git diff --cached --quiet; then
-            echo "No changes to commit"
-            exit 0
-          fi
-
-          git commit -m "fix: Claude 리뷰 필수수정 반영"
-          git push origin "$FIX_BRANCH"
-
-          BASE_BRANCH="${{ github.event.pull_request.head.ref }}"
-          gh pr create \
-            --repo ${{ github.repository }} \
-            --head "$FIX_BRANCH" \
-            --base "$BASE_BRANCH" \
-            --title "fix: Claude 리뷰 필수수정 반영 (PR #${{ github.event.pull_request.number }})" \
-            --body "PR #${{ github.event.pull_request.number }} 리뷰에서 발견된 🔴 필수수정 항목 자동 수정.
-
-          원본 리뷰: PR #${{ github.event.pull_request.number }} 코멘트 참고.
-
-          > ⚠️ 자동 생성 PR입니다. 머지 전 내용을 확인하세요."
