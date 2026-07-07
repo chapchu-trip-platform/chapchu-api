@@ -70,6 +70,3 @@ jobs:
             커밋 메시지: `fix: CI 하네스 체크 오류 수정`
             레이어 규칙: Controller → Service → Repository → Model 단방향만 허용
             PK: @GeneratedValue 금지, UUID.randomUUID() 금지, BaseEntity 상속 필수
-
-          claude_args: |
-            --allowedTools "Bash(./gradlew:*),Bash(git:*),Edit,Write,Read"
