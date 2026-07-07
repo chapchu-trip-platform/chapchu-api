@@ -51,7 +51,7 @@ jobs:
 
       - uses: anthropics/claude-code-action@v1
         with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           prompt: |
             CI 하네스 체크가 실패했어. 아래 에러 로그를 분석해서 원인을 파악하고 코드를 수정한 뒤 커밋해줘.
