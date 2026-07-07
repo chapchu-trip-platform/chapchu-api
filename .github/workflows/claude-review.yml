@@ -1,0 +1,36 @@
+name: Claude PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main, dev]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: anthropics/claude-code-action@beta
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          direct_prompt: |
+            이 PR의 변경된 코드를 아래 기준으로 리뷰해줘. 한국어로 작성해.
+
+            ## 체크 항목
+            1. **레이어 규칙**: Controller → Service → Repository → Model 단방향 의존성 위반 여부
+            2. **패키지 위치**: com.pettrip.{domain}.{controller|service|repository|model} 준수 여부
+            3. **PK 정책**: @GeneratedValue 사용 금지, UUID.randomUUID() 사용 금지, BaseEntity 상속 여부
+            4. **TDD**: Controller에 @WebMvcTest 테스트 + REST Docs 스니펫 작성 여부
+            5. **Flyway**: 기존 마이그레이션 파일 수정 여부 (절대 금지)
+            6. **일반 코드 품질**: 버그 가능성, 예외 처리 누락, 성능 이슈
+
+            ## 리뷰 방식
+            - 문제가 있으면 해당 코드 라인에 직접 코멘트
+            - 심각도 표시: 🔴 필수수정 / 🟡 권장 / 🟢 참고
+            - 전체 요약은 마지막에 한 번만
