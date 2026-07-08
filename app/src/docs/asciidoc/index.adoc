@@ -77,6 +77,16 @@ include::{snippets}/user-preferences-update/request-fields.adoc[]
 include::{snippets}/user-preferences-update/http-response.adoc[]
 include::{snippets}/user-preferences-update/response-fields.adoc[]
 
+=== 작성한 게시글 조회
+
+include::{snippets}/my-post-list/http-request.adoc[]
+include::{snippets}/my-post-list/http-response.adoc[]
+
+=== 북마크한 게시글 조회
+
+include::{snippets}/my-bookmark-list/http-request.adoc[]
+include::{snippets}/my-bookmark-list/http-response.adoc[]
+
 == 반려동물 API
 
 === 반려견 목록 조회
