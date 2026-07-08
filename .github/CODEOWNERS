@@ -1,0 +1,9 @@
+# 하네스 핵심 파일 — @JBumLee 승인 없이 머지 불가
+AGENTS.md                    @JBumLee
+CLAUDE.md                    @JBumLee
+docs/decisions/              @JBumLee
+docs/failures/               @JBumLee
+config/checkstyle/           @JBumLee
+config/pmd/                  @JBumLee
+.github/workflows/           @JBumLee
+.github/CODEOWNERS           @JBumLee

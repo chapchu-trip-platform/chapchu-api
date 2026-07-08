@@ -61,7 +61,9 @@ class DriftPreventionTest {
     List<String> missingFiles = new ArrayList<>();
     while (matcher.find()) {
       String filePath = matcher.group(1);
-      if (filePath.contains("/") && !Files.exists(ROOT_DIR.resolve(filePath))) {
+      if (filePath.contains("/")
+          && !filePath.startsWith("/")
+          && !Files.exists(ROOT_DIR.resolve(filePath))) {
         missingFiles.add(filePath);
       }
     }

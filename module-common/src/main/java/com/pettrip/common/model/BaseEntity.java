@@ -28,4 +28,12 @@ public abstract class BaseEntity {
   public UUID getId() {
     return id;
   }
+
+  public LocalDateTime getCreatedAt() {
+    return createdAt;
+  }
+
+  public LocalDateTime getUpdatedAt() {
+    return updatedAt;
+  }
 }
