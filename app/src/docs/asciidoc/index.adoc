@@ -195,4 +195,18 @@ include::{snippets}/post-report-create/path-parameters.adoc[]
 include::{snippets}/post-report-create/request-fields.adoc[]
 include::{snippets}/post-report-create/http-response.adoc[]
 
+=== 댓글 작성
+
+include::{snippets}/comment-create/http-request.adoc[]
+include::{snippets}/comment-create/path-parameters.adoc[]
+include::{snippets}/comment-create/request-fields.adoc[]
+include::{snippets}/comment-create/http-response.adoc[]
+include::{snippets}/comment-create/response-fields.adoc[]
+
+=== 댓글 삭제
+
+include::{snippets}/comment-delete/http-request.adoc[]
+include::{snippets}/comment-delete/path-parameters.adoc[]
+include::{snippets}/comment-delete/http-response.adoc[]
+
 == 추천 API
