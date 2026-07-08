@@ -123,6 +123,28 @@ include::{snippets}/photo-create/response-fields.adoc[]
 
 == 장소 API
 
+=== 장소 상세 조회
+
+include::{snippets}/place-get/http-request.adoc[]
+include::{snippets}/place-get/path-parameters.adoc[]
+include::{snippets}/place-get/http-response.adoc[]
+include::{snippets}/place-get/response-fields.adoc[]
+
+=== 장소 등록 (외부 API 데이터 저장)
+
+include::{snippets}/place-register/http-request.adoc[]
+include::{snippets}/place-register/request-fields.adoc[]
+include::{snippets}/place-register/http-response.adoc[]
+include::{snippets}/place-register/response-fields.adoc[]
+
+=== 반려동물 정책 등록/수정
+
+include::{snippets}/place-policy-upsert/http-request.adoc[]
+include::{snippets}/place-policy-upsert/path-parameters.adoc[]
+include::{snippets}/place-policy-upsert/request-fields.adoc[]
+include::{snippets}/place-policy-upsert/http-response.adoc[]
+include::{snippets}/place-policy-upsert/response-fields.adoc[]
+
 == 여행 API
 
 == 앨범 API
