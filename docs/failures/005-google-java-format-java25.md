@@ -19,3 +19,6 @@ Java 25 툴체인(JAVA_HOME)에서 `./gradlew spotlessApply` 실행 시 `:app:sp
 - `googleJavaFormat` 버전을 1.17.0 등 구버전으로 되돌리지 마라.
 - google-java-format/spotless 관련 빌드 실패 시, 먼저 Java 버전과 내부 컴파일러 API 비호환 가능성을 의심하고 최신 버전 업그레이드부터 시도하라.
 - Spotless Gradle 플러그인 자체(`com.diffplug.spotless` 6.25.0)도 향후 Java 26+ 대응 문제가 생기면 최신 버전 확인 후 상향하라.
+
+## 관련 문서
+- 동일 증상에 대한 대안(버전 다운그레이드 + JVM `--add-exports`/`--add-opens`) 시도 기록: [[011-spotless-googlejavaformat-java25-jvm-args]]. 현재 `build.gradle`은 본 문서의 1.35.0 상향안이 적용되어 있다.
