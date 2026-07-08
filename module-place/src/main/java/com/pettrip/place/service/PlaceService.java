@@ -7,7 +7,7 @@ import com.pettrip.place.model.PlacePetPolicy;
 import com.pettrip.place.repository.PlacePetPolicyRepository;
 import com.pettrip.place.repository.PlaceRepository;
 import java.math.BigDecimal;
-import java.util.UUID;
+import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,11 +16,15 @@ public class PlaceService {
 
   private final PlaceRepository placeRepository;
   private final PlacePetPolicyRepository petPolicyRepository;
+  private final TourApiClient tourApiClient;
 
   public PlaceService(
-      PlaceRepository placeRepository, PlacePetPolicyRepository petPolicyRepository) {
+      PlaceRepository placeRepository,
+      PlacePetPolicyRepository petPolicyRepository,
+      TourApiClient tourApiClient) {
     this.placeRepository = placeRepository;
     this.petPolicyRepository = petPolicyRepository;
+    this.tourApiClient = tourApiClient;
   }
 
   @Transactional(readOnly = true)
@@ -29,83 +33,89 @@ public class PlaceService {
   }
 
   @Transactional
-  public Place upsertPlace(
-      String externalPlaceId,
-      UUID themeId,
-      String placeName,
-      String placeImageUrl,
-      String address,
-      BigDecimal latitude,
-      BigDecimal longitude,
-      String businessHours,
-      String phoneNumber,
-      Short rating) {
-    return placeRepository
-        .findById(externalPlaceId)
-        .map(
-            existing -> {
-              existing.update(
-                  themeId,
-                  placeName,
-                  placeImageUrl,
-                  address,
-                  latitude,
-                  longitude,
-                  businessHours,
-                  phoneNumber,
-                  rating);
-              return placeRepository.save(existing);
-            })
-        .orElseGet(
-            () ->
-                placeRepository.save(
-                    new Place(
-                        externalPlaceId,
-                        themeId,
-                        placeName,
-                        placeImageUrl,
-                        address,
-                        latitude,
-                        longitude,
-                        businessHours,
-                        phoneNumber,
-                        rating)));
+  public List<Place> searchNearby(BigDecimal lat, BigDecimal lng, int radiusMeters) {
+    List<TourApiClient.NearbyItem> items = tourApiClient.fetchNearby(lat, lng, radiusMeters);
+    return items.stream().map(item -> syncPlace(item)).toList();
   }
 
-  @Transactional
-  public PlacePetPolicy upsertPetPolicy(
-      String externalPlaceId,
-      AllowedPetSize allowedPetSize,
-      Boolean leashRequired,
-      Boolean carrierRequired,
-      IndoorOutdoorType indoorOutdoorType,
-      Boolean parking,
-      String placeCaution) {
+  private Place syncPlace(TourApiClient.NearbyItem item) {
     Place place =
-        placeRepository.findById(externalPlaceId).orElseThrow(PlaceNotFoundException::new);
-    return petPolicyRepository
-        .findById(externalPlaceId)
-        .map(
+        placeRepository
+            .findById(item.contentId())
+            .map(
+                existing -> {
+                  existing.update(
+                      null,
+                      item.title(),
+                      item.firstImage(),
+                      item.addr1(),
+                      item.lat(),
+                      item.lng(),
+                      null,
+                      null,
+                      null);
+                  return placeRepository.save(existing);
+                })
+            .orElseGet(
+                () ->
+                    placeRepository.save(
+                        new Place(
+                            item.contentId(),
+                            null,
+                            item.title(),
+                            item.firstImage(),
+                            item.addr1(),
+                            item.lat(),
+                            item.lng(),
+                            null,
+                            null,
+                            null)));
+
+    syncPetPolicy(place, item.contentId());
+    return place;
+  }
+
+  private void syncPetPolicy(Place place, String contentId) {
+    TourApiClient.PetDetailItem detail = tourApiClient.fetchPetDetail(contentId);
+    if (detail == null) return;
+
+    petPolicyRepository
+        .findById(contentId)
+        .ifPresentOrElse(
             existing -> {
               existing.update(
-                  allowedPetSize,
-                  leashRequired,
-                  carrierRequired,
-                  indoorOutdoorType,
-                  parking,
-                  placeCaution);
-              return petPolicyRepository.save(existing);
-            })
-        .orElseGet(
+                  parseAllowedPetSize(detail.acmpyTypeCd()),
+                  detail.acmpyNeedMtr() != null && detail.acmpyNeedMtr().contains("목줄"),
+                  detail.acmpyNeedMtr() != null && detail.acmpyNeedMtr().contains("케이지"),
+                  parseIndoorOutdoor(detail.acmpyTypeCd()),
+                  detail.relaPrkge() != null && !detail.relaPrkge().isBlank(),
+                  detail.etcAcmpyInfo());
+              petPolicyRepository.save(existing);
+            },
             () ->
                 petPolicyRepository.save(
                     new PlacePetPolicy(
                         place,
-                        allowedPetSize,
-                        leashRequired,
-                        carrierRequired,
-                        indoorOutdoorType,
-                        parking,
-                        placeCaution)));
+                        parseAllowedPetSize(detail.acmpyTypeCd()),
+                        detail.acmpyNeedMtr() != null && detail.acmpyNeedMtr().contains("목줄"),
+                        detail.acmpyNeedMtr() != null && detail.acmpyNeedMtr().contains("케이지"),
+                        parseIndoorOutdoor(detail.acmpyTypeCd()),
+                        detail.relaPrkge() != null && !detail.relaPrkge().isBlank(),
+                        detail.etcAcmpyInfo())));
+  }
+
+  private AllowedPetSize parseAllowedPetSize(String acmpyTypeCd) {
+    if (acmpyTypeCd == null) return AllowedPetSize.ALL;
+    if (acmpyTypeCd.contains("소형")) return AllowedPetSize.SMALL;
+    if (acmpyTypeCd.contains("중형")) return AllowedPetSize.MEDIUM;
+    if (acmpyTypeCd.contains("대형")) return AllowedPetSize.LARGE;
+    return AllowedPetSize.ALL;
+  }
+
+  private IndoorOutdoorType parseIndoorOutdoor(String acmpyTypeCd) {
+    if (acmpyTypeCd == null) return IndoorOutdoorType.BOTH;
+    if (acmpyTypeCd.contains("실내")) return IndoorOutdoorType.INDOOR;
+    if (acmpyTypeCd.contains("실외")) return IndoorOutdoorType.OUTDOOR;
+    return IndoorOutdoorType.BOTH;
   }
 }

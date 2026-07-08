@@ -1,6 +1,11 @@
 spring:
+  config:
+    import: optional:file:.env[.properties]
   application:
     name: pettrip-api
+  threads:
+    virtual:
+      enabled: true
 
   datasource:
     url: ${DB_URL}
@@ -58,6 +63,9 @@ spring:
 app:
   s3:
     bucket: ${S3_BUCKET_NAME}
+  tour-api:
+    key: ${TOUR_API_KEY}
+    base-url: https://apis.data.go.kr/B551011/KorService2
 
 server:
   port: 8080

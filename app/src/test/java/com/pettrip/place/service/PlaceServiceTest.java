@@ -3,16 +3,15 @@ package com.pettrip.place.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.pettrip.place.model.AllowedPetSize;
-import com.pettrip.place.model.IndoorOutdoorType;
 import com.pettrip.place.model.Place;
-import com.pettrip.place.model.PlacePetPolicy;
 import com.pettrip.place.repository.PlacePetPolicyRepository;
 import com.pettrip.place.repository.PlaceRepository;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,12 +24,13 @@ class PlaceServiceTest {
 
   @Mock private PlaceRepository placeRepository;
   @Mock private PlacePetPolicyRepository petPolicyRepository;
+  @Mock private TourApiClient tourApiClient;
 
   @InjectMocks private PlaceService placeService;
 
   private Place samplePlace() {
     return new Place(
-        "kakao-12345",
+        "12345678",
         null,
         "한강공원",
         null,
@@ -44,12 +44,11 @@ class PlaceServiceTest {
 
   @Test
   void 존재하는_장소를_조회한다() {
-    Place place = samplePlace();
-    when(placeRepository.findById("kakao-12345")).thenReturn(Optional.of(place));
+    when(placeRepository.findById("12345678")).thenReturn(Optional.of(samplePlace()));
 
-    Place result = placeService.getPlace("kakao-12345");
+    Place result = placeService.getPlace("12345678");
 
-    assertThat(result.getExternalPlaceId()).isEqualTo("kakao-12345");
+    assertThat(result.getExternalPlaceId()).isEqualTo("12345678");
     assertThat(result.getPlaceName()).isEqualTo("한강공원");
   }
 
@@ -62,77 +61,57 @@ class PlaceServiceTest {
   }
 
   @Test
-  void 새_장소를_등록한다() {
-    when(placeRepository.findById("kakao-new")).thenReturn(Optional.empty());
+  void TourAPI_결과를_DB에_동기화하고_반환한다() {
+    TourApiClient.NearbyItem item =
+        new TourApiClient.NearbyItem(
+            "12345678",
+            "한강공원",
+            null,
+            "서울시 영등포구",
+            new BigDecimal("37.5263"),
+            new BigDecimal("126.9342"));
+    when(tourApiClient.fetchNearby(any(), any(), anyInt())).thenReturn(List.of(item));
+    when(placeRepository.findById("12345678")).thenReturn(Optional.empty());
     when(placeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    when(tourApiClient.fetchPetDetail("12345678")).thenReturn(null);
 
-    Place result =
-        placeService.upsertPlace(
-            "kakao-new",
-            null,
-            "뚝섬유원지",
-            null,
-            "서울시 광진구",
-            new BigDecimal("37.5285"),
-            new BigDecimal("127.0675"),
-            null,
-            null,
-            (short) 5);
+    List<Place> result =
+        placeService.searchNearby(new BigDecimal("37.5263"), new BigDecimal("126.9342"), 5000);
 
-    assertThat(result.getExternalPlaceId()).isEqualTo("kakao-new");
-    assertThat(result.getPlaceName()).isEqualTo("뚝섬유원지");
+    assertThat(result).hasSize(1);
+    assertThat(result.get(0).getPlaceName()).isEqualTo("한강공원");
     verify(placeRepository).save(any(Place.class));
   }
 
   @Test
-  void 이미_존재하는_장소는_정보를_갱신한다() {
+  void TourAPI_결과가_없으면_빈_목록을_반환한다() {
+    when(tourApiClient.fetchNearby(any(), any(), anyInt())).thenReturn(List.of());
+
+    List<Place> result =
+        placeService.searchNearby(new BigDecimal("37.5263"), new BigDecimal("126.9342"), 5000);
+
+    assertThat(result).isEmpty();
+  }
+
+  @Test
+  void 이미_캐시된_장소는_정보를_갱신한다() {
     Place existing = samplePlace();
-    when(placeRepository.findById("kakao-12345")).thenReturn(Optional.of(existing));
+    TourApiClient.NearbyItem item =
+        new TourApiClient.NearbyItem(
+            "12345678",
+            "한강공원(업데이트)",
+            null,
+            "서울시 영등포구",
+            new BigDecimal("37.5263"),
+            new BigDecimal("126.9342"));
+    when(tourApiClient.fetchNearby(any(), any(), anyInt())).thenReturn(List.of(item));
+    when(placeRepository.findById("12345678")).thenReturn(Optional.of(existing));
     when(placeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    when(tourApiClient.fetchPetDetail("12345678")).thenReturn(null);
 
-    Place result =
-        placeService.upsertPlace(
-            "kakao-12345", null, "한강공원(업데이트)", null, null, null, null, null, null, null);
+    List<Place> result =
+        placeService.searchNearby(new BigDecimal("37.5263"), new BigDecimal("126.9342"), 5000);
 
-    assertThat(result.getPlaceName()).isEqualTo("한강공원(업데이트)");
-  }
-
-  @Test
-  void 장소_펫_정책을_신규_등록한다() {
-    Place place = samplePlace();
-    when(placeRepository.findById("kakao-12345")).thenReturn(Optional.of(place));
-    when(petPolicyRepository.findById("kakao-12345")).thenReturn(Optional.empty());
-    when(petPolicyRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-    PlacePetPolicy result =
-        placeService.upsertPetPolicy(
-            "kakao-12345",
-            AllowedPetSize.ALL,
-            true,
-            false,
-            IndoorOutdoorType.OUTDOOR,
-            true,
-            "목줄 필수");
-
-    assertThat(result.getAllowedPetSize()).isEqualTo(AllowedPetSize.ALL);
-    assertThat(result.getIndoorOutdoorType()).isEqualTo(IndoorOutdoorType.OUTDOOR);
-    verify(petPolicyRepository).save(any(PlacePetPolicy.class));
-  }
-
-  @Test
-  void 존재하지_않는_장소에_정책_등록시_예외가_발생한다() {
-    when(placeRepository.findById("unknown")).thenReturn(Optional.empty());
-
-    assertThatThrownBy(
-            () ->
-                placeService.upsertPetPolicy(
-                    "unknown",
-                    AllowedPetSize.ALL,
-                    true,
-                    false,
-                    IndoorOutdoorType.OUTDOOR,
-                    true,
-                    null))
-        .isInstanceOf(PlaceNotFoundException.class);
+    assertThat(result.get(0).getPlaceName()).isEqualTo("한강공원(업데이트)");
   }
 }

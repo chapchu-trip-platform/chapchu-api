@@ -29,3 +29,6 @@ spring:
 app:
   s3:
     bucket: test-bucket
+  tour-api:
+    key: test-key
+    base-url: https://apis.data.go.kr/B551011/KorService2
