@@ -77,6 +77,17 @@ include::{snippets}/user-preferences-update/request-fields.adoc[]
 include::{snippets}/user-preferences-update/http-response.adoc[]
 include::{snippets}/user-preferences-update/response-fields.adoc[]
 
+=== 위시리스트 조회
+
+include::{snippets}/wishlist-list/http-request.adoc[]
+include::{snippets}/wishlist-list/http-response.adoc[]
+
+=== 위시리스트 장소 제거
+
+include::{snippets}/wishlist-delete/http-request.adoc[]
+include::{snippets}/wishlist-delete/path-parameters.adoc[]
+include::{snippets}/wishlist-delete/http-response.adoc[]
+
 == 반려동물 API
 
 === 반려견 목록 조회
