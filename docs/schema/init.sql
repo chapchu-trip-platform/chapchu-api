@@ -347,6 +347,13 @@ CREATE TABLE post_reports (
     PRIMARY KEY (post_id, user_id)
 );
 
+CREATE TABLE place_wishlists (
+    user_id    UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    place_id   VARCHAR(255) NOT NULL REFERENCES places(external_place_id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT now(),
+    PRIMARY KEY (user_id, place_id)
+);
+
 -- ============================================================
 -- ALBUM DOMAIN
 -- ============================================================
@@ -609,6 +616,10 @@ COMMENT ON COLUMN post_reports.user_id IS '신고한 사용자. FK → users';
 COMMENT ON COLUMN post_reports.report_reason IS '신고 사유 분류';
 COMMENT ON COLUMN post_reports.report_detail IS '신고 상세 내용';
 COMMENT ON COLUMN post_reports.report_status IS '처리 상태. ENUM(PENDING, RESOLVED, DISMISSED)';
+
+COMMENT ON TABLE place_wishlists IS '장소 위시리스트. N:M junction table';
+COMMENT ON COLUMN place_wishlists.user_id IS '찜한 사용자. FK → users';
+COMMENT ON COLUMN place_wishlists.place_id IS '찜한 장소. FK → places.external_place_id';
 
 -- ALBUM DOMAIN
 COMMENT ON TABLE albums IS '사용자가 직접 만드는 사진 앨범';
