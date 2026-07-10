@@ -36,7 +36,7 @@ class MainPageControllerTest {
     when(mainPageService.getMainPage(any())).thenReturn(new MainPageSummary("초롱", List.of("루이")));
 
     mockMvc
-        .perform(get("/main"))
+        .perform(get("/home"))
         .andExpect(status().isOk())
         .andDo(
             document(
