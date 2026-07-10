@@ -16,7 +16,10 @@ public class PostService {
     this.postRepository = postRepository;
   }
 
-  public List<Post> listPosts() {
+  public List<Post> listPosts(String sort) {
+    if ("popular".equals(sort)) {
+      return postRepository.findAllByOrderByRecommendationCountDescCreatedAtDesc();
+    }
     return postRepository.findAllByOrderByCreatedAtDesc();
   }
 

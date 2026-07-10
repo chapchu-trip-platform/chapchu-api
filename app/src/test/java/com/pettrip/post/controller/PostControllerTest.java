@@ -9,6 +9,7 @@ import static org.springframework.restdocs.payload.PayloadDocumentation.requestF
 import static org.springframework.restdocs.payload.PayloadDocumentation.responseFields;
 import static org.springframework.restdocs.request.RequestDocumentation.parameterWithName;
 import static org.springframework.restdocs.request.RequestDocumentation.pathParameters;
+import static org.springframework.restdocs.request.RequestDocumentation.queryParameters;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -51,9 +52,33 @@ class PostControllerTest {
             UUID.randomUUID(),
             "첫 여행",
             "즐거웠어요");
-    when(postService.listPosts()).thenReturn(List.of(post));
+    when(postService.listPosts(any())).thenReturn(List.of(post));
 
-    mockMvc.perform(get("/posts")).andExpect(status().isOk()).andDo(document("post-list"));
+    mockMvc
+        .perform(get("/posts").param("sort", "latest"))
+        .andExpect(status().isOk())
+        .andDo(
+            document(
+                "post-list",
+                queryParameters(
+                    parameterWithName("sort")
+                        .optional()
+                        .description("정렬 기준: latest(최신순, 기본값) / popular(추천순)"))));
+  }
+
+  @Test
+  void 게시글_목록을_추천순으로_조회한다() throws Exception {
+    Post post =
+        new Post(
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            "인기 여행",
+            "추천 많아요");
+    when(postService.listPosts(eq("popular"))).thenReturn(List.of(post));
+
+    mockMvc.perform(get("/posts").param("sort", "popular")).andExpect(status().isOk());
   }
 
   @Test
