@@ -165,4 +165,35 @@ include::{snippets}/post-delete/http-request.adoc[]
 include::{snippets}/post-delete/path-parameters.adoc[]
 include::{snippets}/post-delete/http-response.adoc[]
 
+=== 게시글 추천
+
+include::{snippets}/post-recommendation-create/http-request.adoc[]
+include::{snippets}/post-recommendation-create/path-parameters.adoc[]
+include::{snippets}/post-recommendation-create/http-response.adoc[]
+
+=== 게시글 추천 취소
+
+include::{snippets}/post-recommendation-delete/http-request.adoc[]
+include::{snippets}/post-recommendation-delete/path-parameters.adoc[]
+include::{snippets}/post-recommendation-delete/http-response.adoc[]
+
+=== 게시글 북마크
+
+include::{snippets}/post-bookmark-create/http-request.adoc[]
+include::{snippets}/post-bookmark-create/path-parameters.adoc[]
+include::{snippets}/post-bookmark-create/http-response.adoc[]
+
+=== 게시글 북마크 취소
+
+include::{snippets}/post-bookmark-delete/http-request.adoc[]
+include::{snippets}/post-bookmark-delete/path-parameters.adoc[]
+include::{snippets}/post-bookmark-delete/http-response.adoc[]
+
+=== 게시글 신고
+
+include::{snippets}/post-report-create/http-request.adoc[]
+include::{snippets}/post-report-create/path-parameters.adoc[]
+include::{snippets}/post-report-create/request-fields.adoc[]
+include::{snippets}/post-report-create/http-response.adoc[]
+
 == 추천 API
