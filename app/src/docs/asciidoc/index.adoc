@@ -35,6 +35,20 @@ Content-Type: application/json
 | `500 Internal Server Error` | 서버 오류
 |===
 
+== 공통 API
+
+=== 홈 통합 데이터 조회
+
+include::{snippets}/main-page/http-request.adoc[]
+include::{snippets}/main-page/http-response.adoc[]
+include::{snippets}/main-page/response-fields.adoc[]
+
+=== 마이페이지 요약 조회
+
+include::{snippets}/mypage-summary/http-request.adoc[]
+include::{snippets}/mypage-summary/http-response.adoc[]
+include::{snippets}/mypage-summary/response-fields.adoc[]
+
 == 유저 API
 
 === 내 정보 조회
