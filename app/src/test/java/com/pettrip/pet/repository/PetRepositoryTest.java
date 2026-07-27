@@ -31,4 +31,16 @@ class PetRepositoryTest {
     assertThat(result).hasSize(1);
     assertThat(result.get(0).getPetName()).isEqualTo("초코");
   }
+
+  @Test
+  void countByUserId는_해당_유저의_반려견_수를_센다() {
+    Breed breed = breedRepository.save(new Breed("말티즈"));
+    UUID ownerId = UUID.randomUUID();
+    petRepository.save(new Pet(ownerId, breed, "루이", PetSize.SMALL, 2));
+    petRepository.save(new Pet(ownerId, breed, "초코", PetSize.MEDIUM, 3));
+
+    long count = petRepository.countByUserId(ownerId);
+
+    assertThat(count).isEqualTo(2);
+  }
 }
