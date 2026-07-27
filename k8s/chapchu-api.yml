@@ -30,6 +30,11 @@ spec:
                 secretKeyRef:
                   name: postgres-secret
                   key: POSTGRES_PASSWORD
+            - name: AUTH_SERVER_URL
+              valueFrom:
+                secretKeyRef:
+                  name: chapchu-secrets
+                  key: AUTH_SERVER_URL
           resources:
             requests:
               memory: "512Mi"
