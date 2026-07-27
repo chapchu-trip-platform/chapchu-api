@@ -129,4 +129,22 @@ include::{snippets}/photo-create/response-fields.adoc[]
 
 == 리뷰 API
 
+=== 작성한 리뷰 목록 조회
+
+include::{snippets}/my-review-list/http-request.adoc[]
+include::{snippets}/my-review-list/http-response.adoc[]
+include::{snippets}/my-review-list/response-fields.adoc[]
+
+=== 리뷰 추천
+
+include::{snippets}/review-recommendation-create/http-request.adoc[]
+include::{snippets}/review-recommendation-create/path-parameters.adoc[]
+include::{snippets}/review-recommendation-create/http-response.adoc[]
+
+=== 리뷰 추천 취소
+
+include::{snippets}/review-recommendation-delete/http-request.adoc[]
+include::{snippets}/review-recommendation-delete/path-parameters.adoc[]
+include::{snippets}/review-recommendation-delete/http-response.adoc[]
+
 == 추천 API
