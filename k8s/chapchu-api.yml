@@ -13,6 +13,8 @@ spec:
       labels:
         app: chapchu-api
     spec:
+      imagePullSecrets:
+        - name: ghcr-secret
       containers:
         - name: chapchu-api
           image: ghcr.io/chapchu-trip-platform/chapchu-api:latest
