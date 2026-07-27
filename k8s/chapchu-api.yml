@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chapchu-api
+  namespace: chapchu
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: chapchu-api
+  template:
+    metadata:
+      labels:
+        app: chapchu-api
+    spec:
+      containers:
+        - name: chapchu-api
+          image: ghcr.io/chapchu-trip-platform/chapchu-api:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://postgres:5432/chapchu
+            - name: SPRING_DATASOURCE_USERNAME
+              value: chapchu
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_PASSWORD
+          resources:
+            requests:
+              memory: "512Mi"
+            limits:
+              memory: "1Gi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: chapchu-api
+  namespace: chapchu
+spec:
+  selector:
+    app: chapchu-api
+  ports:
+    - port: 8080
+      targetPort: 8080
