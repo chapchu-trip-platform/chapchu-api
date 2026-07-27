@@ -36,12 +36,106 @@ Content-Type: application/json
 |===
 
 == 유저 API
-// include::{snippets}/user-register/http-request.adoc[]
-// include::{snippets}/user-register/http-response.adoc[]
+
+=== 내 정보 조회
+
+include::{snippets}/user-get-me/http-request.adoc[]
+include::{snippets}/user-get-me/http-response.adoc[]
+include::{snippets}/user-get-me/response-fields.adoc[]
+
+=== 닉네임 등록
+
+include::{snippets}/user-register-nickname/http-request.adoc[]
+include::{snippets}/user-register-nickname/request-fields.adoc[]
+include::{snippets}/user-register-nickname/http-response.adoc[]
+include::{snippets}/user-register-nickname/response-fields.adoc[]
+
+=== 내 정보 수정 (닉네임 변경 / 회원 탈퇴)
+
+include::{snippets}/user-update-me/http-request.adoc[]
+include::{snippets}/user-update-me/request-fields.adoc[]
+include::{snippets}/user-update-me/http-response.adoc[]
+include::{snippets}/user-update-me/response-fields.adoc[]
+
+=== 선호 사항 조회
+
+include::{snippets}/user-preferences-get/http-request.adoc[]
+include::{snippets}/user-preferences-get/http-response.adoc[]
+include::{snippets}/user-preferences-get/response-fields.adoc[]
+
+=== 선호 사항 등록
+
+include::{snippets}/user-preferences-register/http-request.adoc[]
+include::{snippets}/user-preferences-register/request-fields.adoc[]
+include::{snippets}/user-preferences-register/http-response.adoc[]
+include::{snippets}/user-preferences-register/response-fields.adoc[]
+
+=== 선호 사항 수정
+
+include::{snippets}/user-preferences-update/http-request.adoc[]
+include::{snippets}/user-preferences-update/request-fields.adoc[]
+include::{snippets}/user-preferences-update/http-response.adoc[]
+include::{snippets}/user-preferences-update/response-fields.adoc[]
 
 == 반려동물 API
 
+=== 반려견 목록 조회
+
+include::{snippets}/pet-list/http-request.adoc[]
+include::{snippets}/pet-list/http-response.adoc[]
+
+=== 반려견 등록
+
+include::{snippets}/pet-create/http-request.adoc[]
+include::{snippets}/pet-create/request-fields.adoc[]
+include::{snippets}/pet-create/http-response.adoc[]
+include::{snippets}/pet-create/response-fields.adoc[]
+
+=== 반려견 정보 수정
+
+include::{snippets}/pet-update/http-request.adoc[]
+include::{snippets}/pet-update/path-parameters.adoc[]
+include::{snippets}/pet-update/request-fields.adoc[]
+include::{snippets}/pet-update/http-response.adoc[]
+include::{snippets}/pet-update/response-fields.adoc[]
+
+=== 반려견 삭제
+
+include::{snippets}/pet-delete/http-request.adoc[]
+include::{snippets}/pet-delete/path-parameters.adoc[]
+include::{snippets}/pet-delete/http-response.adoc[]
+
+== 사진 API
+
+=== 사진 업로드 URL 발급
+
+include::{snippets}/photo-upload-url/http-request.adoc[]
+include::{snippets}/photo-upload-url/request-fields.adoc[]
+include::{snippets}/photo-upload-url/http-response.adoc[]
+include::{snippets}/photo-upload-url/response-fields.adoc[]
+
+=== 사진 저장
+
+include::{snippets}/photo-create/http-request.adoc[]
+include::{snippets}/photo-create/request-fields.adoc[]
+include::{snippets}/photo-create/http-response.adoc[]
+include::{snippets}/photo-create/response-fields.adoc[]
+
 == 장소 API
+
+=== 장소 상세 조회
+
+include::{snippets}/place-get/http-request.adoc[]
+include::{snippets}/place-get/path-parameters.adoc[]
+include::{snippets}/place-get/http-response.adoc[]
+include::{snippets}/place-get/response-fields.adoc[]
+
+=== 주변 장소 검색 (TourAPI 실시간 조회 + 캐시)
+
+include::{snippets}/place-nearby/http-request.adoc[]
+include::{snippets}/place-nearby/query-parameters.adoc[]
+include::{snippets}/place-nearby/http-response.adoc[]
+include::{snippets}/place-nearby/response-fields.adoc[]
 
 == 여행 API
 

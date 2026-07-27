@@ -1,0 +1,7 @@
+package com.pettrip.user.repository;
+
+import com.pettrip.user.model.User;
+import java.util.UUID;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface UserRepository extends JpaRepository<User, UUID> {}

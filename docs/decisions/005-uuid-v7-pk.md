@@ -21,3 +21,4 @@
   @Id
   private UUID id = UuidCreator.getTimeOrderedEpoch();
   ```
+- 예외: 테이블에 `updated_at` 컬럼이 없는 경우 `BaseEntity`를 상속할 수 없다 ([[015-photo-entity-no-base-entity]] 참고). 이 경우에도 PK는 동일하게 `UuidCreator.getTimeOrderedEpoch()`로 직접 생성하라.
