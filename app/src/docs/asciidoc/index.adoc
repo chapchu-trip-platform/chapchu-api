@@ -35,6 +35,20 @@ Content-Type: application/json
 | `500 Internal Server Error` | 서버 오류
 |===
 
+== 공통 API
+
+=== 홈 통합 데이터 조회
+
+include::{snippets}/main-page/http-request.adoc[]
+include::{snippets}/main-page/http-response.adoc[]
+include::{snippets}/main-page/response-fields.adoc[]
+
+=== 마이페이지 요약 조회
+
+include::{snippets}/mypage-summary/http-request.adoc[]
+include::{snippets}/mypage-summary/http-response.adoc[]
+include::{snippets}/mypage-summary/response-fields.adoc[]
+
 == 유저 API
 
 === 내 정보 조회
@@ -128,5 +142,59 @@ include::{snippets}/photo-create/response-fields.adoc[]
 == 앨범 API
 
 == 리뷰 API
+
+=== 작성한 리뷰 목록 조회
+
+include::{snippets}/my-review-list/http-request.adoc[]
+include::{snippets}/my-review-list/http-response.adoc[]
+include::{snippets}/my-review-list/response-fields.adoc[]
+
+=== 리뷰 추천
+
+include::{snippets}/review-recommendation-create/http-request.adoc[]
+include::{snippets}/review-recommendation-create/path-parameters.adoc[]
+include::{snippets}/review-recommendation-create/http-response.adoc[]
+
+=== 리뷰 추천 취소
+
+include::{snippets}/review-recommendation-delete/http-request.adoc[]
+include::{snippets}/review-recommendation-delete/path-parameters.adoc[]
+include::{snippets}/review-recommendation-delete/http-response.adoc[]
+
+== 커뮤니티 API
+
+=== 게시글 목록 조회
+
+include::{snippets}/post-list/http-request.adoc[]
+include::{snippets}/post-list/query-parameters.adoc[]
+include::{snippets}/post-list/http-response.adoc[]
+
+=== 게시글 상세 조회
+
+include::{snippets}/post-detail/http-request.adoc[]
+include::{snippets}/post-detail/path-parameters.adoc[]
+include::{snippets}/post-detail/http-response.adoc[]
+include::{snippets}/post-detail/response-fields.adoc[]
+
+=== 게시글 작성
+
+include::{snippets}/post-create/http-request.adoc[]
+include::{snippets}/post-create/request-fields.adoc[]
+include::{snippets}/post-create/http-response.adoc[]
+include::{snippets}/post-create/response-fields.adoc[]
+
+=== 게시글 수정
+
+include::{snippets}/post-update/http-request.adoc[]
+include::{snippets}/post-update/path-parameters.adoc[]
+include::{snippets}/post-update/request-fields.adoc[]
+include::{snippets}/post-update/http-response.adoc[]
+include::{snippets}/post-update/response-fields.adoc[]
+
+=== 게시글 삭제
+
+include::{snippets}/post-delete/http-request.adoc[]
+include::{snippets}/post-delete/path-parameters.adoc[]
+include::{snippets}/post-delete/http-response.adoc[]
 
 == 추천 API
