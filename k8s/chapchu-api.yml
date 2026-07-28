@@ -35,6 +35,21 @@ spec:
                 secretKeyRef:
                   name: chapchu-secrets
                   key: AUTH_SERVER_URL
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: chapchu-secrets
+                  key: AWS_ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: chapchu-secrets
+                  key: AWS_SECRET_ACCESS_KEY
+            - name: S3_BUCKET_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: chapchu-secrets
+                  key: S3_BUCKET_NAME
           resources:
             requests:
               memory: "512Mi"
