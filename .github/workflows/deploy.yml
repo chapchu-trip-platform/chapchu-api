@@ -49,8 +49,9 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
+          command_timeout: 5m
           script: |
             export KUBECONFIG=/home/ubuntu/.kube/config
             kubectl apply -f ~/k8s/k8s/chapchu-api.yml
             kubectl rollout restart deployment/chapchu-api -n chapchu
-            kubectl rollout status deployment/chapchu-api -n chapchu
+            kubectl rollout status deployment/chapchu-api -n chapchu --timeout=4m
