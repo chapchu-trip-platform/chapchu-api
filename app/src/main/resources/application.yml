@@ -1,11 +1,11 @@
 spring:
   application:
-    name: pettrip-api
+    name: chapchu-api
 
   datasource:
-    url: ${DB_URL}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
   flyway:
@@ -27,37 +27,17 @@ spring:
         jwt:
           issuer-uri: ${AUTH_SERVER_URL}
 
-  ai:
-    anthropic:
-      api-key: ${ANTHROPIC_API_KEY}
-      chat:
-        options:
-          model: claude-sonnet-4-6
-          max-tokens: 4096
-    openai:
-      api-key: ${OPENAI_API_KEY}
-      embedding:
-        options:
-          model: text-embedding-3-large
-          dimensions: 3072
-    vectorstore:
-      pgvector:
-        initialize-schema: false
-        index-type: hnsw
-        distance-type: cosine_distance
-        dimensions: 3072
-
   cloud:
     aws:
       region:
         static: ${AWS_REGION:ap-northeast-2}
       credentials:
-        access-key: ${AWS_ACCESS_KEY_ID}
-        secret-key: ${AWS_SECRET_ACCESS_KEY}
+        access-key: ${AWS_ACCESS_KEY_ID:placeholder}
+        secret-key: ${AWS_SECRET_ACCESS_KEY:placeholder}
 
 app:
   s3:
-    bucket: ${S3_BUCKET_NAME}
+    bucket: ${S3_BUCKET_NAME:placeholder}
 
 server:
   port: 8080

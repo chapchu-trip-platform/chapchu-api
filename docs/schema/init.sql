@@ -20,7 +20,6 @@
 --   place_embeddings   → 신규 (장소 기반 RAG)
 --   모든 FK 제약조건   → 인라인 선언으로 통일
 
-CREATE EXTENSION IF NOT EXISTS pg_uuidv7;
 CREATE EXTENSION IF NOT EXISTS vector;
 
 -- ============================================================
@@ -28,42 +27,42 @@ CREATE EXTENSION IF NOT EXISTS vector;
 -- ============================================================
 
 CREATE TABLE themes (
-    theme_id         UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    theme_id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     theme_name       VARCHAR(50) NOT NULL,
     created_at       TIMESTAMP DEFAULT now(),
     updated_at       TIMESTAMP DEFAULT now()
 );
 
 CREATE TABLE regions (
-    region_id        UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    region_id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     region_name      VARCHAR(100) NOT NULL,
     created_at       TIMESTAMP DEFAULT now(),
     updated_at       TIMESTAMP DEFAULT now()
 );
 
 CREATE TABLE transport_methods (
-    transport_method_id   UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    transport_method_id   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     transport_method_name VARCHAR(50) NOT NULL,
     created_at            TIMESTAMP DEFAULT now(),
     updated_at            TIMESTAMP DEFAULT now()
 );
 
 CREATE TABLE breeds (
-    breed_id    UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    breed_id    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     breed_name  VARCHAR(30) NOT NULL,
     created_at  TIMESTAMP DEFAULT now(),
     updated_at  TIMESTAMP DEFAULT now()
 );
 
 CREATE TABLE pet_activities (
-    activity_id   UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    activity_id   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     activity_name VARCHAR(30) NOT NULL,
     created_at    TIMESTAMP DEFAULT now(),
     updated_at    TIMESTAMP DEFAULT now()
 );
 
 CREATE TABLE stamps (
-    stamp_id    UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    stamp_id    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     stamp_name  VARCHAR(30) NOT NULL,
     created_at  TIMESTAMP DEFAULT now(),
     updated_at  TIMESTAMP DEFAULT now()
@@ -74,7 +73,7 @@ CREATE TABLE stamps (
 -- ============================================================
 
 CREATE TABLE users (
-    user_id        UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    user_id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     google_user_id VARCHAR(255) UNIQUE,
     email          VARCHAR(255) UNIQUE NOT NULL,
     nickname       VARCHAR(30),
@@ -108,7 +107,7 @@ CREATE TABLE user_preference_themes (
 );
 
 CREATE TABLE user_stamps (
-    user_stamp_id UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    user_stamp_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id       UUID REFERENCES users(user_id) ON DELETE SET NULL,
     stamp_id      UUID NOT NULL REFERENCES stamps(stamp_id),
     stamp_count   INT DEFAULT 0,
@@ -121,7 +120,7 @@ CREATE TABLE user_stamps (
 -- ============================================================
 
 CREATE TABLE pets (
-    pet_id     UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    pet_id     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id    UUID REFERENCES users(user_id) ON DELETE SET NULL,
     breed_id   UUID NOT NULL REFERENCES breeds(breed_id),
     pet_name   VARCHAR(50) NOT NULL,
@@ -182,13 +181,13 @@ CREATE TABLE place_embeddings (
 -- ============================================================
 
 CREATE TABLE start_course (
-    start_course_id       UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    start_course_id       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     start_course_location VARCHAR(255),
     start_course_time     TIMESTAMP
 );
 
 CREATE TABLE travel_courses (
-    course_id       UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    course_id       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id         UUID REFERENCES users(user_id) ON DELETE SET NULL,
     start_course_id UUID NOT NULL REFERENCES start_course(start_course_id),
     travel_date     DATE,
@@ -198,7 +197,7 @@ CREATE TABLE travel_courses (
 );
 
 CREATE TABLE course_places (
-    course_place_id  UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    course_place_id  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     course_id        UUID NOT NULL REFERENCES travel_courses(course_id) ON DELETE CASCADE,
     external_place_id VARCHAR(255) NOT NULL REFERENCES places(external_place_id),
     visit_order      SMALLINT,
@@ -210,7 +209,7 @@ CREATE TABLE course_places (
 );
 
 CREATE TABLE course_routes (
-    route_id          UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    route_id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     course_id         UUID NOT NULL REFERENCES travel_courses(course_id) ON DELETE CASCADE,
     transport_method  VARCHAR(20),
     total_distance_m  INT,
@@ -220,7 +219,7 @@ CREATE TABLE course_routes (
 );
 
 CREATE TABLE course_route_legs (
-    route_leg_id        UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    route_leg_id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     route_id            UUID NOT NULL REFERENCES course_routes(route_id) ON DELETE CASCADE,
     from_course_place_id UUID NOT NULL REFERENCES course_places(course_place_id),
     leg_order           SMALLINT,
@@ -233,7 +232,7 @@ CREATE TABLE course_route_legs (
 );
 
 CREATE TABLE course_weather_records (
-    weather_id      UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    weather_id      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     course_id       UUID NOT NULL REFERENCES travel_courses(course_id) ON DELETE CASCADE,
     weather_date    DATE,
     temperature     SMALLINT,
@@ -245,7 +244,7 @@ CREATE TABLE course_weather_records (
 );
 
 CREATE TABLE photos (
-    photo_id        UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    photo_id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id         UUID REFERENCES users(user_id) ON DELETE SET NULL,
     course_place_id UUID NOT NULL REFERENCES course_places(course_place_id),
     photo_url       VARCHAR(500),
@@ -254,7 +253,7 @@ CREATE TABLE photos (
 );
 
 CREATE TABLE visit_verifications (
-    verification_id       UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    verification_id       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id               UUID REFERENCES users(user_id) ON DELETE SET NULL,
     course_place_id       UUID NOT NULL REFERENCES course_places(course_place_id),
     photo_id              UUID NOT NULL REFERENCES photos(photo_id),
@@ -277,7 +276,7 @@ CREATE TABLE course_embeddings (
 -- ============================================================
 
 CREATE TABLE reviews (
-    review_id            UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    review_id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     place_id             VARCHAR(255) NOT NULL REFERENCES places(external_place_id),
     user_id              UUID REFERENCES users(user_id) ON DELETE SET NULL,
     pet_id               UUID NOT NULL REFERENCES pets(pet_id),
@@ -299,7 +298,7 @@ CREATE TABLE review_recommendations (
 -- ============================================================
 
 CREATE TABLE posts (
-    post_id              UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    post_id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id              UUID REFERENCES users(user_id) ON DELETE SET NULL,
     pet_id               UUID NOT NULL REFERENCES pets(pet_id),
     photo_id             UUID NOT NULL REFERENCES photos(photo_id),
@@ -312,7 +311,7 @@ CREATE TABLE posts (
 );
 
 CREATE TABLE comments (
-    comment_id        UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    comment_id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     post_id           UUID NOT NULL REFERENCES posts(post_id) ON DELETE CASCADE,
     user_id           UUID REFERENCES users(user_id) ON DELETE SET NULL,
     parent_comment_id UUID REFERENCES comments(comment_id) ON DELETE CASCADE,  -- NULL = 최상위 댓글
@@ -352,7 +351,7 @@ CREATE TABLE post_reports (
 -- ============================================================
 
 CREATE TABLE albums (
-    album_id   UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    album_id   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id    UUID REFERENCES users(user_id) ON DELETE SET NULL,
     album_name VARCHAR(30),
     created_at TIMESTAMP DEFAULT now(),
@@ -360,7 +359,7 @@ CREATE TABLE albums (
 );
 
 CREATE TABLE album_photos (
-    album_photo_id UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    album_photo_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     album_id       UUID NOT NULL REFERENCES albums(album_id) ON DELETE CASCADE,
     photo_id       UUID NOT NULL REFERENCES photos(photo_id) ON DELETE CASCADE,
     created_at     TIMESTAMP DEFAULT now(),
@@ -368,7 +367,7 @@ CREATE TABLE album_photos (
 );
 
 CREATE TABLE keyring_cards (
-    keyring_card_id UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    keyring_card_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id         UUID REFERENCES users(user_id) ON DELETE SET NULL,
     pet_id          UUID NOT NULL REFERENCES pets(pet_id),
     photo_id        UUID NOT NULL REFERENCES photos(photo_id),
@@ -391,8 +390,8 @@ CREATE INDEX idx_pets_user_id ON pets(user_id);
 CREATE INDEX idx_photos_course_place_id ON photos(course_place_id);
 
 -- 벡터 ANN 탐색용 HNSW 인덱스 (코사인 유사도)
-CREATE INDEX idx_course_embeddings_hnsw ON course_embeddings USING hnsw (embedding vector_cosine_ops);
-CREATE INDEX idx_place_embeddings_hnsw ON place_embeddings USING hnsw (embedding vector_cosine_ops);
+-- CREATE INDEX idx_course_embeddings_hnsw: HNSW 최대 2000차원 제한으로 3072차원 미지원 (failures/009 참조)
+-- CREATE INDEX idx_place_embeddings_hnsw: HNSW 최대 2000차원 제한으로 3072차원 미지원 (failures/009 참조)
 
 -- ============================================================
 -- COMMENTS

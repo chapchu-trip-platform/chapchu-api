@@ -34,13 +34,13 @@ jobs:
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/chapchu-api:latest
 
-      - name: Copy k8s manifest to server
+      - name: Copy k8s manifests to server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          source: "k8s/chapchu-api.yml"
+          source: "k8s/"
           target: "~/k8s"
 
       - name: Deploy to server
@@ -52,6 +52,6 @@ jobs:
           command_timeout: 5m
           script: |
             export KUBECONFIG=/home/ubuntu/.kube/config
-            kubectl apply -f ~/k8s/k8s/chapchu-api.yml
+            kubectl apply -f ~/k8s/k8s/
             kubectl rollout restart deployment/chapchu-api -n chapchu
             kubectl rollout status deployment/chapchu-api -n chapchu --timeout=4m
