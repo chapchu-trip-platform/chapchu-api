@@ -390,9 +390,9 @@ CREATE INDEX idx_comments_post_id ON comments(post_id);
 CREATE INDEX idx_pets_user_id ON pets(user_id);
 CREATE INDEX idx_photos_course_place_id ON photos(course_place_id);
 
--- 벡터 ANN 탐색용 HNSW 인덱스 (코사인 유사도)
-CREATE INDEX idx_course_embeddings_hnsw ON course_embeddings USING hnsw (embedding vector_cosine_ops);
-CREATE INDEX idx_place_embeddings_hnsw ON place_embeddings USING hnsw (embedding vector_cosine_ops);
+-- 벡터 ANN 탐색용 IVFFlat 인덱스 (코사인 유사도) - 3072차원은 HNSW 최대(2000) 초과
+CREATE INDEX idx_course_embeddings_ivfflat ON course_embeddings USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+CREATE INDEX idx_place_embeddings_ivfflat ON place_embeddings USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
 
 -- ============================================================
 -- COMMENTS
