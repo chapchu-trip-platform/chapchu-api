@@ -52,12 +52,12 @@ spring:
       region:
         static: ${AWS_REGION:ap-northeast-2}
       credentials:
-        access-key: ${AWS_ACCESS_KEY_ID}
-        secret-key: ${AWS_SECRET_ACCESS_KEY}
+        access-key: ${AWS_ACCESS_KEY_ID:placeholder}
+        secret-key: ${AWS_SECRET_ACCESS_KEY:placeholder}
 
 app:
   s3:
-    bucket: ${S3_BUCKET_NAME}
+    bucket: ${S3_BUCKET_NAME:placeholder}
 
 server:
   port: 8080
