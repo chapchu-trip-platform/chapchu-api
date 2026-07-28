@@ -390,9 +390,9 @@ CREATE INDEX idx_comments_post_id ON comments(post_id);
 CREATE INDEX idx_pets_user_id ON pets(user_id);
 CREATE INDEX idx_photos_course_place_id ON photos(course_place_id);
 
--- 벡터 ANN 탐색용 HNSW 인덱스 (코사인 유사도)
-CREATE INDEX idx_course_embeddings_hnsw ON course_embeddings USING hnsw (embedding vector_cosine_ops);
-CREATE INDEX idx_place_embeddings_hnsw ON place_embeddings USING hnsw (embedding vector_cosine_ops);
+-- 벡터 ANN 인덱스: pgvector HNSW/IVFFlat 모두 최대 2000차원 제한으로 3072차원 미지원
+-- MVP 단계에서는 시퀀셜 스캔으로 운영, 차원 축소 방향 결정 후 V2 마이그레이션 추가 예정
+-- (docs/failures/009 참조)
 
 -- ============================================================
 -- COMMENTS
