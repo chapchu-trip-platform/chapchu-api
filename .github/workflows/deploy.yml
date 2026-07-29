@@ -23,7 +23,7 @@ jobs:
       - name: Generate REST Docs HTML
         run: |
           sudo apt-get install -y asciidoctor
-          asciidoctor -a snippets=app/build/generated-snippets \
+          asciidoctor -a snippets=$(pwd)/app/build/generated-snippets \
             app/src/docs/asciidoc/index.adoc \
             -D app/build/docs/asciidoc
 
