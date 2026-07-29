@@ -41,3 +41,9 @@ tasks.named('test') {
     workingDir = rootProject.projectDir
     outputs.dir snippetsDir
 }
+
+bootJar {
+    from("${buildDir}/docs/asciidoc") {
+        into "BOOT-INF/classes/static/docs"
+    }
+}
