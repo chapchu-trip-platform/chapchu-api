@@ -1,7 +1,7 @@
 .git
 .gradle
-build
 **/build
+!app/build/libs
 **/.gradle
 *.md
 .env
