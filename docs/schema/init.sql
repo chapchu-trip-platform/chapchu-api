@@ -125,7 +125,7 @@ CREATE TABLE pets (
     breed_id   UUID NOT NULL REFERENCES breeds(breed_id),
     pet_name   VARCHAR(50) NOT NULL,
     size       VARCHAR(10),
-    age        SMALLINT,
+    age        INTEGER,
     created_at TIMESTAMP DEFAULT now(),
     updated_at TIMESTAMP DEFAULT now()
 );
