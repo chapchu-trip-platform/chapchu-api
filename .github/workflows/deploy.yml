@@ -53,6 +53,25 @@ jobs:
           source: "k8s/"
           target: "~/k8s"
 
+      - name: Apply k8s secrets
+        uses: appleboy/ssh-action@v1
+        env:
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          AUTH_SERVER_URL: ${{ secrets.AUTH_SERVER_URL }}
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          envs: DB_PASSWORD,AUTH_SERVER_URL
+          script: |
+            export KUBECONFIG=/home/ubuntu/.kube/config
+            kubectl create secret generic postgres-secret \
+              --from-literal=POSTGRES_PASSWORD="$DB_PASSWORD" \
+              -n chapchu --dry-run=client -o yaml | kubectl apply -f -
+            kubectl create secret generic chapchu-secrets \
+              --from-literal=AUTH_SERVER_URL="$AUTH_SERVER_URL" \
+              -n chapchu --dry-run=client -o yaml | kubectl apply -f -
+
       - name: Deploy to server
         uses: appleboy/ssh-action@v1
         with:
