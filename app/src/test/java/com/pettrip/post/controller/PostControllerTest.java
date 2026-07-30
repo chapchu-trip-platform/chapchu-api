@@ -10,6 +10,7 @@ import static org.springframework.restdocs.payload.PayloadDocumentation.response
 import static org.springframework.restdocs.request.RequestDocumentation.parameterWithName;
 import static org.springframework.restdocs.request.RequestDocumentation.pathParameters;
 import static org.springframework.restdocs.request.RequestDocumentation.queryParameters;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -17,6 +18,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.pettrip.config.SecurityConfig;
 import com.pettrip.post.model.Post;
 import com.pettrip.post.service.PostService;
 import java.util.List;
@@ -25,22 +27,26 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.restdocs.AutoConfigureRestDocs;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.restdocs.RestDocumentationExtension;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @ExtendWith(RestDocumentationExtension.class)
 @WebMvcTest(PostController.class)
-@AutoConfigureMockMvc(addFilters = false)
+@Import(SecurityConfig.class)
 @AutoConfigureRestDocs(outputDir = "app/build/generated-snippets")
 class PostControllerTest {
+
+  private static final UUID USER_ID = UUID.fromString("0198f3a0-1234-7000-8000-000000000001");
 
   @Autowired private MockMvc mockMvc;
   @Autowired private ObjectMapper objectMapper;
 
   @MockitoBean private PostService postService;
+  @MockitoBean private JwtDecoder jwtDecoder;
 
   @Test
   void 게시글_목록을_조회한다() throws Exception {
@@ -55,7 +61,10 @@ class PostControllerTest {
     when(postService.listPosts(any())).thenReturn(List.of(post));
 
     mockMvc
-        .perform(get("/posts").param("sort", "latest"))
+        .perform(
+            get("/posts")
+                .param("sort", "latest")
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
         .andExpect(status().isOk())
         .andDo(
             document(
@@ -78,7 +87,12 @@ class PostControllerTest {
             "추천 많아요");
     when(postService.listPosts(eq("popular"))).thenReturn(List.of(post));
 
-    mockMvc.perform(get("/posts").param("sort", "popular")).andExpect(status().isOk());
+    mockMvc
+        .perform(
+            get("/posts")
+                .param("sort", "popular")
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isOk());
   }
 
   @Test
@@ -95,7 +109,7 @@ class PostControllerTest {
     when(postService.getPost(postId)).thenReturn(post);
 
     mockMvc
-        .perform(get("/posts/{postId}", postId))
+        .perform(get("/posts/{postId}", postId).with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
         .andExpect(status().isOk())
         .andDo(
             document(
@@ -128,7 +142,11 @@ class PostControllerTest {
             new PostCreateRequest(petId, photoId, courseId, "첫 여행", "즐거웠어요"));
 
     mockMvc
-        .perform(post("/posts").contentType("application/json").content(body))
+        .perform(
+            post("/posts")
+                .contentType("application/json")
+                .content(body)
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
         .andExpect(status().isCreated())
         .andDo(
             document(
@@ -167,7 +185,11 @@ class PostControllerTest {
     String body = objectMapper.writeValueAsString(new PostUpdateRequest("수정된 제목", "수정된 내용"));
 
     mockMvc
-        .perform(patch("/posts/{postId}", postId).contentType("application/json").content(body))
+        .perform(
+            patch("/posts/{postId}", postId)
+                .contentType("application/json")
+                .content(body)
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
         .andExpect(status().isOk())
         .andDo(
             document(
@@ -193,7 +215,8 @@ class PostControllerTest {
     UUID postId = UUID.randomUUID();
 
     mockMvc
-        .perform(delete("/posts/{postId}", postId))
+        .perform(
+            delete("/posts/{postId}", postId).with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
         .andExpect(status().isNoContent())
         .andDo(
             document(

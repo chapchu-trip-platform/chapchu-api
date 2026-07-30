@@ -1,8 +1,9 @@
 package com.pettrip.review.controller;
 
-import com.pettrip.common.service.TempAuthContext;
+import com.pettrip.common.service.CurrentUserId;
 import com.pettrip.review.service.ReviewService;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -18,9 +19,7 @@ public class MyReviewController {
   }
 
   @GetMapping
-  public List<ReviewResponse> listMyReviews() {
-    return reviewService.listMyReviews(TempAuthContext.TEMP_USER_ID).stream()
-        .map(ReviewResponse::from)
-        .toList();
+  public List<ReviewResponse> listMyReviews(@CurrentUserId UUID userId) {
+    return reviewService.listMyReviews(userId).stream().map(ReviewResponse::from).toList();
   }
 }

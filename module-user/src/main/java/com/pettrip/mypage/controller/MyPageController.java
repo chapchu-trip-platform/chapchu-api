@@ -1,7 +1,8 @@
 package com.pettrip.mypage.controller;
 
-import com.pettrip.common.service.TempAuthContext;
+import com.pettrip.common.service.CurrentUserId;
 import com.pettrip.mypage.service.MyPageService;
+import java.util.UUID;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -17,7 +18,7 @@ public class MyPageController {
   }
 
   @GetMapping
-  public MyPageSummaryResponse getSummary() {
-    return MyPageSummaryResponse.from(myPageService.getSummary(TempAuthContext.TEMP_USER_ID));
+  public MyPageSummaryResponse getSummary(@CurrentUserId UUID userId) {
+    return MyPageSummaryResponse.from(myPageService.getSummary(userId));
   }
 }

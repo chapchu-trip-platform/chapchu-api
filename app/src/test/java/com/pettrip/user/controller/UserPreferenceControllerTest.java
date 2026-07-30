@@ -7,12 +7,14 @@ import static org.mockito.Mockito.when;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
 import static org.springframework.restdocs.payload.PayloadDocumentation.requestFields;
 import static org.springframework.restdocs.payload.PayloadDocumentation.responseFields;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.pettrip.config.SecurityConfig;
 import com.pettrip.user.model.Region;
 import com.pettrip.user.model.Theme;
 import com.pettrip.user.model.TransportMethod;
@@ -25,22 +27,26 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.restdocs.AutoConfigureRestDocs;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.restdocs.RestDocumentationExtension;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @ExtendWith(RestDocumentationExtension.class)
 @WebMvcTest(UserPreferenceController.class)
-@AutoConfigureMockMvc(addFilters = false)
+@Import(SecurityConfig.class)
 @AutoConfigureRestDocs(outputDir = "app/build/generated-snippets")
 class UserPreferenceControllerTest {
+
+  private static final UUID USER_ID = UUID.fromString("0198f3a0-1234-7000-8000-000000000001");
 
   @Autowired private MockMvc mockMvc;
   @Autowired private ObjectMapper objectMapper;
 
   @MockitoBean private UserService userService;
+  @MockitoBean private JwtDecoder jwtDecoder;
 
   private User userWithPreferences() {
     User user = new User("test@example.com", "google-1");
@@ -55,7 +61,7 @@ class UserPreferenceControllerTest {
     when(userService.getPreferences(any())).thenReturn(userWithPreferences());
 
     mockMvc
-        .perform(get("/users/me/preferences"))
+        .perform(get("/users/me/preferences").with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
         .andExpect(status().isOk())
         .andDo(
             document(
@@ -83,7 +89,11 @@ class UserPreferenceControllerTest {
             new PreferenceRequest(List.of(regionId), List.of(themeId), List.of(transportMethodId)));
 
     mockMvc
-        .perform(post("/users/me/preferences").contentType("application/json").content(body))
+        .perform(
+            post("/users/me/preferences")
+                .contentType("application/json")
+                .content(body)
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
         .andExpect(status().isCreated())
         .andDo(
             document(
@@ -111,7 +121,11 @@ class UserPreferenceControllerTest {
         objectMapper.writeValueAsString(new PreferenceRequest(List.of(regionId), null, null));
 
     mockMvc
-        .perform(patch("/users/me/preferences").contentType("application/json").content(body))
+        .perform(
+            patch("/users/me/preferences")
+                .contentType("application/json")
+                .content(body)
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
         .andExpect(status().isOk())
         .andDo(
             document(
