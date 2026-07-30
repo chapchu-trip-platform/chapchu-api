@@ -8,7 +8,8 @@
 - 기존 스키마(`V1__init_schema.sql`)에는 위시리스트를 저장할 테이블이 전혀 없었다.
 
 ## 결정
-- `place_wishlists` 테이블을 `V4__create_place_wishlists.sql`로 추가한다.
+- `place_wishlists` 테이블을 `V5__create_place_wishlists.sql`로 추가한다.
+  (최초 작성 시 V4였으나, dev에 `V4__fix_pets_age_type.sql`(#36)이 먼저 들어와 번호가 겹쳐 V5로 변경했다.)
 - PK는 `(user_id, place_id)` 복합키로 하고, `post_bookmarks`와 동일한 `@IdClass` 패턴을 따른다.
 - `place_id`는 `places.external_place_id`(VARCHAR(255))를 참조한다. PK 타입이 UUID가 아니라 VARCHAR임에 유의.
 - 테이블에 `updated_at`이 없으므로 `Wishlist` 엔티티는 `BaseEntity`를 상속하지 않고 `@Id` + `@CreatedDate`만 직접 선언한다 (ADR 015 준수).
