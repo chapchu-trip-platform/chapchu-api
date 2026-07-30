@@ -1,12 +1,15 @@
 # 013. 임시 인증 스텁 (실제 OAuth2 Resource Server 붙기 전)
 
 ## 상태
+- [x] **부분 폐기됨 (Partially Superseded by decision 025)** — 아래 `SecurityConfig` 항목은 폐기, `TempAuthContext` 항목은 여전히 유효
 - [x] 확정됨 (Accepted, 임시)
 
 ## 결정
 - `auth`/`user` 도메인의 실제 JWT 인증(decision 008, chapchu-auth 연동)이 구현되기 전까지:
-  - `app/src/main/java/com/pettrip/config/SecurityConfig.java`에 모든 요청을 `permitAll()` 처리하는 임시 `SecurityFilterChain`을 둔다.
+  - ~~`app/src/main/java/com/pettrip/config/SecurityConfig.java`에 모든 요청을 `permitAll()` 처리하는 임시 `SecurityFilterChain`을 둔다.~~
+    → **폐기됨. decision 025로 실제 JWT 검증 + 공개/인증 엔드포인트 분리로 교체되었다.**
   - 인증이 필요한 Controller는 `@AuthenticationPrincipal` 대신 `com.pettrip.common.service.TempAuthContext.TEMP_USER_ID`(모든 도메인이 공유하는 고정 상수)를 현재 유저로 사용한다.
+    → **아직 유효.** 실제 유저 UUID 추출로 교체하는 작업은 범위가 커서 별도 이슈로 분리했다(decision 025 참고).
 
 ## 이유
 - pet 등 유저 소유 리소스 도메인을 auth 도메인보다 먼저 구현하게 되어, 실제 인증 없이도 소유권 로직/TDD/REST Docs 패턴을 검증할 수 있어야 했음.
