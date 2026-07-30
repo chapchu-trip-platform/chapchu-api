@@ -1,6 +1,6 @@
 package com.pettrip.review.controller;
 
-import com.pettrip.common.service.TempAuthContext;
+import com.pettrip.common.service.CurrentUserId;
 import com.pettrip.review.service.ReviewService;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -23,13 +23,13 @@ public class ReviewRecommendationController {
 
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  public void recommend(@PathVariable UUID reviewId) {
-    reviewService.recommend(TempAuthContext.TEMP_USER_ID, reviewId);
+  public void recommend(@CurrentUserId UUID userId, @PathVariable UUID reviewId) {
+    reviewService.recommend(userId, reviewId);
   }
 
   @DeleteMapping
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  public void cancelRecommendation(@PathVariable UUID reviewId) {
-    reviewService.cancelRecommendation(TempAuthContext.TEMP_USER_ID, reviewId);
+  public void cancelRecommendation(@CurrentUserId UUID userId, @PathVariable UUID reviewId) {
+    reviewService.cancelRecommendation(userId, reviewId);
   }
 }

@@ -5,9 +5,11 @@ import static org.mockito.Mockito.when;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.document;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
 import static org.springframework.restdocs.payload.PayloadDocumentation.responseFields;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.pettrip.config.SecurityConfig;
 import com.pettrip.review.model.Review;
 import com.pettrip.review.service.ReviewService;
 import java.util.List;
@@ -16,22 +18,26 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.restdocs.AutoConfigureRestDocs;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.restdocs.RestDocumentationExtension;
 import org.springframework.restdocs.payload.JsonFieldType;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @ExtendWith(RestDocumentationExtension.class)
 @WebMvcTest(MyReviewController.class)
-@AutoConfigureMockMvc(addFilters = false)
+@Import(SecurityConfig.class)
 @AutoConfigureRestDocs(outputDir = "app/build/generated-snippets")
 class MyReviewControllerTest {
+
+  private static final UUID USER_ID = UUID.fromString("0198f3a0-1234-7000-8000-000000000001");
 
   @Autowired private MockMvc mockMvc;
 
   @MockitoBean private ReviewService reviewService;
+  @MockitoBean private JwtDecoder jwtDecoder;
 
   @Test
   void 작성한_리뷰_목록을_조회한다() throws Exception {
@@ -40,7 +46,7 @@ class MyReviewControllerTest {
     when(reviewService.listMyReviews(any())).thenReturn(List.of(review));
 
     mockMvc
-        .perform(get("/users/me/reviews"))
+        .perform(get("/users/me/reviews").with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
         .andExpect(status().isOk())
         .andDo(
             document(

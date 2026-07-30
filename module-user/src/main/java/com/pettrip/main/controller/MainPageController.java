@@ -1,7 +1,8 @@
 package com.pettrip.main.controller;
 
-import com.pettrip.common.service.TempAuthContext;
+import com.pettrip.common.service.CurrentUserId;
 import com.pettrip.main.service.MainPageService;
+import java.util.UUID;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -17,7 +18,7 @@ public class MainPageController {
   }
 
   @GetMapping
-  public MainPageResponse getMainPage() {
-    return MainPageResponse.from(mainPageService.getMainPage(TempAuthContext.TEMP_USER_ID));
+  public MainPageResponse getMainPage(@CurrentUserId UUID userId) {
+    return MainPageResponse.from(mainPageService.getMainPage(userId));
   }
 }
