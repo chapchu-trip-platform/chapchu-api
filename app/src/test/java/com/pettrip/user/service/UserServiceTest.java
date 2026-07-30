@@ -135,4 +135,54 @@ class UserServiceTest {
 
     assertThat(result.getPreferredRegions()).containsExactly(existingRegion);
   }
+
+  @Test
+  void isNicknameAvailable은_사용_중이면_false를_반환한다() {
+    when(userRepository.existsByNickname("초롱이")).thenReturn(true);
+
+    assertThat(userService.isNicknameAvailable("초롱이")).isFalse();
+  }
+
+  @Test
+  void isNicknameAvailable은_사용_중이_아니면_true를_반환한다() {
+    when(userRepository.existsByNickname("초롱이")).thenReturn(false);
+
+    assertThat(userService.isNicknameAvailable("초롱이")).isTrue();
+  }
+
+  @Test
+  void registerNickname은_이미_사용_중인_닉네임이면_예외를_던진다() {
+    UUID userId = UUID.randomUUID();
+    User user = new User("test@example.com", "google-1");
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.existsByNickname("초롱이")).thenReturn(true);
+
+    assertThatThrownBy(() -> userService.registerNickname(userId, "초롱이"))
+        .isInstanceOf(NicknameAlreadyInUseException.class);
+  }
+
+  @Test
+  void updateMe는_다른_유저가_쓰는_닉네임이면_예외를_던진다() {
+    UUID userId = UUID.randomUUID();
+    User user = new User("test@example.com", "google-1");
+    user.registerNickname("내닉네임");
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.existsByNickname("남의닉네임")).thenReturn(true);
+
+    assertThatThrownBy(() -> userService.updateMe(userId, "남의닉네임", null))
+        .isInstanceOf(NicknameAlreadyInUseException.class);
+  }
+
+  @Test
+  void updateMe는_자기_닉네임을_그대로_보내면_예외를_던지지_않는다() {
+    UUID userId = UUID.randomUUID();
+    User user = new User("test@example.com", "google-1");
+    user.registerNickname("내닉네임");
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.save(any(User.class))).thenReturn(user);
+
+    User result = userService.updateMe(userId, "내닉네임", null);
+
+    assertThat(result.getNickname()).isEqualTo("내닉네임");
+  }
 }

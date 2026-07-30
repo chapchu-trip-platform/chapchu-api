@@ -10,11 +10,13 @@ import static org.springframework.restdocs.payload.PayloadDocumentation.response
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pettrip.user.model.AccountStatus;
 import com.pettrip.user.model.User;
+import com.pettrip.user.service.NicknameAlreadyInUseException;
 import com.pettrip.user.service.UserService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -107,5 +109,30 @@ class UserControllerTest {
                     fieldWithPath("accountStatus").description("계정 상태"),
                     fieldWithPath("createdAt").description("생성일시"),
                     fieldWithPath("updatedAt").description("수정일시"))));
+  }
+
+  @Test
+  void 이미_사용_중인_닉네임으로_등록하면_409를_반환한다() throws Exception {
+    when(userService.registerNickname(any(), eq("초롱이")))
+        .thenThrow(new NicknameAlreadyInUseException());
+
+    String body = objectMapper.writeValueAsString(new NicknameRegisterRequest("초롱이"));
+
+    mockMvc
+        .perform(post("/users/me").contentType("application/json").content(body))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("CONFLICT"));
+  }
+
+  @Test
+  void 이미_사용_중인_닉네임으로_변경하면_409를_반환한다() throws Exception {
+    when(userService.updateMe(any(), eq("초롱이"), any()))
+        .thenThrow(new NicknameAlreadyInUseException());
+
+    String body = objectMapper.writeValueAsString(new UserUpdateRequest("초롱이", null));
+
+    mockMvc
+        .perform(patch("/users/me").contentType("application/json").content(body))
+        .andExpect(status().isConflict());
   }
 }

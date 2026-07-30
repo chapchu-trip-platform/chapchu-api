@@ -76,7 +76,7 @@ CREATE TABLE users (
     user_id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     google_user_id VARCHAR(255) UNIQUE,
     email          VARCHAR(255) UNIQUE NOT NULL,
-    nickname       VARCHAR(30),
+    nickname       VARCHAR(30) UNIQUE,
     role           VARCHAR(20) DEFAULT 'USER',
     account_status VARCHAR(20) DEFAULT 'ACTIVE',
     created_at     TIMESTAMP DEFAULT now(),
