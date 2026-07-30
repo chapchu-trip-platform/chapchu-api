@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: chapchu-auth
+  namespace: chapchu
+spec:
+  type: ClusterIP
+  selector:
+    app: chapchu-auth
+  ports:
+    - port: 9000
+      targetPort: 9000
