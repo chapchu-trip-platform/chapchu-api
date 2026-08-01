@@ -10,11 +10,12 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/users/me")
+@RequestMapping("/users")
 public class UserController {
 
   private final UserService userService;
@@ -23,23 +24,28 @@ public class UserController {
     this.userService = userService;
   }
 
-  @GetMapping
+  @GetMapping("/me")
   public UserResponse getMe() {
     return UserResponse.from(userService.getMe(TempAuthContext.TEMP_USER_ID));
   }
 
-  @PostMapping
+  @PostMapping("/me")
   @ResponseStatus(HttpStatus.CREATED)
   public UserResponse registerNickname(@RequestBody @Valid NicknameRegisterRequest request) {
     User user = userService.registerNickname(TempAuthContext.TEMP_USER_ID, request.nickname());
     return UserResponse.from(user);
   }
 
-  @PatchMapping
+  @PatchMapping("/me")
   public UserResponse updateMe(@RequestBody UserUpdateRequest request) {
     User user =
         userService.updateMe(
             TempAuthContext.TEMP_USER_ID, request.nickname(), request.accountStatus());
     return UserResponse.from(user);
+  }
+
+  @GetMapping("/nickname/check")
+  public NicknameCheckResponse checkNickname(@RequestParam String nickname) {
+    return NicknameCheckResponse.of(userService.isNicknameAvailable(nickname));
   }
 }

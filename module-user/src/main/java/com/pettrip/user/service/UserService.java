@@ -33,6 +33,10 @@ public class UserService {
     this.transportMethodRepository = transportMethodRepository;
   }
 
+  public boolean isNicknameAvailable(String nickname) {
+    return !userRepository.existsByNickname(nickname);
+  }
+
   public User getMe(UUID userId) {
     return findUser(userId);
   }

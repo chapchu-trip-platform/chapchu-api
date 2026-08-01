@@ -57,6 +57,13 @@ include::{snippets}/user-get-me/http-request.adoc[]
 include::{snippets}/user-get-me/http-response.adoc[]
 include::{snippets}/user-get-me/response-fields.adoc[]
 
+=== 닉네임 중복 확인
+
+include::{snippets}/user-nickname-check/http-request.adoc[]
+include::{snippets}/user-nickname-check/query-parameters.adoc[]
+include::{snippets}/user-nickname-check/http-response.adoc[]
+include::{snippets}/user-nickname-check/response-fields.adoc[]
+
 === 닉네임 등록
 
 include::{snippets}/user-register-nickname/http-request.adoc[]

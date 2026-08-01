@@ -7,6 +7,8 @@ import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.docu
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
 import static org.springframework.restdocs.payload.PayloadDocumentation.requestFields;
 import static org.springframework.restdocs.payload.PayloadDocumentation.responseFields;
+import static org.springframework.restdocs.request.RequestDocumentation.parameterWithName;
+import static org.springframework.restdocs.request.RequestDocumentation.queryParameters;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -80,6 +82,20 @@ class UserControllerTest {
                     fieldWithPath("accountStatus").description("계정 상태"),
                     fieldWithPath("createdAt").description("생성일시"),
                     fieldWithPath("updatedAt").description("수정일시"))));
+  }
+
+  @Test
+  void 닉네임_중복을_확인한다() throws Exception {
+    when(userService.isNicknameAvailable(eq("초코사랑"))).thenReturn(true);
+
+    mockMvc
+        .perform(get("/users/nickname/check").param("nickname", "초코사랑"))
+        .andExpect(status().isOk())
+        .andDo(
+            document(
+                "user-nickname-check",
+                queryParameters(parameterWithName("nickname").description("중복 확인할 닉네임")),
+                responseFields(fieldWithPath("available").description("사용 가능 여부 (true=사용 가능)"))));
   }
 
   @Test
