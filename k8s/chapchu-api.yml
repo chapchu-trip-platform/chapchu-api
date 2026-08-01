@@ -47,7 +47,7 @@ metadata:
   name: chapchu-api
   namespace: chapchu
 spec:
-  type: LoadBalancer
+  type: ClusterIP
   selector:
     app: chapchu-api
   ports:
