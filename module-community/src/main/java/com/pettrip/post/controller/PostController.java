@@ -1,6 +1,6 @@
 package com.pettrip.post.controller;
 
-import com.pettrip.common.service.TempAuthContext;
+import com.pettrip.common.service.CurrentUserId;
 import com.pettrip.post.model.Post;
 import com.pettrip.post.service.PostService;
 import jakarta.validation.Valid;
@@ -41,10 +41,11 @@ public class PostController {
 
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  public PostResponse createPost(@RequestBody @Valid PostCreateRequest request) {
+  public PostResponse createPost(
+      @CurrentUserId UUID userId, @RequestBody @Valid PostCreateRequest request) {
     Post post =
         postService.createPost(
-            TempAuthContext.TEMP_USER_ID,
+            userId,
             request.petId(),
             request.photoId(),
             request.courseId(),
@@ -55,16 +56,16 @@ public class PostController {
 
   @PatchMapping("/{postId}")
   public PostResponse updatePost(
-      @PathVariable UUID postId, @RequestBody PostUpdateRequest request) {
-    Post post =
-        postService.updatePost(
-            TempAuthContext.TEMP_USER_ID, postId, request.title(), request.content());
+      @CurrentUserId UUID userId,
+      @PathVariable UUID postId,
+      @RequestBody PostUpdateRequest request) {
+    Post post = postService.updatePost(userId, postId, request.title(), request.content());
     return PostResponse.from(post);
   }
 
   @DeleteMapping("/{postId}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  public void deletePost(@PathVariable UUID postId) {
-    postService.deletePost(TempAuthContext.TEMP_USER_ID, postId);
+  public void deletePost(@CurrentUserId UUID userId, @PathVariable UUID postId) {
+    postService.deletePost(userId, postId);
   }
 }

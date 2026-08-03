@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.pettrip.pet.controller.PetController;
 import com.pettrip.pet.service.PetService;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -21,6 +22,8 @@ import org.springframework.test.web.servlet.MockMvc;
 @WebMvcTest(PetController.class)
 @Import(SecurityConfig.class)
 class SecurityConfigTest {
+
+  private static final UUID USER_ID = UUID.fromString("0198f3a0-1234-7000-8000-000000000001");
 
   @Autowired private MockMvc mockMvc;
 
@@ -36,7 +39,9 @@ class SecurityConfigTest {
   void 인증이_필요한_엔드포인트는_유효한_토큰이_있으면_접근할_수_있다() throws Exception {
     when(petService.listPets(any())).thenReturn(List.of());
 
-    mockMvc.perform(get("/pets").with(jwt())).andExpect(status().isOk());
+    mockMvc
+        .perform(get("/pets").with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isOk());
   }
 
   /**

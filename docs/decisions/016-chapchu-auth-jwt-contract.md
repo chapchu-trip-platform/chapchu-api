@@ -17,5 +17,7 @@
 ## 에이전트 행동 지침
 - `TempAuthContext.TEMP_USER_ID`를 실제 인증으로 교체할 때:
   1. `SecurityConfig`의 `permitAll()`을 제거하고 `spring.security.oauth2.resourceserver.jwt.issuer-uri: ${AUTH_SERVER_URL}` 설정으로 Resource Server를 활성화하라 (이미 `application.yml`에 설정돼 있음, `AUTH_SERVER_URL`만 실제 값으로 채우면 됨).
-  2. 각 Controller에서 `@AuthenticationPrincipal Jwt jwt`를 받아 `UUID.fromString(jwt.getSubject())`로 현재 유저 UUID를 얻어라. `jwt.getClaimAsString("role")`로 권한을 확인할 수 있다.
+  2. ~~각 Controller에서 `@AuthenticationPrincipal Jwt jwt`를 받아 `UUID.fromString(jwt.getSubject())`로 현재 유저 UUID를 얻어라.~~
+     → **decision 026으로 대체됨.** 컨트롤러는 `@CurrentUserId UUID userId` 파라미터를 받는다. 추출은 `CurrentUserIdArgumentResolver`가 담당하며, 도메인 모듈에 Spring Security 의존성을 추가하지 않는다.
+     `role` 클레임이 필요해지면 같은 방식으로 `app` 모듈에 리졸버를 추가하라.
   3. `POST /auth/google` 같은 토큰 발급 엔드포인트를 chapchu-api에 추가하지 마라 (decision 008). 로그인은 전적으로 chapchu-auth의 `/oauth2/authorize` 흐름을 통한다.

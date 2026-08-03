@@ -7,10 +7,12 @@ import static org.mockito.Mockito.when;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
 import static org.springframework.restdocs.payload.PayloadDocumentation.requestFields;
 import static org.springframework.restdocs.payload.PayloadDocumentation.responseFields;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.pettrip.config.SecurityConfig;
 import com.pettrip.photo.model.Photo;
 import com.pettrip.photo.service.PhotoService;
 import java.net.URI;
@@ -20,22 +22,26 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.restdocs.AutoConfigureRestDocs;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.restdocs.RestDocumentationExtension;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @ExtendWith(RestDocumentationExtension.class)
 @WebMvcTest(PhotoController.class)
-@AutoConfigureMockMvc(addFilters = false)
+@Import(SecurityConfig.class)
 @AutoConfigureRestDocs(outputDir = "app/build/generated-snippets")
 class PhotoControllerTest {
+
+  private static final UUID USER_ID = UUID.fromString("0198f3a0-1234-7000-8000-000000000001");
 
   @Autowired private MockMvc mockMvc;
   @Autowired private ObjectMapper objectMapper;
 
   @MockitoBean private PhotoService photoService;
+  @MockitoBean private JwtDecoder jwtDecoder;
 
   @Test
   void 사진_업로드_URL을_발급한다() throws Exception {
@@ -48,7 +54,11 @@ class PhotoControllerTest {
     String body = objectMapper.writeValueAsString(new PhotoUploadUrlRequest("초코.jpg"));
 
     mockMvc
-        .perform(post("/photos/upload-url").contentType("application/json").content(body))
+        .perform(
+            post("/photos/upload-url")
+                .contentType("application/json")
+                .content(body)
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
         .andExpect(status().isCreated())
         .andDo(
             document(
@@ -72,7 +82,11 @@ class PhotoControllerTest {
         objectMapper.writeValueAsString(new PhotoCreateRequest(coursePlaceId, photoKey, takenAt));
 
     mockMvc
-        .perform(post("/photos").contentType("application/json").content(body))
+        .perform(
+            post("/photos")
+                .contentType("application/json")
+                .content(body)
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
         .andExpect(status().isCreated())
         .andDo(
             document(

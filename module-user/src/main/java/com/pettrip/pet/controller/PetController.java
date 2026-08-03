@@ -1,6 +1,6 @@
 package com.pettrip.pet.controller;
 
-import com.pettrip.common.service.TempAuthContext;
+import com.pettrip.common.service.CurrentUserId;
 import com.pettrip.pet.model.Pet;
 import com.pettrip.pet.service.PetService;
 import jakarta.validation.Valid;
@@ -28,42 +28,34 @@ public class PetController {
   }
 
   @GetMapping
-  public List<PetResponse> listPets() {
-    return petService.listPets(TempAuthContext.TEMP_USER_ID).stream()
-        .map(PetResponse::from)
-        .toList();
+  public List<PetResponse> listPets(@CurrentUserId UUID userId) {
+    return petService.listPets(userId).stream().map(PetResponse::from).toList();
   }
 
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  public PetResponse createPet(@RequestBody @Valid PetCreateRequest request) {
+  public PetResponse createPet(
+      @CurrentUserId UUID userId, @RequestBody @Valid PetCreateRequest request) {
     Pet pet =
         petService.createPet(
-            TempAuthContext.TEMP_USER_ID,
-            request.breedId(),
-            request.petName(),
-            request.size(),
-            request.age());
+            userId, request.breedId(), request.petName(), request.size(), request.age());
     return PetResponse.from(pet);
   }
 
   @PatchMapping("/{petId}")
   public PetResponse updatePet(
-      @PathVariable UUID petId, @RequestBody @Valid PetUpdateRequest request) {
+      @CurrentUserId UUID userId,
+      @PathVariable UUID petId,
+      @RequestBody @Valid PetUpdateRequest request) {
     Pet pet =
         petService.updatePet(
-            TempAuthContext.TEMP_USER_ID,
-            petId,
-            request.breedId(),
-            request.petName(),
-            request.size(),
-            request.age());
+            userId, petId, request.breedId(), request.petName(), request.size(), request.age());
     return PetResponse.from(pet);
   }
 
   @DeleteMapping("/{petId}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  public void deletePet(@PathVariable UUID petId) {
-    petService.deletePet(TempAuthContext.TEMP_USER_ID, petId);
+  public void deletePet(@CurrentUserId UUID userId, @PathVariable UUID petId) {
+    petService.deletePet(userId, petId);
   }
 }

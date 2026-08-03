@@ -1,7 +1,8 @@
 package com.pettrip.user.controller;
 
-import com.pettrip.common.service.TempAuthContext;
+import com.pettrip.common.service.CurrentUserId;
 import com.pettrip.user.service.UserService;
+import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -22,28 +23,24 @@ public class UserPreferenceController {
   }
 
   @GetMapping
-  public PreferenceResponse getPreferences() {
-    return PreferenceResponse.from(userService.getPreferences(TempAuthContext.TEMP_USER_ID));
+  public PreferenceResponse getPreferences(@CurrentUserId UUID userId) {
+    return PreferenceResponse.from(userService.getPreferences(userId));
   }
 
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  public PreferenceResponse registerPreferences(@RequestBody PreferenceRequest request) {
+  public PreferenceResponse registerPreferences(
+      @CurrentUserId UUID userId, @RequestBody PreferenceRequest request) {
     return PreferenceResponse.from(
         userService.updatePreferences(
-            TempAuthContext.TEMP_USER_ID,
-            request.regionIds(),
-            request.themeIds(),
-            request.transportMethodIds()));
+            userId, request.regionIds(), request.themeIds(), request.transportMethodIds()));
   }
 
   @PatchMapping
-  public PreferenceResponse updatePreferences(@RequestBody PreferenceRequest request) {
+  public PreferenceResponse updatePreferences(
+      @CurrentUserId UUID userId, @RequestBody PreferenceRequest request) {
     return PreferenceResponse.from(
         userService.updatePreferences(
-            TempAuthContext.TEMP_USER_ID,
-            request.regionIds(),
-            request.themeIds(),
-            request.transportMethodIds()));
+            userId, request.regionIds(), request.themeIds(), request.transportMethodIds()));
   }
 }

@@ -1,10 +1,11 @@
 package com.pettrip.photo.controller;
 
-import com.pettrip.common.service.TempAuthContext;
+import com.pettrip.common.service.CurrentUserId;
 import com.pettrip.photo.model.Photo;
 import com.pettrip.photo.service.PhotoService;
 import jakarta.validation.Valid;
 import java.net.URL;
+import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -24,21 +25,20 @@ public class PhotoController {
 
   @PostMapping("/upload-url")
   @ResponseStatus(HttpStatus.CREATED)
-  public PhotoUploadUrlResponse issueUploadUrl(@RequestBody @Valid PhotoUploadUrlRequest request) {
-    String photoKey = photoService.buildPhotoKey(TempAuthContext.TEMP_USER_ID, request.fileName());
+  public PhotoUploadUrlResponse issueUploadUrl(
+      @CurrentUserId UUID userId, @RequestBody @Valid PhotoUploadUrlRequest request) {
+    String photoKey = photoService.buildPhotoKey(userId, request.fileName());
     URL uploadUrl = photoService.issueUploadUrl(photoKey);
     return new PhotoUploadUrlResponse(uploadUrl.toString(), photoKey);
   }
 
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  public PhotoResponse createPhoto(@RequestBody @Valid PhotoCreateRequest request) {
+  public PhotoResponse createPhoto(
+      @CurrentUserId UUID userId, @RequestBody @Valid PhotoCreateRequest request) {
     Photo photo =
         photoService.savePhoto(
-            TempAuthContext.TEMP_USER_ID,
-            request.coursePlaceId(),
-            request.photoKey(),
-            request.takenAt());
+            userId, request.coursePlaceId(), request.photoKey(), request.takenAt());
     return PhotoResponse.from(photo);
   }
 }

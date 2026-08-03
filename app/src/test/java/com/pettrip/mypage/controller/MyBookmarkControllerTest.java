@@ -1,11 +1,12 @@
 package com.pettrip.mypage.controller;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.document;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.pettrip.config.SecurityConfig;
 import com.pettrip.mypage.service.MyBookmarkService;
 import com.pettrip.post.model.Post;
 import java.util.List;
@@ -14,31 +15,35 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.restdocs.AutoConfigureRestDocs;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.restdocs.RestDocumentationExtension;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @ExtendWith(RestDocumentationExtension.class)
 @WebMvcTest(MyBookmarkController.class)
-@AutoConfigureMockMvc(addFilters = false)
+@Import(SecurityConfig.class)
 @AutoConfigureRestDocs(outputDir = "app/build/generated-snippets")
 class MyBookmarkControllerTest {
+
+  private static final UUID USER_ID = UUID.fromString("0198f3a0-1234-7000-8000-000000000001");
 
   @Autowired private MockMvc mockMvc;
 
   @MockitoBean private MyBookmarkService myBookmarkService;
+  @MockitoBean private JwtDecoder jwtDecoder;
 
   @Test
   void 북마크한_게시글_목록을_조회한다() throws Exception {
     Post post =
         new Post(
             UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "제목", "내용");
-    when(myBookmarkService.listMyBookmarks(any())).thenReturn(List.of(post));
+    when(myBookmarkService.listMyBookmarks(USER_ID)).thenReturn(List.of(post));
 
     mockMvc
-        .perform(get("/users/me/bookmarks"))
+        .perform(get("/users/me/bookmarks").with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
         .andExpect(status().isOk())
         .andDo(document("my-bookmark-list"));
   }

@@ -1,6 +1,5 @@
 package com.pettrip.comment.controller;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
@@ -11,6 +10,7 @@ import static org.springframework.restdocs.payload.PayloadDocumentation.requestF
 import static org.springframework.restdocs.payload.PayloadDocumentation.responseFields;
 import static org.springframework.restdocs.request.RequestDocumentation.parameterWithName;
 import static org.springframework.restdocs.request.RequestDocumentation.pathParameters;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -18,41 +18,49 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pettrip.comment.model.Comment;
 import com.pettrip.comment.service.CommentService;
+import com.pettrip.config.SecurityConfig;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.restdocs.AutoConfigureRestDocs;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.restdocs.RestDocumentationExtension;
 import org.springframework.restdocs.payload.JsonFieldType;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @ExtendWith(RestDocumentationExtension.class)
 @WebMvcTest(CommentController.class)
-@AutoConfigureMockMvc(addFilters = false)
+@Import(SecurityConfig.class)
 @AutoConfigureRestDocs(outputDir = "app/build/generated-snippets")
 class CommentControllerTest {
+
+  private static final UUID USER_ID = UUID.fromString("0198f3a0-1234-7000-8000-000000000001");
 
   @Autowired private MockMvc mockMvc;
   @Autowired private ObjectMapper objectMapper;
 
   @MockitoBean private CommentService commentService;
+  @MockitoBean private JwtDecoder jwtDecoder;
 
   @Test
   void 댓글을_작성한다() throws Exception {
     UUID postId = UUID.randomUUID();
     Comment comment = new Comment(postId, UUID.randomUUID(), null, 0, 1, "좋은 글이네요");
-    when(commentService.createComment(any(), eq(postId), isNull(), eq("좋은 글이네요")))
+    when(commentService.createComment(eq(USER_ID), eq(postId), isNull(), eq("좋은 글이네요")))
         .thenReturn(comment);
 
     String body = objectMapper.writeValueAsString(new CommentCreateRequest(null, "좋은 글이네요"));
 
     mockMvc
         .perform(
-            post("/posts/{postId}/comments", postId).contentType("application/json").content(body))
+            post("/posts/{postId}/comments", postId)
+                .contentType("application/json")
+                .content(body)
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
         .andExpect(status().isCreated())
         .andDo(
             document(
@@ -82,13 +90,15 @@ class CommentControllerTest {
     UUID commentId = UUID.randomUUID();
 
     mockMvc
-        .perform(delete("/comments/{commentId}", commentId))
+        .perform(
+            delete("/comments/{commentId}", commentId)
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
         .andExpect(status().isNoContent())
         .andDo(
             document(
                 "comment-delete",
                 pathParameters(parameterWithName("commentId").description("댓글 ID"))));
 
-    verify(commentService).deleteComment(any(), eq(commentId));
+    verify(commentService).deleteComment(USER_ID, commentId);
   }
 }

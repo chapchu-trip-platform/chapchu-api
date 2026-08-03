@@ -2,7 +2,7 @@ package com.pettrip.comment.controller;
 
 import com.pettrip.comment.model.Comment;
 import com.pettrip.comment.service.CommentService;
-import com.pettrip.common.service.TempAuthContext;
+import com.pettrip.common.service.CurrentUserId;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -25,16 +25,17 @@ public class CommentController {
   @PostMapping("/posts/{postId}/comments")
   @ResponseStatus(HttpStatus.CREATED)
   public CommentResponse createComment(
-      @PathVariable UUID postId, @RequestBody @Valid CommentCreateRequest request) {
+      @CurrentUserId UUID userId,
+      @PathVariable UUID postId,
+      @RequestBody @Valid CommentCreateRequest request) {
     Comment comment =
-        commentService.createComment(
-            TempAuthContext.TEMP_USER_ID, postId, request.parentCommentId(), request.content());
+        commentService.createComment(userId, postId, request.parentCommentId(), request.content());
     return CommentResponse.from(comment);
   }
 
   @DeleteMapping("/comments/{commentId}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  public void deleteComment(@PathVariable UUID commentId) {
-    commentService.deleteComment(TempAuthContext.TEMP_USER_ID, commentId);
+  public void deleteComment(@CurrentUserId UUID userId, @PathVariable UUID commentId) {
+    commentService.deleteComment(userId, commentId);
   }
 }
