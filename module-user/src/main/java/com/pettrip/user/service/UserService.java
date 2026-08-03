@@ -37,19 +37,36 @@ public class UserService {
     return findUser(userId);
   }
 
+  /** docs/decisions/027 참고: 닉네임은 유저 간 중복될 수 없다. */
+  public boolean isNicknameAvailable(String nickname) {
+    return !userRepository.existsByNickname(nickname);
+  }
+
   public User registerNickname(UUID userId, String nickname) {
     User user = findUser(userId);
     if (user.hasNickname()) {
       throw new NicknameAlreadyRegisteredException();
     }
+    validateNicknameNotTaken(user, nickname);
     user.registerNickname(nickname);
     return userRepository.save(user);
   }
 
   public User updateMe(UUID userId, String nickname, AccountStatus accountStatus) {
     User user = findUser(userId);
+    validateNicknameNotTaken(user, nickname);
     user.update(nickname, accountStatus);
     return userRepository.save(user);
+  }
+
+  /** 본인이 이미 쓰던 닉네임을 그대로 보낸 경우는 중복으로 보지 않는다. */
+  private void validateNicknameNotTaken(User user, String nickname) {
+    if (nickname == null || nickname.equals(user.getNickname())) {
+      return;
+    }
+    if (userRepository.existsByNickname(nickname)) {
+      throw new NicknameAlreadyInUseException();
+    }
   }
 
   public User getPreferences(UUID userId) {

@@ -57,7 +57,19 @@ include::{snippets}/user-get-me/http-request.adoc[]
 include::{snippets}/user-get-me/http-response.adoc[]
 include::{snippets}/user-get-me/response-fields.adoc[]
 
+=== 닉네임 중복 확인
+
+닉네임은 유저 간 중복될 수 없습니다. 이 API는 조회 시점 기준의 사전 안내이며 **예약 효과가 없습니다**.
+확인과 등록 사이에 다른 유저가 선점할 수 있으므로, 최종 판정은 닉네임 등록/수정 요청의 `409 Conflict` 응답으로 처리하세요.
+
+include::{snippets}/nickname-availability/http-request.adoc[]
+include::{snippets}/nickname-availability/query-parameters.adoc[]
+include::{snippets}/nickname-availability/http-response.adoc[]
+include::{snippets}/nickname-availability/response-fields.adoc[]
+
 === 닉네임 등록
+
+이미 사용 중인 닉네임이면 `409 Conflict`를 반환합니다.
 
 include::{snippets}/user-register-nickname/http-request.adoc[]
 include::{snippets}/user-register-nickname/request-fields.adoc[]
@@ -65,6 +77,9 @@ include::{snippets}/user-register-nickname/http-response.adoc[]
 include::{snippets}/user-register-nickname/response-fields.adoc[]
 
 === 내 정보 수정 (닉네임 변경 / 회원 탈퇴)
+
+다른 유저가 사용 중인 닉네임으로 변경하면 `409 Conflict`를 반환합니다.
+본인이 쓰던 닉네임을 그대로 보내는 것은 중복으로 보지 않습니다.
 
 include::{snippets}/user-update-me/http-request.adoc[]
 include::{snippets}/user-update-me/request-fields.adoc[]
