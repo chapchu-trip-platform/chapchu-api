@@ -7,6 +7,27 @@
 :sectlinks:
 :snippets: ../../../build/generated-snippets
 
+++++
+<style>
+.sect4.request > h4 {
+  background: #e6f3ea;
+  color: #1a5928;
+  padding: 6px 14px;
+  border-left: 5px solid #2e7d32;
+  border-radius: 0 4px 4px 0;
+  margin-top: 1.4em;
+}
+.sect4.response > h4 {
+  background: #e3edf7;
+  color: #0d3a6e;
+  padding: 6px 14px;
+  border-left: 5px solid #1565c0;
+  border-radius: 0 4px 4px 0;
+  margin-top: 1.4em;
+}
+</style>
+++++
+
 == 개요
 
 PetTrip 반려동물 동반 여행 플랫폼 REST API 명세입니다.
@@ -41,10 +62,12 @@ Content-Type: application/json
 
 `GET /home`
 
+[.request]
 ==== 요청
 
 include::{snippets}/main-page/http-request.adoc[]
 
+[.response]
 ==== 응답
 
 include::{snippets}/main-page/http-response.adoc[]
@@ -54,10 +77,12 @@ include::{snippets}/main-page/response-fields.adoc[]
 
 `GET /users/me/mypage`
 
+[.request]
 ==== 요청
 
 include::{snippets}/mypage-summary/http-request.adoc[]
 
+[.response]
 ==== 응답
 
 include::{snippets}/mypage-summary/http-response.adoc[]
@@ -69,10 +94,12 @@ include::{snippets}/mypage-summary/response-fields.adoc[]
 
 `GET /users/me`
 
+[.request]
 ==== 요청
 
 include::{snippets}/user-get-me/http-request.adoc[]
 
+[.response]
 ==== 응답
 
 include::{snippets}/user-get-me/http-response.adoc[]
@@ -85,11 +112,13 @@ include::{snippets}/user-get-me/response-fields.adoc[]
 닉네임은 유저 간 중복될 수 없습니다. 이 API는 조회 시점 기준의 사전 안내이며 **예약 효과가 없습니다**.
 확인과 등록 사이에 다른 유저가 선점할 수 있으므로, 최종 판정은 닉네임 등록/수정 요청의 `409 Conflict` 응답으로 처리하세요.
 
+[.request]
 ==== 요청
 
 include::{snippets}/nickname-availability/http-request.adoc[]
 include::{snippets}/nickname-availability/query-parameters.adoc[]
 
+[.response]
 ==== 응답
 
 include::{snippets}/nickname-availability/http-response.adoc[]
@@ -101,11 +130,13 @@ include::{snippets}/nickname-availability/response-fields.adoc[]
 
 이미 사용 중인 닉네임이면 `409 Conflict`를 반환합니다.
 
+[.request]
 ==== 요청
 
 include::{snippets}/user-register-nickname/http-request.adoc[]
 include::{snippets}/user-register-nickname/request-fields.adoc[]
 
+[.response]
 ==== 응답
 
 include::{snippets}/user-register-nickname/http-response.adoc[]
@@ -118,11 +149,13 @@ include::{snippets}/user-register-nickname/response-fields.adoc[]
 다른 유저가 사용 중인 닉네임으로 변경하면 `409 Conflict`를 반환합니다.
 본인이 쓰던 닉네임을 그대로 보내는 것은 중복으로 보지 않습니다.
 
+[.request]
 ==== 요청
 
 include::{snippets}/user-update-me/http-request.adoc[]
 include::{snippets}/user-update-me/request-fields.adoc[]
 
+[.response]
 ==== 응답
 
 include::{snippets}/user-update-me/http-response.adoc[]
@@ -132,10 +165,12 @@ include::{snippets}/user-update-me/response-fields.adoc[]
 
 `GET /users/me/preferences`
 
+[.request]
 ==== 요청
 
 include::{snippets}/user-preferences-get/http-request.adoc[]
 
+[.response]
 ==== 응답
 
 include::{snippets}/user-preferences-get/http-response.adoc[]
@@ -145,11 +180,13 @@ include::{snippets}/user-preferences-get/response-fields.adoc[]
 
 `POST /users/me/preferences`
 
+[.request]
 ==== 요청
 
 include::{snippets}/user-preferences-register/http-request.adoc[]
 include::{snippets}/user-preferences-register/request-fields.adoc[]
 
+[.response]
 ==== 응답
 
 include::{snippets}/user-preferences-register/http-response.adoc[]
@@ -159,11 +196,13 @@ include::{snippets}/user-preferences-register/response-fields.adoc[]
 
 `PATCH /users/me/preferences`
 
+[.request]
 ==== 요청
 
 include::{snippets}/user-preferences-update/http-request.adoc[]
 include::{snippets}/user-preferences-update/request-fields.adoc[]
 
+[.response]
 ==== 응답
 
 include::{snippets}/user-preferences-update/http-response.adoc[]
@@ -173,10 +212,12 @@ include::{snippets}/user-preferences-update/response-fields.adoc[]
 
 `GET /users/me/wishlist`
 
+[.request]
 ==== 요청
 
 include::{snippets}/wishlist-list/http-request.adoc[]
 
+[.response]
 ==== 응답
 
 include::{snippets}/wishlist-list/http-response.adoc[]
@@ -185,11 +226,13 @@ include::{snippets}/wishlist-list/http-response.adoc[]
 
 `DELETE /users/me/wishlist/{placeId}`
 
+[.request]
 ==== 요청
 
 include::{snippets}/wishlist-delete/http-request.adoc[]
 include::{snippets}/wishlist-delete/path-parameters.adoc[]
 
+[.response]
 ==== 응답
 
 include::{snippets}/wishlist-delete/http-response.adoc[]
@@ -198,10 +241,12 @@ include::{snippets}/wishlist-delete/http-response.adoc[]
 
 `GET /users/me/reviews`
 
+[.request]
 ==== 요청
 
 include::{snippets}/my-review-list/http-request.adoc[]
 
+[.response]
 ==== 응답
 
 include::{snippets}/my-review-list/http-response.adoc[]
@@ -213,10 +258,12 @@ include::{snippets}/my-review-list/response-fields.adoc[]
 
 `GET /pets`
 
+[.request]
 ==== 요청
 
 include::{snippets}/pet-list/http-request.adoc[]
 
+[.response]
 ==== 응답
 
 include::{snippets}/pet-list/http-response.adoc[]
@@ -225,11 +272,13 @@ include::{snippets}/pet-list/http-response.adoc[]
 
 `POST /pets`
 
+[.request]
 ==== 요청
 
 include::{snippets}/pet-create/http-request.adoc[]
 include::{snippets}/pet-create/request-fields.adoc[]
 
+[.response]
 ==== 응답
 
 include::{snippets}/pet-create/http-response.adoc[]
@@ -239,12 +288,14 @@ include::{snippets}/pet-create/response-fields.adoc[]
 
 `PATCH /pets/{petId}`
 
+[.request]
 ==== 요청
 
 include::{snippets}/pet-update/http-request.adoc[]
 include::{snippets}/pet-update/path-parameters.adoc[]
 include::{snippets}/pet-update/request-fields.adoc[]
 
+[.response]
 ==== 응답
 
 include::{snippets}/pet-update/http-response.adoc[]
@@ -254,11 +305,13 @@ include::{snippets}/pet-update/response-fields.adoc[]
 
 `DELETE /pets/{petId}`
 
+[.request]
 ==== 요청
 
 include::{snippets}/pet-delete/http-request.adoc[]
 include::{snippets}/pet-delete/path-parameters.adoc[]
 
+[.response]
 ==== 응답
 
 include::{snippets}/pet-delete/http-response.adoc[]
@@ -269,11 +322,13 @@ include::{snippets}/pet-delete/http-response.adoc[]
 
 `POST /photos/upload-url`
 
+[.request]
 ==== 요청
 
 include::{snippets}/photo-upload-url/http-request.adoc[]
 include::{snippets}/photo-upload-url/request-fields.adoc[]
 
+[.response]
 ==== 응답
 
 include::{snippets}/photo-upload-url/http-response.adoc[]
@@ -283,11 +338,13 @@ include::{snippets}/photo-upload-url/response-fields.adoc[]
 
 `POST /photos`
 
+[.request]
 ==== 요청
 
 include::{snippets}/photo-create/http-request.adoc[]
 include::{snippets}/photo-create/request-fields.adoc[]
 
+[.response]
 ==== 응답
 
 include::{snippets}/photo-create/http-response.adoc[]
@@ -299,11 +356,13 @@ include::{snippets}/photo-create/response-fields.adoc[]
 
 `GET /places/{placeId}`
 
+[.request]
 ==== 요청
 
 include::{snippets}/place-get/http-request.adoc[]
 include::{snippets}/place-get/path-parameters.adoc[]
 
+[.response]
 ==== 응답
 
 include::{snippets}/place-get/http-response.adoc[]
@@ -313,11 +372,13 @@ include::{snippets}/place-get/response-fields.adoc[]
 
 `GET /places/nearby?lat={lat}&lng={lng}&radiusMeters={radiusMeters}`
 
+[.request]
 ==== 요청
 
 include::{snippets}/place-nearby/http-request.adoc[]
 include::{snippets}/place-nearby/query-parameters.adoc[]
 
+[.response]
 ==== 응답
 
 include::{snippets}/place-nearby/http-response.adoc[]
@@ -327,11 +388,13 @@ include::{snippets}/place-nearby/response-fields.adoc[]
 
 `POST /places`
 
+[.request]
 ==== 요청
 
 include::{snippets}/place-register/http-request.adoc[]
 include::{snippets}/place-register/request-fields.adoc[]
 
+[.response]
 ==== 응답
 
 include::{snippets}/place-register/http-response.adoc[]
@@ -341,12 +404,14 @@ include::{snippets}/place-register/response-fields.adoc[]
 
 `PUT /places/{placeId}/policy`
 
+[.request]
 ==== 요청
 
 include::{snippets}/place-policy-upsert/http-request.adoc[]
 include::{snippets}/place-policy-upsert/path-parameters.adoc[]
 include::{snippets}/place-policy-upsert/request-fields.adoc[]
 
+[.response]
 ==== 응답
 
 include::{snippets}/place-policy-upsert/http-response.adoc[]
@@ -358,11 +423,13 @@ include::{snippets}/place-policy-upsert/response-fields.adoc[]
 
 `GET /posts?sort={sort}`
 
+[.request]
 ==== 요청
 
 include::{snippets}/post-list/http-request.adoc[]
 include::{snippets}/post-list/query-parameters.adoc[]
 
+[.response]
 ==== 응답
 
 include::{snippets}/post-list/http-response.adoc[]
@@ -371,11 +438,13 @@ include::{snippets}/post-list/http-response.adoc[]
 
 `GET /posts/{postId}`
 
+[.request]
 ==== 요청
 
 include::{snippets}/post-detail/http-request.adoc[]
 include::{snippets}/post-detail/path-parameters.adoc[]
 
+[.response]
 ==== 응답
 
 include::{snippets}/post-detail/http-response.adoc[]
@@ -385,11 +454,13 @@ include::{snippets}/post-detail/response-fields.adoc[]
 
 `POST /posts`
 
+[.request]
 ==== 요청
 
 include::{snippets}/post-create/http-request.adoc[]
 include::{snippets}/post-create/request-fields.adoc[]
 
+[.response]
 ==== 응답
 
 include::{snippets}/post-create/http-response.adoc[]
@@ -399,12 +470,14 @@ include::{snippets}/post-create/response-fields.adoc[]
 
 `PATCH /posts/{postId}`
 
+[.request]
 ==== 요청
 
 include::{snippets}/post-update/http-request.adoc[]
 include::{snippets}/post-update/path-parameters.adoc[]
 include::{snippets}/post-update/request-fields.adoc[]
 
+[.response]
 ==== 응답
 
 include::{snippets}/post-update/http-response.adoc[]
@@ -414,11 +487,13 @@ include::{snippets}/post-update/response-fields.adoc[]
 
 `DELETE /posts/{postId}`
 
+[.request]
 ==== 요청
 
 include::{snippets}/post-delete/http-request.adoc[]
 include::{snippets}/post-delete/path-parameters.adoc[]
 
+[.response]
 ==== 응답
 
 include::{snippets}/post-delete/http-response.adoc[]
@@ -429,11 +504,13 @@ include::{snippets}/post-delete/http-response.adoc[]
 
 `POST /reviews/{reviewId}/recommend`
 
+[.request]
 ==== 요청
 
 include::{snippets}/review-recommendation-create/http-request.adoc[]
 include::{snippets}/review-recommendation-create/path-parameters.adoc[]
 
+[.response]
 ==== 응답
 
 include::{snippets}/review-recommendation-create/http-response.adoc[]
@@ -442,11 +519,13 @@ include::{snippets}/review-recommendation-create/http-response.adoc[]
 
 `DELETE /reviews/{reviewId}/recommend`
 
+[.request]
 ==== 요청
 
 include::{snippets}/review-recommendation-delete/http-request.adoc[]
 include::{snippets}/review-recommendation-delete/path-parameters.adoc[]
 
+[.response]
 ==== 응답
 
 include::{snippets}/review-recommendation-delete/http-response.adoc[]
