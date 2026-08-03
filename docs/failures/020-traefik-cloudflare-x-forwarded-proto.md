@@ -18,7 +18,7 @@ Spring Boot의 `forward-headers-strategy: FRAMEWORK`는 Traefik이 덮어쓴 `ht
 redirect URI가 `http://`로 생성되어 Google Cloud Console에 등록된 `https://` URI와 mismatch.
 
 ## 해결
-헤더 의존을 제거하고 redirect-uri를 환경변수로 명시 (decisions/025 참고):
+헤더 의존을 제거하고 redirect-uri를 환경변수로 명시 (decisions/029 참고):
 ```yaml
 redirect-uri: "${GOOGLE_REDIRECT_URI:http://localhost:9000/login/oauth2/code/google}"
 ```

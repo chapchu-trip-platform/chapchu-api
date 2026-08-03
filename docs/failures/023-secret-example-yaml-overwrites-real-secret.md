@@ -1,4 +1,4 @@
-# 019. secret.example.yaml이 실제 시크릿을 REPLACE_ME로 덮어씀
+# 023. secret.example.yaml이 실제 시크릿을 REPLACE_ME로 덮어씀
 
 ## 증상
 ```
