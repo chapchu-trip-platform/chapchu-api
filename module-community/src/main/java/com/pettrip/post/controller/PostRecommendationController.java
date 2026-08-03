@@ -1,6 +1,6 @@
 package com.pettrip.post.controller;
 
-import com.pettrip.common.service.TempAuthContext;
+import com.pettrip.common.service.CurrentUserId;
 import com.pettrip.post.service.PostService;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -23,13 +23,13 @@ public class PostRecommendationController {
 
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  public void recommend(@PathVariable UUID postId) {
-    postService.recommend(TempAuthContext.TEMP_USER_ID, postId);
+  public void recommend(@CurrentUserId UUID userId, @PathVariable UUID postId) {
+    postService.recommend(userId, postId);
   }
 
   @DeleteMapping
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  public void cancelRecommendation(@PathVariable UUID postId) {
-    postService.cancelRecommendation(TempAuthContext.TEMP_USER_ID, postId);
+  public void cancelRecommendation(@CurrentUserId UUID userId, @PathVariable UUID postId) {
+    postService.cancelRecommendation(userId, postId);
   }
 }

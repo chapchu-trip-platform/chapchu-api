@@ -1,6 +1,6 @@
 package com.pettrip.post.controller;
 
-import com.pettrip.common.service.TempAuthContext;
+import com.pettrip.common.service.CurrentUserId;
 import com.pettrip.post.service.PostService;
 import jakarta.validation.Valid;
 import java.util.UUID;
@@ -24,8 +24,10 @@ public class PostReportController {
 
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  public void report(@PathVariable UUID postId, @RequestBody @Valid PostReportRequest request) {
-    postService.report(
-        TempAuthContext.TEMP_USER_ID, postId, request.reportReason(), request.reportDetail());
+  public void report(
+      @CurrentUserId UUID userId,
+      @PathVariable UUID postId,
+      @RequestBody @Valid PostReportRequest request) {
+    postService.report(userId, postId, request.reportReason(), request.reportDetail());
   }
 }

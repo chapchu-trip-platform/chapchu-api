@@ -1,16 +1,16 @@
 package com.pettrip.wishlist.controller;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.document;
 import static org.springframework.restdocs.request.RequestDocumentation.parameterWithName;
 import static org.springframework.restdocs.request.RequestDocumentation.pathParameters;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.pettrip.config.SecurityConfig;
 import com.pettrip.wishlist.model.Wishlist;
 import com.pettrip.wishlist.service.WishlistService;
 import java.util.List;
@@ -19,29 +19,33 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.restdocs.AutoConfigureRestDocs;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.restdocs.RestDocumentationExtension;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @ExtendWith(RestDocumentationExtension.class)
 @WebMvcTest(WishlistController.class)
-@AutoConfigureMockMvc(addFilters = false)
+@Import(SecurityConfig.class)
 @AutoConfigureRestDocs(outputDir = "app/build/generated-snippets")
 class WishlistControllerTest {
+
+  private static final UUID USER_ID = UUID.fromString("0198f3a0-1234-7000-8000-000000000001");
 
   @Autowired private MockMvc mockMvc;
 
   @MockitoBean private WishlistService wishlistService;
+  @MockitoBean private JwtDecoder jwtDecoder;
 
   @Test
   void 위시리스트_목록을_조회한다() throws Exception {
-    when(wishlistService.listMyWishlist(any()))
+    when(wishlistService.listMyWishlist(USER_ID))
         .thenReturn(List.of(new Wishlist(UUID.randomUUID(), "place-123")));
 
     mockMvc
-        .perform(get("/users/me/wishlist"))
+        .perform(get("/users/me/wishlist").with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
         .andExpect(status().isOk())
         .andDo(document("wishlist-list"));
   }
@@ -49,7 +53,9 @@ class WishlistControllerTest {
   @Test
   void 위시리스트에서_장소를_제거한다() throws Exception {
     mockMvc
-        .perform(delete("/users/me/wishlist/{placeId}", "place-123"))
+        .perform(
+            delete("/users/me/wishlist/{placeId}", "place-123")
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
         .andExpect(status().isNoContent())
         .andDo(
             document(
@@ -57,6 +63,6 @@ class WishlistControllerTest {
                 pathParameters(
                     parameterWithName("placeId").description("제거할 장소의 external place id"))));
 
-    verify(wishlistService).removeFromWishlist(any(), eq("place-123"));
+    verify(wishlistService).removeFromWishlist(USER_ID, "place-123");
   }
 }

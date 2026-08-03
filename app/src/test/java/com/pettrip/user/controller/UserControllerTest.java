@@ -128,26 +128,34 @@ class UserControllerTest {
 
   @Test
   void 이미_사용_중인_닉네임으로_등록하면_409를_반환한다() throws Exception {
-    when(userService.registerNickname(any(), eq("초롱이")))
+    when(userService.registerNickname(eq(USER_ID), eq("초롱이")))
         .thenThrow(new NicknameAlreadyInUseException());
 
     String body = objectMapper.writeValueAsString(new NicknameRegisterRequest("초롱이"));
 
     mockMvc
-        .perform(post("/users/me").contentType("application/json").content(body))
+        .perform(
+            post("/users/me")
+                .contentType("application/json")
+                .content(body)
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
         .andExpect(status().isConflict())
         .andExpect(jsonPath("$.code").value("CONFLICT"));
   }
 
   @Test
   void 이미_사용_중인_닉네임으로_변경하면_409를_반환한다() throws Exception {
-    when(userService.updateMe(any(), eq("초롱이"), any()))
+    when(userService.updateMe(eq(USER_ID), eq("초롱이"), any()))
         .thenThrow(new NicknameAlreadyInUseException());
 
     String body = objectMapper.writeValueAsString(new UserUpdateRequest("초롱이", null));
 
     mockMvc
-        .perform(patch("/users/me").contentType("application/json").content(body))
+        .perform(
+            patch("/users/me")
+                .contentType("application/json")
+                .content(body)
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
         .andExpect(status().isConflict());
   }
 }

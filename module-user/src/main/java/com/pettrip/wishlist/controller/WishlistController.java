@@ -1,8 +1,9 @@
 package com.pettrip.wishlist.controller;
 
-import com.pettrip.common.service.TempAuthContext;
+import com.pettrip.common.service.CurrentUserId;
 import com.pettrip.wishlist.service.WishlistService;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,15 +23,13 @@ public class WishlistController {
   }
 
   @GetMapping
-  public List<WishlistResponse> listMyWishlist() {
-    return wishlistService.listMyWishlist(TempAuthContext.TEMP_USER_ID).stream()
-        .map(WishlistResponse::from)
-        .toList();
+  public List<WishlistResponse> listMyWishlist(@CurrentUserId UUID userId) {
+    return wishlistService.listMyWishlist(userId).stream().map(WishlistResponse::from).toList();
   }
 
   @DeleteMapping("/{placeId}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  public void removeFromWishlist(@PathVariable String placeId) {
-    wishlistService.removeFromWishlist(TempAuthContext.TEMP_USER_ID, placeId);
+  public void removeFromWishlist(@CurrentUserId UUID userId, @PathVariable String placeId) {
+    wishlistService.removeFromWishlist(userId, placeId);
   }
 }

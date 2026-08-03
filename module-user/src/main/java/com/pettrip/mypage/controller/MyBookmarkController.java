@@ -1,9 +1,10 @@
 package com.pettrip.mypage.controller;
 
-import com.pettrip.common.service.TempAuthContext;
+import com.pettrip.common.service.CurrentUserId;
 import com.pettrip.mypage.service.MyBookmarkService;
 import com.pettrip.post.controller.PostResponse;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -19,9 +20,7 @@ public class MyBookmarkController {
   }
 
   @GetMapping
-  public List<PostResponse> listMyBookmarks() {
-    return myBookmarkService.listMyBookmarks(TempAuthContext.TEMP_USER_ID).stream()
-        .map(PostResponse::from)
-        .toList();
+  public List<PostResponse> listMyBookmarks(@CurrentUserId UUID userId) {
+    return myBookmarkService.listMyBookmarks(userId).stream().map(PostResponse::from).toList();
   }
 }
