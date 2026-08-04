@@ -1,4 +1,4 @@
-# 025. Google OAuth redirect-uri 명시적 고정
+# 029. Google OAuth redirect-uri 명시적 고정
 
 ## 상태
 - [x] 확정됨 (Accepted)
