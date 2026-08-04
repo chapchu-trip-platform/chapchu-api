@@ -161,6 +161,24 @@ include::{snippets}/user-update-me/request-fields.adoc[]
 include::{snippets}/user-update-me/http-response.adoc[]
 include::{snippets}/user-update-me/response-fields.adoc[]
 
+=== 선호 사항 선택지 조회
+
+`GET /preferences/options`
+
+선호 사항 등록/수정은 지역·테마·이동수단을 **UUID로** 받습니다.
+코드값은 DB 시딩 시 생성되므로 하드코딩할 수 없고, 이 API로 받아서 써야 합니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/preference-options/http-request.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/preference-options/http-response.adoc[]
+include::{snippets}/preference-options/response-fields.adoc[]
+
 === 선호 사항 조회
 
 `GET /users/me/preferences`

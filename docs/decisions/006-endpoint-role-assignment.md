@@ -18,6 +18,7 @@
 | 기능 | Method | URL | 담당 |
 |---|---|---|---|
 | 사용자 정보 조회 | GET | /users/me | 류연승 |
+| 선호 사항 선택지 조회 | GET | /preferences/options | 류연승 |
 | 사용자 선호 사항 등록 | POST | /users/me/preferences | 류연승 |
 | 사용자 선호 사항 조회 | GET | /users/me/preferences | 류연승 |
 | 사용자 선호 사항 수정 | PATCH | /users/me/preferences | 류연승 |
