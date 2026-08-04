@@ -380,11 +380,9 @@ include::{snippets}/photo-create/response-fields.adoc[]
 
 == 장소 API
 
-NOTE: 장소 도메인은 `main`에만 머지되어 있고 배포 대상인 `dev`에는 반영되지 않았습니다 (이슈 #50).
-스니펫이 생성되지 않아 문서를 제공할 수 없어 아래 내용을 주석 처리해 두었습니다.
-장소 도메인이 `dev`에 들어오면 아래 주석 블록만 걷어내면 됩니다.
+NOTE: 장소 등록(`POST /places`)과 정책 등록/수정은 아직 구현되지 않았습니다.
+현재 장소 데이터는 TourAPI에서 가져와 채웁니다 (`docs/decisions/030` 참고).
 
-////
 === 장소 조회
 
 `GET /places/{placeId}`
@@ -416,40 +414,6 @@ include::{snippets}/place-nearby/query-parameters.adoc[]
 
 include::{snippets}/place-nearby/http-response.adoc[]
 include::{snippets}/place-nearby/response-fields.adoc[]
-
-=== 장소 등록
-
-`POST /places`
-
-[.request]
-==== 요청
-
-include::{snippets}/place-register/http-request.adoc[]
-include::{snippets}/place-register/request-fields.adoc[]
-
-[.response]
-==== 응답
-
-include::{snippets}/place-register/http-response.adoc[]
-include::{snippets}/place-register/response-fields.adoc[]
-
-=== 장소 정책 등록/수정
-
-`PUT /places/{placeId}/policy`
-
-[.request]
-==== 요청
-
-include::{snippets}/place-policy-upsert/http-request.adoc[]
-include::{snippets}/place-policy-upsert/path-parameters.adoc[]
-include::{snippets}/place-policy-upsert/request-fields.adoc[]
-
-[.response]
-==== 응답
-
-include::{snippets}/place-policy-upsert/http-response.adoc[]
-include::{snippets}/place-policy-upsert/response-fields.adoc[]
-////
 
 == 커뮤니티 API
 
