@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chapchu-api-config
+  namespace: chapchu
+data:
+  SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres:5432/chapchu"
+  SPRING_DATASOURCE_USERNAME: "chapchu"
+  AUTH_SERVER_URL: "https://auth.chapchu.site"
