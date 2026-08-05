@@ -68,8 +68,8 @@ jobs:
             kubectl create secret generic postgres-secret \
               --from-literal=POSTGRES_PASSWORD="$DB_PASSWORD" \
               -n chapchu --dry-run=client -o yaml | kubectl apply -f -
-            kubectl create secret generic chapchu-secrets \
-              --from-literal=AUTH_SERVER_URL="https://auth.chapchu.site" \
+            kubectl create secret generic chapchu-api-secret \
+              --from-literal=SPRING_DATASOURCE_PASSWORD="$DB_PASSWORD" \
               -n chapchu --dry-run=client -o yaml | kubectl apply -f -
             kubectl create configmap chapchu-api-config \
               --from-literal=CORS_ALLOWED_ORIGINS="$CORS_ALLOWED_ORIGINS" \

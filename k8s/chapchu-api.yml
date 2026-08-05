@@ -20,26 +20,11 @@ spec:
           image: ghcr.io/chapchu-trip-platform/chapchu-api:latest
           ports:
             - containerPort: 8080
-          env:
-            - name: SPRING_DATASOURCE_URL
-              value: jdbc:postgresql://postgres:5432/chapchu
-            - name: SPRING_DATASOURCE_USERNAME
-              value: chapchu
-            - name: SPRING_DATASOURCE_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: postgres-secret
-                  key: POSTGRES_PASSWORD
-            - name: AUTH_SERVER_URL
-              valueFrom:
-                secretKeyRef:
-                  name: chapchu-secrets
-                  key: AUTH_SERVER_URL
-            - name: CORS_ALLOWED_ORIGINS
-              valueFrom:
-                configMapKeyRef:
-                  name: chapchu-api-config
-                  key: CORS_ALLOWED_ORIGINS
+          envFrom:
+            - configMapRef:
+                name: chapchu-api-config
+            - secretRef:
+                name: chapchu-api-secret
           resources:
             requests:
               memory: "512Mi"
