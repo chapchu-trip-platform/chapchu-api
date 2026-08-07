@@ -13,6 +13,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.pettrip.common.controller.GlobalExceptionHandler;
+import com.pettrip.common.service.ExternalApiException;
 import com.pettrip.config.SecurityConfig;
 import com.pettrip.place.model.Place;
 import com.pettrip.place.service.PlaceNotFoundException;
@@ -36,7 +38,7 @@ import org.springframework.test.web.servlet.MockMvc;
  * 위해서다 (docs/decisions/025). 필터를 끄면 시큐리티 설정이 잘못돼도 테스트는 통과한다.
  */
 @WebMvcTest(PlaceController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, GlobalExceptionHandler.class})
 @AutoConfigureRestDocs(outputDir = "app/build/generated-snippets")
 class PlaceControllerTest {
 
@@ -135,5 +137,25 @@ class PlaceControllerTest {
                     fieldWithPath("[].petPolicy").description("반려동물 정책").optional(),
                     fieldWithPath("[].createdAt").description("등록일시"),
                     fieldWithPath("[].updatedAt").description("수정일시"))));
+  }
+
+  /**
+   * TourAPI가 실패하면 502로 알린다. 500 raw 응답이 나가면 프론트가 "우리 서버가 깨졌는지 외부가 죽었는지" 구분할 수 없고, Spring 기본 에러 본문이
+   * 그대로 노출된다.
+   */
+  @Test
+  void 외부_API_실패시_502와_우리_에러_형식을_반환한다() throws Exception {
+    when(placeService.searchNearby(any(), any(), anyInt()))
+        .thenThrow(new ExternalApiException("TourAPI 호출에 실패했습니다.", null));
+
+    mockMvc
+        .perform(
+            get("/places/nearby")
+                .param("lat", "37.5665")
+                .param("lng", "126.9780")
+                .param("radiusMeters", "1000"))
+        .andExpect(status().isBadGateway())
+        .andExpect(jsonPath("$.code").value("EXTERNAL_API_ERROR"))
+        .andExpect(jsonPath("$.message").value("TourAPI 호출에 실패했습니다."));
   }
 }

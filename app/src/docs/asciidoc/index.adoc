@@ -54,6 +54,7 @@ Content-Type: application/json
 | `403 Forbidden` | 권한 없음
 | `404 Not Found` | 리소스 없음
 | `500 Internal Server Error` | 서버 오류
+| `502 Bad Gateway` | 외부 API(TourAPI 등) 연동 실패. 우리 서버가 아니라 상대 서비스 문제
 |===
 
 == 공통 API

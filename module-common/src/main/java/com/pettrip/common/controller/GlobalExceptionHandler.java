@@ -2,6 +2,7 @@ package com.pettrip.common.controller;
 
 import com.pettrip.common.model.ErrorResponse;
 import com.pettrip.common.service.ConflictException;
+import com.pettrip.common.service.ExternalApiException;
 import com.pettrip.common.service.NotFoundException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
@@ -30,6 +31,13 @@ public class GlobalExceptionHandler {
    * {@code @Validated} 컨트롤러의 요청 파라미터 제약 위반. 요청 본문(DTO) 검증은 {@code
    * MethodArgumentNotValidException}으로 별도 처리된다.
    */
+  /** 외부 API 장애는 502로 알린다. 500으로 두면 우리 서버 버그와 구분되지 않아 원인 추적이 늦어진다. */
+  @ExceptionHandler(ExternalApiException.class)
+  public ResponseEntity<ErrorResponse> handleExternalApi(ExternalApiException exception) {
+    return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+        .body(new ErrorResponse("EXTERNAL_API_ERROR", exception.getMessage()));
+  }
+
   @ExceptionHandler(ConstraintViolationException.class)
   public ResponseEntity<ErrorResponse> handleConstraintViolation(
       ConstraintViolationException exception) {
