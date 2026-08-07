@@ -107,7 +107,7 @@ include::{snippets}/user-get-me/response-fields.adoc[]
 
 === 닉네임 중복 확인
 
-`GET /users/nickname/check?nickname={nickname}`
+`GET /users/nickname/availability?nickname={nickname}`
 
 닉네임은 유저 간 중복될 수 없습니다. 이 API는 조회 시점 기준의 사전 안내이며 **예약 효과가 없습니다**.
 확인과 등록 사이에 다른 유저가 선점할 수 있으므로, 최종 판정은 닉네임 등록/수정 요청의 `409 Conflict` 응답으로 처리하세요.
@@ -626,7 +626,7 @@ include::{snippets}/comment-delete/http-response.adoc[]
 
 === 리뷰 추천
 
-`POST /reviews/{reviewId}/recommend`
+`POST /reviews/{reviewId}/recommendations`
 
 [.request]
 ==== 요청
@@ -641,7 +641,7 @@ include::{snippets}/review-recommendation-create/http-response.adoc[]
 
 === 리뷰 추천 취소
 
-`DELETE /reviews/{reviewId}/recommend`
+`DELETE /reviews/{reviewId}/recommendations`
 
 [.request]
 ==== 요청
