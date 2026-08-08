@@ -36,7 +36,10 @@ spec:
                   name: chapchu-secrets
                   key: AUTH_SERVER_URL
             - name: CORS_ALLOWED_ORIGINS
-              value: "http://localhost:3000"
+              valueFrom:
+                configMapKeyRef:
+                  name: chapchu-api-config
+                  key: CORS_ALLOWED_ORIGINS
           resources:
             requests:
               memory: "512Mi"
