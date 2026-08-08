@@ -35,6 +35,8 @@ spec:
                 secretKeyRef:
                   name: chapchu-secrets
                   key: AUTH_SERVER_URL
+            - name: CORS_ALLOWED_ORIGINS
+              value: "http://localhost:3000"
           resources:
             requests:
               memory: "512Mi"
