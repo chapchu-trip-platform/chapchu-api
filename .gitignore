@@ -35,6 +35,7 @@ Thumbs.db
 # Planning documents (로컬 참고용, VCS 불필요)
 *.pdf
 *.html
+!app/src/main/resources/static/docs/test-login.html
 
 # Blog posts (개인 블로그용, 레포에 포함 불필요)
 docs/blog/
