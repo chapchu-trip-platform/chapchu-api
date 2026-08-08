@@ -54,6 +54,7 @@ openapi3 {
 }
 
 bootJar {
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
     from("${buildDir}/docs/asciidoc") {
         into "BOOT-INF/classes/static/docs"
     }
