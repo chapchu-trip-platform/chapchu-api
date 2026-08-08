@@ -5,6 +5,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.pettrip.pet.controller.PetController;
@@ -85,5 +87,17 @@ class SecurityConfigTest {
   @Test
   void ERROR_디스패치가_아닌_일반_요청은_여전히_인증을_요구한다() throws Exception {
     mockMvc.perform(get("/error")).andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void 허용된_origin의_preflight_요청은_CORS_헤더를_포함해_응답한다() throws Exception {
+    mockMvc
+        .perform(
+            options("/users/me")
+                .header("Origin", "http://localhost:3000")
+                .header("Access-Control-Request-Method", "GET")
+                .header("Access-Control-Request-Headers", "Authorization"))
+        .andExpect(status().isOk())
+        .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:3000"));
   }
 }
