@@ -26,6 +26,7 @@ spring:
       resourceserver:
         jwt:
           issuer-uri: ${AUTH_SERVER_URL}
+          jwk-set-uri: ${AUTH_JWK_SET_URI:http://chapchu-auth.chapchu.svc.cluster.local:9000/oauth2/jwks}
 
   cloud:
     aws:
