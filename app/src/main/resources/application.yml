@@ -27,6 +27,22 @@ spring:
         jwt:
           issuer-uri: ${AUTH_SERVER_URL}
           jwk-set-uri: ${AUTH_JWK_SET_URI:http://chapchu-auth.chapchu.svc.cluster.local:9000/oauth2/jwks}
+      client:
+        registration:
+          chapchu-auth:
+            client-id: chapchu-api
+            client-secret: ${CHAPCHU_API_CLIENT_SECRET}
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/auth/callback"
+            scope: openid,profile,email
+        provider:
+          chapchu-auth:
+            issuer-uri: ${AUTH_SERVER_URL}
+
+chapchu-api:
+  auth:
+    fe-callback-url: ${FE_CALLBACK_URL:http://localhost:3000/login/callback}
+    fe-onboarding-url: ${FE_ONBOARDING_URL:http://localhost:3000/onboarding}
 
   cloud:
     aws:

@@ -9,6 +9,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
@@ -26,15 +27,21 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @Configuration
 public class SecurityConfig {
 
-  private static final String[] PUBLIC_PATHS = {
-    "/actuator/health", "/actuator/health/**", "/docs/**"
+  public static final String[] PUBLIC_PATHS = {
+    "/actuator/health",
+    "/actuator/health/**",
+    "/docs/**",
+    "/auth/login",
+    "/auth/callback",
+    "/auth/register",
+    "/auth/refresh"
   };
 
-  private static final String[] PUBLIC_GET_PATHS = {"/places", "/places/**", "/weather"};
+  public static final String[] PUBLIC_GET_PATHS = {"/places", "/places/**", "/weather"};
 
   @Bean
   public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-    http.csrf(csrf -> csrf.disable())
+    http.csrf(AbstractHttpConfigurer::disable)
         .cors(Customizer.withDefaults())
         .sessionManagement(
             session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
