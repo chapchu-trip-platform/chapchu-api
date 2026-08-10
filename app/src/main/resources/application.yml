@@ -41,6 +41,7 @@ spring:
 
 chapchu-api:
   auth:
+    callback-url: ${AUTH_CALLBACK_URL:}
     fe-callback-url: ${FE_CALLBACK_URL:http://localhost:3000/login/callback}
     fe-onboarding-url: ${FE_ONBOARDING_URL:http://localhost:3000/onboarding}
 
