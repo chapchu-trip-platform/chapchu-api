@@ -43,6 +43,9 @@ public class AuthController {
   @Value("${chapchu-api.auth.fe-onboarding-url}")
   private String feOnboardingUrl;
 
+  @Value("${chapchu-api.auth.callback-url:}")
+  private String configuredCallbackUrl;
+
   @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}")
   private String authServerUrl;
 
@@ -178,6 +181,9 @@ public class AuthController {
   }
 
   private String buildRedirectUri(HttpServletRequest request) {
+    if (configuredCallbackUrl != null && !configuredCallbackUrl.isEmpty()) {
+      return configuredCallbackUrl;
+    }
     int port = request.getServerPort();
     String portPart = (port == 80 || port == 443) ? "" : ":" + port;
     return request.getScheme() + "://" + request.getServerName() + portPart + "/auth/callback";
