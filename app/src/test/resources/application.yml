@@ -13,6 +13,26 @@ spring:
       resourceserver:
         jwt:
           issuer-uri: http://localhost:9000
+      client:
+        registration:
+          chapchu-auth:
+            client-id: chapchu-api
+            client-secret: test-secret
+            authorization-grant-type: authorization_code
+            redirect-uri: "http://localhost:8080/auth/callback"
+            scope: openid,profile,email
+        provider:
+          chapchu-auth:
+            authorization-uri: http://localhost:9000/oauth2/authorize
+            token-uri: http://localhost:9000/oauth2/token
+            jwk-set-uri: http://localhost:9000/oauth2/jwks
+            user-info-uri: http://localhost:9000/userinfo
+            user-name-attribute: sub
+
+chapchu-api:
+  auth:
+    fe-callback-url: http://localhost:3000/login/callback
+    fe-onboarding-url: http://localhost:3000/onboarding
   ai:
     anthropic:
       api-key: test
