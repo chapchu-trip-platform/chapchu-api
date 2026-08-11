@@ -78,7 +78,8 @@ public class AuthController {
             + "&scope="
             + URLEncoder.encode(String.join(" ", reg.getScopes()), StandardCharsets.UTF_8)
             + "&state="
-            + state;
+            + state
+            + "&prompt=select_account";
 
     response.sendRedirect(authorizationUri);
   }
