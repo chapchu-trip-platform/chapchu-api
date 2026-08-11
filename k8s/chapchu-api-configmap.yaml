@@ -8,6 +8,6 @@ data:
   SPRING_DATASOURCE_USERNAME: "chapchu"
   AUTH_SERVER_URL: "https://auth.chapchu.site"
   AUTH_CALLBACK_URL: "https://api.chapchu.site/auth/callback"
-  FE_CALLBACK_URL: "https://www.chapchu.site/login/callback"
-  FE_ONBOARDING_URL: "https://www.chapchu.site/onboarding"
+  FE_CALLBACK_URL: "https://api.chapchu.site/docs/test-login.html"
+  FE_ONBOARDING_URL: "https://api.chapchu.site/docs/test-login.html"
   CORS_ALLOWED_ORIGINS: "https://www.chapchu.site,http://localhost:3000"
