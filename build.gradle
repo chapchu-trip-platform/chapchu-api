@@ -46,6 +46,10 @@ subprojects {
         options.compilerArgs << '-parameters'
     }
 
+    // Boot 3.4.5가 고정하는 testcontainers 1.20.6은 최신 Docker Desktop의 소켓을 인식하지 못한다.
+    // Boot BOM은 버전을 프로퍼티로 노출하므로 이렇게 덮어써야 한다 (BOM을 덧붙이면 Boot 쪽이 이긴다).
+    ext['testcontainers.version'] = '1.21.4'
+
     dependencyManagement {
         imports {
             mavenBom "org.springframework.boot:spring-boot-dependencies:3.4.5"

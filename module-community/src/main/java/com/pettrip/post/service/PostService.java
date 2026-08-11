@@ -92,6 +92,8 @@ public class PostService {
     postBookmarkRepository.save(new PostBookmark(userId, postId));
   }
 
+  /** 파생 delete 쿼리는 트랜잭션 안에서만 실행된다. 빠지면 호출이 통째로 500이 된다. */
+  @Transactional
   public void cancelBookmark(UUID userId, UUID postId) {
     findPost(postId);
     if (!postBookmarkRepository.existsByUserIdAndPostId(userId, postId)) {
