@@ -10,4 +10,4 @@ data:
   AUTH_CALLBACK_URL: "https://api.chapchu.site/auth/callback"
   FE_CALLBACK_URL: "https://api.chapchu.site/docs/test-login.html"
   FE_ONBOARDING_URL: "https://api.chapchu.site/docs/test-login.html"
-  CORS_ALLOWED_ORIGINS: "https://www.chapchu.site,http://localhost:3000"
+  CORS_ALLOWED_ORIGINS: "https://api.chapchu.site,http://localhost:3000"
