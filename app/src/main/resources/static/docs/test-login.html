@@ -16,59 +16,22 @@
   </style>
 </head>
 <body>
-<h2>Chapchu 로그인 테스트</h2>
+<h2>Chapchu 로그인 테스트 (BFF)</h2>
 <div id="app"></div>
 
 <script>
-const AUTH_URL = 'https://auth.chapchu.site';
-const API_URL  = 'https://api.chapchu.site';
-const CLIENT_ID    = 'chapchu-front';
-const REDIRECT_URI = 'https://api.chapchu.site/docs/test-login.html';
+const API_URL = 'https://api.chapchu.site';
 
-function b64url(buf) {
-  return btoa(String.fromCharCode(...new Uint8Array(buf)))
-    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+function login() {
+  location.href = `${API_URL}/auth/login`;
 }
 
-async function pkce() {
-  const verifier  = b64url(crypto.getRandomValues(new Uint8Array(32)));
-  const challenge = b64url(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)));
-  return { verifier, challenge };
-}
-
-async function login() {
-  const { verifier, challenge } = await pkce();
-  sessionStorage.setItem('cv', verifier);
-  const params = new URLSearchParams({
-    response_type: 'code', client_id: CLIENT_ID,
-    redirect_uri: REDIRECT_URI, scope: 'openid profile email',
-    code_challenge: challenge, code_challenge_method: 'S256',
-  });
-  location.href = `${AUTH_URL}/oauth2/authorize?${params}`;
-}
-
-async function handleCallback(code) {
+async function handleToken(accessToken) {
   const app = document.getElementById('app');
-  app.innerHTML = '<p>토큰 교환 중...</p>';
-
-  const tokenRes = await fetch(`${AUTH_URL}/oauth2/token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'authorization_code', client_id: CLIENT_ID,
-      redirect_uri: REDIRECT_URI, code,
-      code_verifier: sessionStorage.getItem('cv'),
-    }),
-  });
-
-  const tokens = await tokenRes.json();
-  if (!tokens.access_token) {
-    app.innerHTML = `<p class="error">토큰 교환 실패</p><pre>${JSON.stringify(tokens, null, 2)}</pre>`;
-    return;
-  }
+  app.innerHTML = '<p>유저 정보 조회 중...</p>';
 
   const meRes = await fetch(`${API_URL}/users/me`, {
-    headers: { Authorization: `Bearer ${tokens.access_token}` },
+    headers: { Authorization: `Bearer ${accessToken}` },
   });
   const me = await meRes.json();
 
@@ -77,9 +40,7 @@ async function handleCallback(code) {
     <h3>유저 정보 (/users/me)</h3>
     <pre>${JSON.stringify(me, null, 2)}</pre>
     <h3>Access Token</h3>
-    <pre class="token">${tokens.access_token}</pre>
-    <h3>Token 전체 응답</h3>
-    <pre>${JSON.stringify(tokens, null, 2)}</pre>
+    <pre class="token">${accessToken}</pre>
     <br><button onclick="login()">다른 계정으로 로그인</button>
   `;
 }
@@ -105,7 +66,7 @@ async function submitNickname(registrationToken) {
   if (!nickname) { errEl.textContent = '닉네임을 입력해주세요.'; return; }
   errEl.textContent = '';
 
-  const res = await fetch(`${AUTH_URL}/auth/register`, {
+  const res = await fetch(`${API_URL}/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ registrationToken, nickname }),
@@ -117,18 +78,21 @@ async function submitNickname(registrationToken) {
     return;
   }
 
-  // 유저 생성 완료 — OAuth 플로우 재시작 (Google 세션 유지로 투명하게 처리됨)
   login();
 }
 
+// fragment에서 access_token 추출 (BFF 콜백)
+const hash = new URLSearchParams(location.hash.slice(1));
+const accessToken = hash.get('access_token');
+
+// query param에서 registration_token 추출 (신규 유저 온보딩)
 const params = new URLSearchParams(location.search);
-const code = params.get('code');
 const registrationToken = params.get('registration_token');
 
-if (registrationToken) {
+if (accessToken) {
+  handleToken(accessToken);
+} else if (registrationToken) {
   showOnboardingForm(registrationToken);
-} else if (code) {
-  handleCallback(code);
 } else {
   document.getElementById('app').innerHTML = '<button onclick="login()">구글로 로그인</button>';
 }
