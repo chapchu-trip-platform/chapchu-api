@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
@@ -129,13 +130,17 @@ public class AuthController {
     MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
     body.add("grant_type", "refresh_token");
     body.add("refresh_token", refreshToken);
-    body.add("client_id", reg.getClientId());
-    body.add("client_secret", reg.getClientSecret());
+
+    String credentials =
+        Base64.getEncoder()
+            .encodeToString(
+                (reg.getClientId() + ":" + reg.getClientSecret()).getBytes(StandardCharsets.UTF_8));
 
     Map<?, ?> tokenResponse =
         restClient
             .post()
             .uri(URI.create(authServerUrl + "/oauth2/token"))
+            .header("Authorization", "Basic " + credentials)
             .contentType(MediaType.APPLICATION_FORM_URLENCODED)
             .body(body)
             .retrieve()
@@ -164,13 +169,17 @@ public class AuthController {
     body.add("grant_type", "authorization_code");
     body.add("code", code);
     body.add("redirect_uri", redirectUri);
-    body.add("client_id", reg.getClientId());
-    body.add("client_secret", reg.getClientSecret());
+
+    String credentials =
+        Base64.getEncoder()
+            .encodeToString(
+                (reg.getClientId() + ":" + reg.getClientSecret()).getBytes(StandardCharsets.UTF_8));
 
     Map<?, ?> tokenResponse =
         restClient
             .post()
             .uri(URI.create(authServerUrl + "/oauth2/token"))
+            .header("Authorization", "Basic " + credentials)
             .contentType(MediaType.APPLICATION_FORM_URLENCODED)
             .body(body)
             .retrieve()
