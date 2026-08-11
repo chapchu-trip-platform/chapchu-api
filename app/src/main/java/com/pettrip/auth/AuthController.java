@@ -38,11 +38,8 @@ public class AuthController {
   private final ClientRegistrationRepository clientRegistrationRepository;
   private final RestClient restClient = RestClient.create();
 
-  @Value("${chapchu-api.auth.fe-callback-url}")
-  private String feCallbackUrl;
-
-  @Value("${chapchu-api.auth.fe-onboarding-url}")
-  private String feOnboardingUrl;
+  @Value("${chapchu-api.auth.fe-redirect-url}")
+  private String feRedirectUrl;
 
   @Value("${chapchu-api.auth.callback-url:}")
   private String configuredCallbackUrl;
@@ -103,7 +100,7 @@ public class AuthController {
       throws IOException {
 
     if (registrationToken != null) {
-      response.sendRedirect(feOnboardingUrl + "?registration_token=" + registrationToken);
+      response.sendRedirect(feRedirectUrl + "?registration_token=" + registrationToken);
       return;
     }
 
@@ -116,7 +113,7 @@ public class AuthController {
 
     TokenResponse tokens = exchangeCode(code, buildRedirectUri(request));
     setRefreshTokenCookie(response, tokens.refreshToken(), request.isSecure());
-    response.sendRedirect(feCallbackUrl + "#access_token=" + tokens.accessToken());
+    response.sendRedirect(feRedirectUrl + "#access_token=" + tokens.accessToken());
   }
 
   /** refresh_token 쿠키를 만료시켜 로그아웃한다. */
