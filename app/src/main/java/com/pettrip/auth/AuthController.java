@@ -119,6 +119,17 @@ public class AuthController {
     response.sendRedirect(feCallbackUrl + "#access_token=" + tokens.accessToken());
   }
 
+  /** refresh_token 쿠키를 만료시켜 로그아웃한다. */
+  @PostMapping("/logout")
+  public ResponseEntity<Void> logout(HttpServletResponse response) {
+    Cookie cookie = new Cookie(REFRESH_TOKEN_COOKIE, "");
+    cookie.setPath("/auth/refresh");
+    cookie.setMaxAge(0);
+    cookie.setHttpOnly(true);
+    response.addCookie(cookie);
+    return ResponseEntity.ok().build();
+  }
+
   /** refresh_token 쿠키로 새 access_token을 발급한다. */
   @PostMapping("/refresh")
   public ResponseEntity<Map<String, String>> refresh(

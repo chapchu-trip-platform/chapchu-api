@@ -34,7 +34,8 @@ public class SecurityConfig {
     "/auth/login",
     "/auth/callback",
     "/auth/register",
-    "/auth/refresh"
+    "/auth/refresh",
+    "/auth/logout"
   };
 
   public static final String[] PUBLIC_GET_PATHS = {"/places", "/places/**", "/weather"};
