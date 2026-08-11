@@ -54,7 +54,9 @@ tasks.named('test') {
     // 건너뛴 테스트를 반드시 드러낸다.
     testLogging {
         events 'skipped', 'failed'
-        exceptionFormat 'short'
+        exceptionFormat 'full'
+        showCauses true
+        showStackTraces true
     }
 }
 
