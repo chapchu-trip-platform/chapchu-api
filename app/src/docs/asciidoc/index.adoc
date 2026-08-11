@@ -56,6 +56,92 @@ Content-Type: application/json
 | `500 Internal Server Error` | 서버 오류
 |===
 
+== 인증 API (BFF)
+
+chapchu-api가 OAuth2 Confidential Client로서 구글 로그인 흐름 전체를 대리 처리합니다.
+FE는 `/auth/login` 만 알면 되고, 코드 교환·토큰 저장·갱신은 서버가 처리합니다.
+
+=== 로그인 시작
+
+`GET /auth/login`
+
+FE가 *브라우저를* 이 URL로 이동시킵니다. 이후 흐름은 서버가 자동 처리합니다.
+
+* *기존 유저*: 구글 로그인 완료 후 `{FE_CALLBACK_URL}#access_token={JWT}` 로 리다이렉트
+* *신규 유저*: `{FE_ONBOARDING_URL}?registration_token={token}` 로 리다이렉트
+
+NOTE: access_token은 URL fragment(`#`)로 전달됩니다. 서버 로그에 남지 않으며 FE 스크립트에서만 읽을 수 있습니다.
+
+=== 신규 유저 등록
+
+`POST /auth/register`
+
+신규 유저 온보딩 시 닉네임을 등록합니다. 성공 후 FE에서 다시 `/auth/login`으로 이동해 토큰을 발급받습니다.
+
+[.request]
+==== 요청
+
+[source,http]
+----
+POST /auth/register HTTP/1.1
+Content-Type: application/json
+
+{
+  "registrationToken": "온보딩 콜백에서 받은 토큰",
+  "nickname": "사용자 닉네임"
+}
+----
+
+[.response]
+==== 응답
+
+* `200 OK` — 등록 성공
+* `400 Bad Request` — 토큰 만료 또는 닉네임 중복
+
+=== access_token 갱신
+
+`POST /auth/refresh`
+
+refresh_token 쿠키가 자동으로 포함되므로 FE는 별도 헤더 없이 호출합니다.
+반드시 `credentials: 'include'` (fetch) 또는 `withCredentials: true` (axios) 설정이 필요합니다.
+
+[.request]
+==== 요청
+
+[source,http]
+----
+POST /auth/refresh HTTP/1.1
+Cookie: refresh_token={token}
+----
+
+[.response]
+==== 응답
+
+[source,json]
+----
+{
+  "access_token": "새로 발급된 JWT"
+}
+----
+
+* `401 Unauthorized` — refresh_token 없음 또는 만료 → FE에서 `/auth/login`으로 이동
+
+=== 로그아웃
+
+`POST /auth/logout`
+
+refresh_token 쿠키를 만료시킵니다. FE는 로컬에 저장된 access_token도 함께 삭제해야 합니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/auth-logout/http-request.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/auth-logout/http-response.adoc[]
+
 == 공통 API
 
 === 홈 통합 데이터 조회
