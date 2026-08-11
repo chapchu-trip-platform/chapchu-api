@@ -27,8 +27,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @TestPropertySource(
     properties = {
       "spring.security.oauth2.resourceserver.jwt.issuer-uri=https://auth.chapchu.site",
-      "chapchu-api.auth.fe-callback-url=http://localhost:3000/login/callback",
-      "chapchu-api.auth.fe-onboarding-url=http://localhost:3000/onboarding",
+      "chapchu-api.auth.fe-redirect-url=http://localhost:3000/auth/oauth",
       "chapchu-api.auth.callback-url=http://localhost:8080/auth/callback"
     })
 class AuthControllerTest {
