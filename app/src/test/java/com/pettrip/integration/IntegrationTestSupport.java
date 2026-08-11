@@ -101,12 +101,23 @@ abstract class IntegrationTestSupport {
     registry.add("app.tour-api.base-url", () -> "http://localhost:1/never-called");
   }
 
+  /**
+   * 로컬에서 Docker를 켜지 않은 사람도 {@code ./gradlew check}가 돌아가게 건너뛴다.
+   *
+   * <p>단 CI에서는 건너뛰지 않고 <b>실패시킨다.</b> 조용히 건너뛰면 통합 테스트가 한 줄도 돌지 않았는데도 CI가 초록불이 되고, 그건 테스트가 없는 것보다
+   * 나쁘다.
+   */
   static boolean dockerAvailable() {
+    boolean available;
     try {
-      return DockerClientFactory.instance().isDockerAvailable();
+      available = DockerClientFactory.instance().isDockerAvailable();
     } catch (Throwable t) {
-      return false;
+      available = false;
     }
+    if (!available && System.getenv("CI") != null) {
+      throw new IllegalStateException("CI인데 Docker를 찾지 못했다. 통합 테스트를 건너뛴 채 초록불을 내지 않는다.");
+    }
+    return available;
   }
 
   // ─────────────────────────────────────────────── 인증
