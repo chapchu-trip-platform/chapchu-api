@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.Map;
 import java.util.UUID;
@@ -33,6 +34,7 @@ public class AuthController {
 
   private static final String REGISTRATION_ID = "chapchu-auth";
   private static final String STATE_COOKIE = "oauth2_state";
+  private static final String REDIRECT_COOKIE = "oauth2_redirect";
   private static final String REFRESH_TOKEN_COOKIE = "refresh_token";
 
   private final ClientRegistrationRepository clientRegistrationRepository;
@@ -44,6 +46,9 @@ public class AuthController {
   @Value("${chapchu-api.auth.callback-url:}")
   private String configuredCallbackUrl;
 
+  @Value("${cors.allowed-origins:http://localhost:3000}")
+  private String allowedOrigins;
+
   @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}")
   private String authServerUrl;
 
@@ -51,9 +56,13 @@ public class AuthController {
     this.clientRegistrationRepository = clientRegistrationRepository;
   }
 
-  /** FE 로그인 진입점. state를 쿠키에 저장하고 chapchu-auth 인가 엔드포인트로 리다이렉트한다. */
+  /** FE 로그인 진입점. redirect 파라미터로 환경별 콜백 URL 지정 가능. 허용된 CORS origin 기준으로 검증하여 open redirect를 차단한다. */
   @GetMapping("/login")
-  public void login(HttpServletRequest request, HttpServletResponse response) throws IOException {
+  public void login(
+      @RequestParam(required = false) String redirect,
+      HttpServletRequest request,
+      HttpServletResponse response)
+      throws IOException {
     ClientRegistration reg = clientRegistrationRepository.findByRegistrationId(REGISTRATION_ID);
     String state = UUID.randomUUID().toString();
 
@@ -64,14 +73,22 @@ public class AuthController {
     stateCookie.setMaxAge(300);
     response.addCookie(stateCookie);
 
-    String redirectUri = buildRedirectUri(request);
+    String resolvedRedirect = resolveRedirectUrl(redirect);
+    Cookie redirectCookie = new Cookie(REDIRECT_COOKIE, resolvedRedirect);
+    redirectCookie.setHttpOnly(true);
+    redirectCookie.setSecure(request.isSecure());
+    redirectCookie.setPath("/auth/callback");
+    redirectCookie.setMaxAge(300);
+    response.addCookie(redirectCookie);
+
+    String callbackUri = buildRedirectUri(request);
     String authorizationUri =
         reg.getProviderDetails().getAuthorizationUri()
             + "?response_type=code"
             + "&client_id="
             + reg.getClientId()
             + "&redirect_uri="
-            + URLEncoder.encode(redirectUri, StandardCharsets.UTF_8)
+            + URLEncoder.encode(callbackUri, StandardCharsets.UTF_8)
             + "&scope="
             + URLEncoder.encode(String.join(" ", reg.getScopes()), StandardCharsets.UTF_8)
             + "&state="
@@ -85,7 +102,7 @@ public class AuthController {
    * chapchu-auth 콜백.
    *
    * <ul>
-   *   <li>신규 유저: {@code ?registration_token=xxx} → FE 온보딩 페이지로 리다이렉트
+   *   <li>신규 유저: {@code ?registration_token=xxx} → FE 콜백으로 리다이렉트
    *   <li>기존 유저: {@code ?code=xxx&state=xxx} → 토큰 교환 → FE 콜백으로 리다이렉트
    * </ul>
    */
@@ -95,12 +112,16 @@ public class AuthController {
       @RequestParam(required = false) String state,
       @RequestParam(name = "registration_token", required = false) String registrationToken,
       @CookieValue(name = STATE_COOKIE, required = false) String stateCookie,
+      @CookieValue(name = REDIRECT_COOKIE, required = false) String redirectCookie,
       HttpServletRequest request,
       HttpServletResponse response)
       throws IOException {
 
+    String targetRedirect = redirectCookie != null ? redirectCookie : feRedirectUrl;
+    clearCookie(response, REDIRECT_COOKIE, "/auth/callback");
+
     if (registrationToken != null) {
-      response.sendRedirect(feRedirectUrl + "?registration_token=" + registrationToken);
+      response.sendRedirect(targetRedirect + "?registration_token=" + registrationToken);
       return;
     }
 
@@ -109,11 +130,11 @@ public class AuthController {
       return;
     }
 
-    clearCookie(response, STATE_COOKIE);
+    clearCookie(response, STATE_COOKIE, "/");
 
     TokenResponse tokens = exchangeCode(code, buildRedirectUri(request));
     setRefreshTokenCookie(response, tokens.refreshToken(), request.isSecure());
-    response.sendRedirect(feRedirectUrl + "#access_token=" + tokens.accessToken());
+    response.sendRedirect(targetRedirect + "#access_token=" + tokens.accessToken());
   }
 
   /** refresh_token 쿠키를 만료시켜 로그아웃한다. */
@@ -171,6 +192,18 @@ public class AuthController {
     return ResponseEntity.ok().build();
   }
 
+  /** redirect 파라미터가 허용된 origin 기준으로 유효하면 그대로, 아니면 기본 URL 반환. */
+  private String resolveRedirectUrl(String redirect) {
+    if (redirect == null || redirect.isBlank()) {
+      return feRedirectUrl;
+    }
+    boolean allowed =
+        Arrays.stream(allowedOrigins.split(","))
+            .map(String::trim)
+            .anyMatch(origin -> redirect.startsWith(origin + "/") || redirect.equals(origin));
+    return allowed ? redirect : feRedirectUrl;
+  }
+
   private TokenResponse exchangeCode(String code, String redirectUri) {
     ClientRegistration reg = clientRegistrationRepository.findByRegistrationId(REGISTRATION_ID);
 
@@ -217,9 +250,9 @@ public class AuthController {
     response.addCookie(cookie);
   }
 
-  private void clearCookie(HttpServletResponse response, String name) {
+  private void clearCookie(HttpServletResponse response, String name, String path) {
     Cookie cookie = new Cookie(name, "");
-    cookie.setPath("/");
+    cookie.setPath(path);
     cookie.setMaxAge(0);
     response.addCookie(cookie);
   }
