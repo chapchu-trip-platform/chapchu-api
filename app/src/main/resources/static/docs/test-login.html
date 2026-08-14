@@ -23,7 +23,8 @@
 const API_URL = 'https://api.chapchu.site';
 
 function login() {
-  location.href = `${API_URL}/auth/login`;
+  const redirect = encodeURIComponent(`${API_URL}/docs/test-login.html`);
+  location.href = `${API_URL}/auth/login?redirect=${redirect}`;
 }
 
 async function handleToken(accessToken) {
