@@ -21,9 +21,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pettrip.config.SecurityConfig;
 import com.pettrip.pet.model.Breed;
 import com.pettrip.pet.model.Pet;
+import com.pettrip.pet.model.PetActivity;
 import com.pettrip.pet.model.PetSize;
 import com.pettrip.pet.service.PetService;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -80,13 +82,16 @@ class PetControllerTest {
   @Test
   void 반려견을_등록한다() throws Exception {
     Integer breedId = 7;
+    UUID activityId = UUID.randomUUID();
     Breed breed = new Breed("골든리트리버");
     Pet pet = new Pet(UUID.randomUUID(), breed, "초코", PetSize.MEDIUM, 3);
-    when(petService.createPet(any(), eq(breedId), eq("초코"), eq(PetSize.MEDIUM), eq(3)))
+    pet.replaceActivities(Set.of(new PetActivity("산책")));
+    when(petService.createPet(any(), eq(breedId), eq("초코"), eq(PetSize.MEDIUM), eq(3), any()))
         .thenReturn(pet);
 
     String body =
-        objectMapper.writeValueAsString(new PetCreateRequest("초코", breedId, PetSize.MEDIUM, 3));
+        objectMapper.writeValueAsString(
+            new PetCreateRequest("초코", breedId, PetSize.MEDIUM, 3, List.of(activityId)));
 
     mockMvc
         .perform(
@@ -102,7 +107,10 @@ class PetControllerTest {
                     fieldWithPath("petName").description("반려견 이름"),
                     fieldWithPath("breedId").description("견종 ID"),
                     fieldWithPath("size").description("크기 (SMALL/MEDIUM/LARGE)"),
-                    fieldWithPath("age").description("나이")),
+                    fieldWithPath("age").description("나이"),
+                    fieldWithPath("activityIds")
+                        .description("선호 활동 ID 목록. 생략 가능. `GET /activities`로 선택지를 받는다")
+                        .optional()),
                 responseFields(
                     fieldWithPath("id").description("반려견 ID"),
                     fieldWithPath("petName").description("반려견 이름"),
@@ -110,6 +118,8 @@ class PetControllerTest {
                     fieldWithPath("breedName").description("견종 이름"),
                     fieldWithPath("size").description("크기"),
                     fieldWithPath("age").description("나이"),
+                    fieldWithPath("activities[].id").description("선호 활동 ID"),
+                    fieldWithPath("activities[].name").description("선호 활동 이름"),
                     fieldWithPath("createdAt").description("생성일시"),
                     fieldWithPath("updatedAt").description("수정일시"))));
   }
@@ -119,10 +129,12 @@ class PetControllerTest {
     UUID petId = UUID.randomUUID();
     Breed breed = new Breed("말티즈");
     Pet pet = new Pet(UUID.randomUUID(), breed, "루이", PetSize.SMALL, 2);
-    when(petService.updatePet(any(), eq(petId), eq(null), eq("루이"), eq(null), eq(null)))
+    pet.replaceActivities(Set.of(new PetActivity("산책")));
+    when(petService.updatePet(any(), eq(petId), eq(null), eq("루이"), eq(null), eq(null), eq(null)))
         .thenReturn(pet);
 
-    String body = objectMapper.writeValueAsString(new PetUpdateRequest("루이", null, null, null));
+    String body =
+        objectMapper.writeValueAsString(new PetUpdateRequest("루이", null, null, null, null));
 
     mockMvc
         .perform(
@@ -139,7 +151,10 @@ class PetControllerTest {
                     fieldWithPath("petName").description("반려견 이름 (선택)"),
                     fieldWithPath("breedId").description("견종 ID (선택)"),
                     fieldWithPath("size").description("크기 (선택)"),
-                    fieldWithPath("age").description("나이 (선택)")),
+                    fieldWithPath("age").description("나이 (선택)"),
+                    fieldWithPath("activityIds")
+                        .description("선호 활동 ID 목록. 생략하면 기존 값 유지, 빈 배열이면 전부 삭제")
+                        .optional()),
                 responseFields(
                     fieldWithPath("id").description("반려견 ID"),
                     fieldWithPath("petName").description("반려견 이름"),
@@ -147,6 +162,8 @@ class PetControllerTest {
                     fieldWithPath("breedName").description("견종 이름"),
                     fieldWithPath("size").description("크기"),
                     fieldWithPath("age").description("나이"),
+                    fieldWithPath("activities[].id").description("선호 활동 ID"),
+                    fieldWithPath("activities[].name").description("선호 활동 이름"),
                     fieldWithPath("createdAt").description("생성일시"),
                     fieldWithPath("updatedAt").description("수정일시"))));
   }

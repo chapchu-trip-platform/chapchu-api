@@ -38,7 +38,12 @@ public class PetController {
       @CurrentUserId UUID userId, @RequestBody @Valid PetCreateRequest request) {
     Pet pet =
         petService.createPet(
-            userId, request.breedId(), request.petName(), request.size(), request.age());
+            userId,
+            request.breedId(),
+            request.petName(),
+            request.size(),
+            request.age(),
+            request.activityIds());
     return PetResponse.from(pet);
   }
 
@@ -49,7 +54,13 @@ public class PetController {
       @RequestBody @Valid PetUpdateRequest request) {
     Pet pet =
         petService.updatePet(
-            userId, petId, request.breedId(), request.petName(), request.size(), request.age());
+            userId,
+            petId,
+            request.breedId(),
+            request.petName(),
+            request.size(),
+            request.age(),
+            request.activityIds());
     return PetResponse.from(pet);
   }
 
