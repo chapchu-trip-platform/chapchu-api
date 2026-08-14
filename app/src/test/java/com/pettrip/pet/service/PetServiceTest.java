@@ -46,7 +46,7 @@ class PetServiceTest {
   @Test
   void createPet는_견종이_없으면_예외를_던진다() {
     UUID userId = UUID.randomUUID();
-    UUID breedId = UUID.randomUUID();
+    Integer breedId = 7;
     when(breedRepository.findById(breedId)).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> petService.createPet(userId, breedId, "초코", PetSize.MEDIUM, 3))
@@ -56,7 +56,7 @@ class PetServiceTest {
   @Test
   void createPet는_견종이_있으면_반려견을_저장한다() {
     UUID userId = UUID.randomUUID();
-    UUID breedId = UUID.randomUUID();
+    Integer breedId = 7;
     Breed breed = new Breed("골든리트리버");
     when(breedRepository.findById(breedId)).thenReturn(Optional.of(breed));
     when(petRepository.save(any(Pet.class))).thenAnswer(invocation -> invocation.getArgument(0));

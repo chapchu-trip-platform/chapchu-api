@@ -79,7 +79,7 @@ class PetControllerTest {
 
   @Test
   void 반려견을_등록한다() throws Exception {
-    UUID breedId = UUID.randomUUID();
+    Integer breedId = 7;
     Breed breed = new Breed("골든리트리버");
     Pet pet = new Pet(UUID.randomUUID(), breed, "초코", PetSize.MEDIUM, 3);
     when(petService.createPet(any(), eq(breedId), eq("초코"), eq(PetSize.MEDIUM), eq(3)))
