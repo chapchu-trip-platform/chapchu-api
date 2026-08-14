@@ -2,7 +2,9 @@ package com.pettrip.common.controller;
 
 import com.pettrip.common.model.ErrorResponse;
 import com.pettrip.common.service.ConflictException;
+import com.pettrip.common.service.ExternalApiException;
 import com.pettrip.common.service.NotFoundException;
+import com.pettrip.common.service.UnauthorizedException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
@@ -18,6 +20,19 @@ public class GlobalExceptionHandler {
   public ResponseEntity<ErrorResponse> handleNotFound(NotFoundException exception) {
     return ResponseEntity.status(HttpStatus.NOT_FOUND)
         .body(new ErrorResponse("NOT_FOUND", exception.getMessage()));
+  }
+
+  @ExceptionHandler(UnauthorizedException.class)
+  public ResponseEntity<ErrorResponse> handleUnauthorized(UnauthorizedException e) {
+    return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+        .body(new ErrorResponse("UNAUTHORIZED", e.getMessage()));
+  }
+
+  /** 바깥 서비스 장애를 500으로 흘리지 않는다. 프론트가 "잠시 후 다시 시도"를 안내할 수 있어야 한다. */
+  @ExceptionHandler(ExternalApiException.class)
+  public ResponseEntity<ErrorResponse> handleExternalApi(ExternalApiException e) {
+    return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+        .body(new ErrorResponse("EXTERNAL_API_ERROR", e.getMessage()));
   }
 
   @ExceptionHandler(ConflictException.class)
