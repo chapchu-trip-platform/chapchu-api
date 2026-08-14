@@ -67,8 +67,34 @@ FE는 `/auth/login` 만 알면 되고, 코드 교환·토큰 저장·갱신은 �
 
 FE가 *브라우저를* 이 URL로 이동시킵니다. 이후 흐름은 서버가 자동 처리합니다.
 
-* *기존 유저*: 구글 로그인 완료 후 `{FE_CALLBACK_URL}#access_token={JWT}` 로 리다이렉트
-* *신규 유저*: `{FE_ONBOARDING_URL}?registration_token={token}` 로 리다이렉트
+[.request]
+==== 요청 파라미터 (선택)
+
+|===
+| 파라미터 | 필수 | 설명
+
+| `redirect`
+| 아니오
+| 로그인 완료 후 리다이렉트할 FE 콜백 URL. 생략 시 서버 기본값(`FE_REDIRECT_URL`) 사용. 허용된 CORS origin 이외의 값은 무시됩니다.
+|===
+
+[source,js]
+----
+// 배포 환경 (파라미터 생략)
+window.location.href = 'https://api.chapchu.site/auth/login';
+
+// 로컬 개발
+const redirect = encodeURIComponent(window.location.origin + '/auth/callback');
+window.location.href = `https://api.chapchu.site/auth/login?redirect=${redirect}`;
+----
+
+[.response]
+==== 응답
+
+로그인 완료 후 `{redirect}` 경로로 리다이렉트합니다.
+
+* *기존 유저*: `{redirect}#access_token={JWT}`
+* *신규 유저*: `{redirect}?registration_token={token}`
 
 NOTE: access_token은 URL fragment(`#`)로 전달됩니다. 서버 로그에 남지 않으며 FE 스크립트에서만 읽을 수 있습니다.
 
