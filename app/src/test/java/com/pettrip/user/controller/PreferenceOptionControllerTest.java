@@ -67,8 +67,16 @@ class PreferenceOptionControllerTest {
                     fieldWithPath("transportMethods[].name").description("이동수단 이름"))));
   }
 
+  /**
+   * 온보딩 화면은 access token을 받기 전에 이 목록이 필요하다. 그 시점에 사용자가 가진 것은 registration token뿐이다. 인증을 걸면 회원가입에서
+   * 지역·테마·이동수단을 고를 수 없다.
+   */
   @Test
-  void 토큰이_없으면_401을_반환한다() throws Exception {
-    mockMvc.perform(get("/preferences/options")).andExpect(status().isUnauthorized());
+  void 토큰이_없어도_조회할_수_있다() throws Exception {
+    Mockito.when(preferenceOptionService.findRegions()).thenReturn(List.of(new Region("서울")));
+    Mockito.when(preferenceOptionService.findThemes()).thenReturn(List.of());
+    Mockito.when(preferenceOptionService.findTransportMethods()).thenReturn(List.of());
+
+    mockMvc.perform(get("/preferences/options")).andExpect(status().isOk());
   }
 }

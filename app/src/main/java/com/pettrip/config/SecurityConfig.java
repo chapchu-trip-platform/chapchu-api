@@ -35,17 +35,19 @@ public class SecurityConfig {
     "/auth/callback",
     "/auth/register",
     "/auth/refresh",
-    "/auth/logout"
+    "/auth/logout",
+    "/auth/signup"
   };
 
   /**
    * 인증 없이 조회할 수 있는 GET 경로.
    *
-   * <p>{@code /breeds}와 {@code /activities}는 온보딩 때문에 열어 둔다. 신규 유저는 반려동물과 선호 활동을 등록하는 시점에 아직 access
-   * token이 없고 registration token만 갖고 있다. 유저와 무관한 고정 코드값이라 공개해도 드러나는 정보가 없다.
+   * <p>{@code /breeds}, {@code /activities}, {@code /preferences/options}는 온보딩 때문에 열어 둔다. 신규 유저는
+   * 회원가입 화면에서 선호 사항과 반려동물을 고르는데, 그 시점에는 아직 access token이 없고 registration token만 갖고 있다. 유저와 무관한 고정
+   * 코드값이라 공개해도 드러나는 정보가 없다.
    */
   public static final String[] PUBLIC_GET_PATHS = {
-    "/places", "/places/**", "/weather", "/breeds", "/activities"
+    "/places", "/places/**", "/weather", "/breeds", "/activities", "/preferences/options"
   };
 
   @Bean
