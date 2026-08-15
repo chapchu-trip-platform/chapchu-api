@@ -48,7 +48,7 @@ CREATE TABLE transport_methods (
 );
 
 CREATE TABLE breeds (
-    breed_id    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    breed_id    INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     breed_name  VARCHAR(30) NOT NULL,
     created_at  TIMESTAMP DEFAULT now(),
     updated_at  TIMESTAMP DEFAULT now()
@@ -122,7 +122,7 @@ CREATE TABLE user_stamps (
 CREATE TABLE pets (
     pet_id     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id    UUID REFERENCES users(user_id) ON DELETE SET NULL,
-    breed_id   UUID NOT NULL REFERENCES breeds(breed_id),
+    breed_id   INT NOT NULL REFERENCES breeds(breed_id),
     pet_name   VARCHAR(50) NOT NULL,
     size       VARCHAR(10),
     age        INTEGER,
