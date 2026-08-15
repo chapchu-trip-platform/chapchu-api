@@ -38,7 +38,13 @@ public class SecurityConfig {
     "/auth/logout"
   };
 
-  public static final String[] PUBLIC_GET_PATHS = {"/places", "/places/**", "/weather"};
+  /**
+   * 인증 없이 조회할 수 있는 GET 경로.
+   *
+   * <p>{@code /breeds}는 온보딩 때문에 열어 둔다. 신규 유저는 반려동물을 등록하는 시점에 아직 access token이 없고 registration
+   * token만 갖고 있다. 유저와 무관한 고정 코드값이라 공개해도 드러나는 정보가 없다.
+   */
+  public static final String[] PUBLIC_GET_PATHS = {"/places", "/places/**", "/weather", "/breeds"};
 
   @Bean
   public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {

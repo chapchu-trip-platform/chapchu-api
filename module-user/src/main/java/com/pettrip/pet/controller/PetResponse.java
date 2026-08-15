@@ -8,7 +8,7 @@ import java.util.UUID;
 public record PetResponse(
     UUID id,
     String petName,
-    UUID breedId,
+    Integer breedId,
     String breedName,
     PetSize size,
     Integer age,

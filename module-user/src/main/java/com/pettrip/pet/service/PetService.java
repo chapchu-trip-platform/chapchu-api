@@ -24,13 +24,13 @@ public class PetService {
     return petRepository.findByUserId(userId);
   }
 
-  public Pet createPet(UUID userId, UUID breedId, String petName, PetSize size, Integer age) {
+  public Pet createPet(UUID userId, Integer breedId, String petName, PetSize size, Integer age) {
     Breed breed = findBreed(breedId);
     return petRepository.save(new Pet(userId, breed, petName, size, age));
   }
 
   public Pet updatePet(
-      UUID userId, UUID petId, UUID breedId, String petName, PetSize size, Integer age) {
+      UUID userId, UUID petId, Integer breedId, String petName, PetSize size, Integer age) {
     Pet pet = getOwnedPet(userId, petId);
     Breed breed = breedId != null ? findBreed(breedId) : null;
     pet.update(breed, petName, size, age);
@@ -42,7 +42,7 @@ public class PetService {
     petRepository.delete(pet);
   }
 
-  private Breed findBreed(UUID breedId) {
+  private Breed findBreed(Integer breedId) {
     return breedRepository.findById(breedId).orElseThrow(BreedNotFoundException::new);
   }
 
