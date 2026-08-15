@@ -151,10 +151,12 @@ public class AuthController {
     return ResponseEntity.ok().build();
   }
 
-  /** refresh_token 쿠키로 새 access_token을 발급한다. */
+  /** refresh_token 쿠키로 새 access_token을 발급한다. 토큰 회전 시 새 refresh_token도 쿠키에 갱신한다. */
   @PostMapping("/refresh")
   public ResponseEntity<Map<String, String>> refresh(
-      @CookieValue(name = REFRESH_TOKEN_COOKIE, required = false) String refreshToken) {
+      @CookieValue(name = REFRESH_TOKEN_COOKIE, required = false) String refreshToken,
+      HttpServletRequest request,
+      HttpServletResponse response) {
     if (refreshToken == null) {
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
     }
@@ -169,15 +171,31 @@ public class AuthController {
             .encodeToString(
                 (reg.getClientId() + ":" + reg.getClientSecret()).getBytes(StandardCharsets.UTF_8));
 
-    Map<?, ?> tokenResponse =
-        restClient
-            .post()
-            .uri(URI.create(authServerUrl + "/oauth2/token"))
-            .header("Authorization", "Basic " + credentials)
-            .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-            .body(body)
-            .retrieve()
-            .body(Map.class);
+    Map<?, ?> tokenResponse;
+    try {
+      tokenResponse =
+          restClient
+              .post()
+              .uri(URI.create(authServerUrl + "/oauth2/token"))
+              .header("Authorization", "Basic " + credentials)
+              .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+              .body(body)
+              .retrieve()
+              .onStatus(
+                  status -> status.is4xxClientError(),
+                  (req, res) -> {
+                    throw new org.springframework.web.client.HttpClientErrorException(
+                        org.springframework.http.HttpStatus.UNAUTHORIZED);
+                  })
+              .body(Map.class);
+    } catch (org.springframework.web.client.HttpClientErrorException e) {
+      return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+    }
+
+    String newRefreshToken = (String) tokenResponse.get("refresh_token");
+    if (newRefreshToken != null) {
+      setRefreshTokenCookie(response, newRefreshToken, request.isSecure());
+    }
 
     return ResponseEntity.ok(Map.of("access_token", (String) tokenResponse.get("access_token")));
   }

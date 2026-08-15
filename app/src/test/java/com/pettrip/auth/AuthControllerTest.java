@@ -88,4 +88,12 @@ class AuthControllerTest {
                     "Location",
                     "http://localhost:3000/auth/oauth?registration_token=reg-token-abc"));
   }
+
+  @Test
+  void refresh_token_쿠키_없이_refresh하면_401을_반환한다() throws Exception {
+    mockMvc
+        .perform(post("/auth/refresh"))
+        .andExpect(status().isUnauthorized())
+        .andDo(document("auth-refresh-no-cookie"));
+  }
 }
