@@ -10,7 +10,6 @@ import static org.springframework.restdocs.payload.PayloadDocumentation.response
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -68,23 +67,23 @@ class UserControllerTest {
   }
 
   @Test
-  void 닉네임을_등록한다() throws Exception {
+  void 닉네임을_변경한다() throws Exception {
     User user = new User("test@example.com", "google-1");
-    when(userService.registerNickname(any(), eq("초코사랑"))).thenReturn(user);
+    when(userService.updateMe(any(), eq("초코사랑"), eq(null))).thenReturn(user);
 
-    String body = objectMapper.writeValueAsString(new NicknameRegisterRequest("초코사랑"));
+    String body = objectMapper.writeValueAsString(new NicknameChangeRequest("초코사랑"));
 
     mockMvc
         .perform(
-            post("/users/me")
+            patch("/users/me/nickname")
                 .contentType("application/json")
                 .content(body)
                 .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
-        .andExpect(status().isCreated())
+        .andExpect(status().isOk())
         .andDo(
             document(
-                "user-register-nickname",
-                requestFields(fieldWithPath("nickname").description("등록할 닉네임")),
+                "user-change-nickname",
+                requestFields(fieldWithPath("nickname").description("변경할 닉네임")),
                 responseFields(
                     fieldWithPath("id").description("유저 ID"),
                     fieldWithPath("email").description("이메일"),
@@ -127,15 +126,15 @@ class UserControllerTest {
   }
 
   @Test
-  void 이미_사용_중인_닉네임으로_등록하면_409를_반환한다() throws Exception {
-    when(userService.registerNickname(eq(USER_ID), eq("초롱이")))
+  void 이미_사용_중인_닉네임으로_변경하면_409를_반환한다() throws Exception {
+    when(userService.updateMe(eq(USER_ID), eq("초롱이"), eq(null)))
         .thenThrow(new NicknameAlreadyInUseException());
 
-    String body = objectMapper.writeValueAsString(new NicknameRegisterRequest("초롱이"));
+    String body = objectMapper.writeValueAsString(new NicknameChangeRequest("초롱이"));
 
     mockMvc
         .perform(
-            post("/users/me")
+            patch("/users/me/nickname")
                 .contentType("application/json")
                 .content(body)
                 .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
@@ -144,7 +143,7 @@ class UserControllerTest {
   }
 
   @Test
-  void 이미_사용_중인_닉네임으로_변경하면_409를_반환한다() throws Exception {
+  void 이미_사용_중인_닉네임으로_내_정보를_수정하면_409를_반환한다() throws Exception {
     when(userService.updateMe(eq(USER_ID), eq("초롱이"), any()))
         .thenThrow(new NicknameAlreadyInUseException());
 

@@ -50,29 +50,6 @@ class UserServiceTest {
   }
 
   @Test
-  void registerNickname은_이미_등록되어_있으면_예외를_던진다() {
-    UUID userId = UUID.randomUUID();
-    User user = new User("test@example.com", "google-1");
-    user.registerNickname("기존닉네임");
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-
-    assertThatThrownBy(() -> userService.registerNickname(userId, "새닉네임"))
-        .isInstanceOf(NicknameAlreadyRegisteredException.class);
-  }
-
-  @Test
-  void registerNickname은_닉네임이_없으면_등록한다() {
-    UUID userId = UUID.randomUUID();
-    User user = new User("test@example.com", "google-1");
-    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-    User result = userService.registerNickname(userId, "초코사랑");
-
-    assertThat(result.getNickname()).isEqualTo("초코사랑");
-  }
-
-  @Test
   void updateMe는_탈퇴_상태로_변경할_수_있다() {
     UUID userId = UUID.randomUUID();
     User user = new User("test@example.com", "google-1");
@@ -151,13 +128,13 @@ class UserServiceTest {
   }
 
   @Test
-  void registerNickname은_이미_사용_중인_닉네임이면_예외를_던진다() {
+  void updateMe는_이미_사용_중인_닉네임이면_예외를_던진다() {
     UUID userId = UUID.randomUUID();
     User user = new User("test@example.com", "google-1");
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(userRepository.existsByNickname("초롱이")).thenReturn(true);
 
-    assertThatThrownBy(() -> userService.registerNickname(userId, "초롱이"))
+    assertThatThrownBy(() -> userService.updateMe(userId, "초롱이", null))
         .isInstanceOf(NicknameAlreadyInUseException.class);
   }
 
