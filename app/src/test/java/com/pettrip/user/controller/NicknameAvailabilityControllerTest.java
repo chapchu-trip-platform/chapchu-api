@@ -103,9 +103,10 @@ class NicknameAvailabilityControllerTest {
    * 통과한다 (docs/failures/022 참고).
    */
   @Test
-  void 토큰이_없으면_401을_반환한다() throws Exception {
+  void 토큰이_없어도_조회할_수_있다() throws Exception {
+    when(userService.isNicknameAvailable("초롱이")).thenReturn(true);
     mockMvc
         .perform(get("/users/nickname/availability").param("nickname", "초롱이"))
-        .andExpect(status().isUnauthorized());
+        .andExpect(status().isOk());
   }
 }

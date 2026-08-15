@@ -47,7 +47,13 @@ public class SecurityConfig {
    * 코드값이라 공개해도 드러나는 정보가 없다.
    */
   public static final String[] PUBLIC_GET_PATHS = {
-    "/places", "/places/**", "/weather", "/breeds", "/activities", "/preferences/options"
+    "/places",
+    "/places/**",
+    "/weather",
+    "/breeds",
+    "/activities",
+    "/preferences/options",
+    "/users/nickname/availability"
   };
 
   @Bean
