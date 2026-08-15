@@ -1,8 +1,10 @@
 package com.pettrip.auth;
 
 import static com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper.document;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.pettrip.config.SecurityConfig;
@@ -44,5 +46,46 @@ class AuthControllerTest {
         .andExpect(status().isOk())
         .andExpect(cookie().maxAge("refresh_token", 0))
         .andDo(document("auth-logout"));
+  }
+
+  @Test
+  void 콜백에서_code가_빈_문자열이면_400을_반환한다() throws Exception {
+    mockMvc
+        .perform(
+            get("/auth/callback")
+                .param("code", "")
+                .param("state", "some-state")
+                .cookie(new Cookie("oauth2_state", "some-state")))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void 콜백에서_state_쿠키가_없으면_400을_반환한다() throws Exception {
+    mockMvc
+        .perform(get("/auth/callback").param("code", "valid-code").param("state", "some-state"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void 콜백에서_state_파라미터가_쿠키와_불일치하면_400을_반환한다() throws Exception {
+    mockMvc
+        .perform(
+            get("/auth/callback")
+                .param("code", "valid-code")
+                .param("state", "tampered-state")
+                .cookie(new Cookie("oauth2_state", "original-state")))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void 콜백에서_registration_token이_있으면_FE_온보딩으로_리다이렉트한다() throws Exception {
+    mockMvc
+        .perform(get("/auth/callback").param("registration_token", "reg-token-abc"))
+        .andExpect(status().is3xxRedirection())
+        .andExpect(
+            header()
+                .string(
+                    "Location",
+                    "http://localhost:3000/auth/oauth?registration_token=reg-token-abc"));
   }
 }

@@ -124,7 +124,11 @@ public class AuthController {
       return;
     }
 
-    if (code == null || !code.isEmpty() && (state == null || !state.equals(stateCookie))) {
+    if (code == null
+        || code.isEmpty()
+        || state == null
+        || stateCookie == null
+        || !state.equals(stateCookie)) {
       response.sendError(HttpStatus.BAD_REQUEST.value(), "state 불일치 또는 code 없음");
       return;
     }
