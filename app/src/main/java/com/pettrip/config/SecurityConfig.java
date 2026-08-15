@@ -33,7 +33,6 @@ public class SecurityConfig {
     "/docs/**",
     "/auth/login",
     "/auth/callback",
-    "/auth/register",
     "/auth/refresh",
     "/auth/logout",
     "/auth/signup"

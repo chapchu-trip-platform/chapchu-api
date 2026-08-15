@@ -22,7 +22,6 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -177,19 +176,6 @@ public class AuthController {
             .body(Map.class);
 
     return ResponseEntity.ok(Map.of("access_token", (String) tokenResponse.get("access_token")));
-  }
-
-  /** chapchu-auth POST /auth/register 프록시. FE가 직접 chapchu-auth를 호출하지 않는다. */
-  @PostMapping("/register")
-  public ResponseEntity<Void> register(@RequestBody Map<String, String> body) {
-    restClient
-        .post()
-        .uri(URI.create(authServerUrl + "/auth/register"))
-        .contentType(MediaType.APPLICATION_JSON)
-        .body(body)
-        .retrieve()
-        .toBodilessEntity();
-    return ResponseEntity.ok().build();
   }
 
   /** redirect 파라미터가 허용된 origin 기준으로 유효하면 그대로, 아니면 기본 URL 반환. */

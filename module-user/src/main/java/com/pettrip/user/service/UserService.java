@@ -42,16 +42,6 @@ public class UserService {
     return !userRepository.existsByNickname(nickname);
   }
 
-  public User registerNickname(UUID userId, String nickname) {
-    User user = findUser(userId);
-    if (user.hasNickname()) {
-      throw new NicknameAlreadyRegisteredException();
-    }
-    validateNicknameNotTaken(user, nickname);
-    user.registerNickname(nickname);
-    return userRepository.save(user);
-  }
-
   public User updateMe(UUID userId, String nickname, AccountStatus accountStatus) {
     User user = findUser(userId);
     validateNicknameNotTaken(user, nickname);
