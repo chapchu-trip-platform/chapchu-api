@@ -126,6 +126,32 @@ class UserControllerTest {
   }
 
   @Test
+  void 빈_닉네임으로_변경하면_400을_반환한다() throws Exception {
+    String body = objectMapper.writeValueAsString(new NicknameChangeRequest(""));
+
+    mockMvc
+        .perform(
+            patch("/users/me/nickname")
+                .contentType("application/json")
+                .content(body)
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void 최대_길이_초과_닉네임으로_변경하면_400을_반환한다() throws Exception {
+    String body = objectMapper.writeValueAsString(new NicknameChangeRequest("a".repeat(31)));
+
+    mockMvc
+        .perform(
+            patch("/users/me/nickname")
+                .contentType("application/json")
+                .content(body)
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
   void 이미_사용_중인_닉네임으로_변경하면_409를_반환한다() throws Exception {
     when(userService.updateMe(eq(USER_ID), eq("초롱이"), eq(null)))
         .thenThrow(new NicknameAlreadyInUseException());
