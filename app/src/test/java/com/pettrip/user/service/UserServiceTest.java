@@ -81,7 +81,7 @@ class UserServiceTest {
     UUID transportMethodId = UUID.randomUUID();
     User user = new User("test@example.com", "google-1");
     Region region = new Region("서울");
-    Theme theme = new Theme("카페");
+    Theme theme = new Theme("관광지", 12);
     TransportMethod transportMethod = new TransportMethod("자가용");
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(regionRepository.findAllById(List.of(regionId))).thenReturn(List.of(region));

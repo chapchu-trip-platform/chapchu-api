@@ -51,7 +51,7 @@ class UserPreferenceControllerTest {
   private User userWithPreferences() {
     User user = new User("test@example.com", "google-1");
     user.replacePreferredRegions(Set.of(new Region("서울")));
-    user.replacePreferredThemes(Set.of(new Theme("카페")));
+    user.replacePreferredThemes(Set.of(new Theme("관광지", 12)));
     user.replacePreferredTransportMethods(Set.of(new TransportMethod("자가용")));
     return user;
   }
