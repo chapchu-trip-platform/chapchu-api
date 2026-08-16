@@ -355,25 +355,20 @@ include::{snippets}/user-preferences-get/http-request.adoc[]
 include::{snippets}/user-preferences-get/http-response.adoc[]
 include::{snippets}/user-preferences-get/response-fields.adoc[]
 
-=== 선호 사항 등록
-
-`POST /users/me/preferences`
-
-[.request]
-==== 요청
-
-include::{snippets}/user-preferences-register/http-request.adoc[]
-include::{snippets}/user-preferences-register/request-fields.adoc[]
-
-[.response]
-==== 응답
-
-include::{snippets}/user-preferences-register/http-response.adoc[]
-include::{snippets}/user-preferences-register/response-fields.adoc[]
-
 === 선호 사항 수정
 
 `PATCH /users/me/preferences`
+
+최초 등록과 이후 수정을 나누지 않습니다. 선호 사항은 유저에 종속된 단일 값이라
+따로 생성되는 리소스가 아니고, 서버가 두 경우를 구분하지 않습니다.
+
+보내지 않은 항목은 **그대로 유지**됩니다. 세 항목을 모두 보내면 전부 설정되고,
+`regionIds`만 보내면 테마·이동수단은 건드리지 않습니다.
+
+WARNING: `POST /users/me/preferences`는 제거되었습니다. `PATCH`로 바꿔 주세요.
+본문 형식과 응답은 같습니다.
+
+NOTE: 회원가입 시점의 최초 등록은 `POST /auth/signup`이 함께 처리합니다.
 
 [.request]
 ==== 요청

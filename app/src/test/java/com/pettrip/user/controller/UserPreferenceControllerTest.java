@@ -75,8 +75,9 @@ class UserPreferenceControllerTest {
                     fieldWithPath("transportMethods[].name").description("이동 수단 이름"))));
   }
 
+  /** 최초 등록도 이 엔드포인트를 쓴다. 세 항목을 모두 보내면 전부 채워진다. */
   @Test
-  void 선호_사항을_등록한다() throws Exception {
+  void 선호_사항을_한_번에_모두_설정한다() throws Exception {
     UUID regionId = UUID.randomUUID();
     UUID themeId = UUID.randomUUID();
     UUID transportMethodId = UUID.randomUUID();
@@ -90,25 +91,25 @@ class UserPreferenceControllerTest {
 
     mockMvc
         .perform(
+            patch("/users/me/preferences")
+                .contentType("application/json")
+                .content(body)
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isOk());
+  }
+
+  /** POST 는 제거됐다. 프론트가 옛 방식으로 부르면 405 로 분명히 막힌다. */
+  @Test
+  void POST_는_더_이상_지원하지_않는다() throws Exception {
+    String body = objectMapper.writeValueAsString(new PreferenceRequest(List.of(), null, null));
+
+    mockMvc
+        .perform(
             post("/users/me/preferences")
                 .contentType("application/json")
                 .content(body)
                 .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
-        .andExpect(status().isCreated())
-        .andDo(
-            document(
-                "user-preferences-register",
-                requestFields(
-                    fieldWithPath("regionIds").description("선호 지역 ID 목록"),
-                    fieldWithPath("themeIds").description("선호 테마 ID 목록"),
-                    fieldWithPath("transportMethodIds").description("선호 이동 수단 ID 목록")),
-                responseFields(
-                    fieldWithPath("regions[].id").description("지역 ID"),
-                    fieldWithPath("regions[].name").description("지역 이름"),
-                    fieldWithPath("themes[].id").description("테마 ID"),
-                    fieldWithPath("themes[].name").description("테마 이름"),
-                    fieldWithPath("transportMethods[].id").description("이동 수단 ID"),
-                    fieldWithPath("transportMethods[].name").description("이동 수단 이름"))));
+        .andExpect(status().isMethodNotAllowed());
   }
 
   @Test
