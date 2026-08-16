@@ -2,7 +2,10 @@ package com.pettrip.pet.service;
 
 import com.pettrip.pet.model.Breed;
 import com.pettrip.pet.repository.BreedRepository;
+import java.text.Collator;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import org.springframework.stereotype.Service;
 
 /**
@@ -22,8 +25,11 @@ public class BreedService {
     this.breedRepository = breedRepository;
   }
 
-  /** 이름 오름차순으로 돌려준다. 선택 목록에 그대로 뿌릴 수 있어야 한다. */
+  /** 한국어 언어 순으로 정렬해 돌려준다. 선택 목록에 그대로 뿌릴 수 있어야 한다. */
   public List<Breed> findAll() {
-    return breedRepository.findAllByOrderByBreedNameAsc();
+    List<Breed> breeds = new ArrayList<>(breedRepository.findAll());
+    Collator collator = Collator.getInstance(Locale.KOREAN);
+    breeds.sort((a, b) -> collator.compare(a.getBreedName(), b.getBreedName()));
+    return breeds;
   }
 }
