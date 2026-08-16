@@ -140,15 +140,40 @@ public class AuthController {
     response.sendRedirect(targetRedirect + "#access_token=" + tokens.accessToken());
   }
 
-  /** refresh_token 쿠키를 만료시켜 로그아웃한다. */
+  /** refresh_token을 auth 서버에서 폐기하고 쿠키를 만료시켜 로그아웃한다. */
   @PostMapping("/logout")
-  public ResponseEntity<Void> logout(HttpServletResponse response) {
-    Cookie cookie = new Cookie(REFRESH_TOKEN_COOKIE, "");
-    cookie.setPath("/auth/refresh");
-    cookie.setMaxAge(0);
-    cookie.setHttpOnly(true);
-    response.addCookie(cookie);
+  public ResponseEntity<Void> logout(
+      @CookieValue(name = REFRESH_TOKEN_COOKIE, required = false) String refreshToken,
+      HttpServletResponse response) {
+    if (refreshToken != null) {
+      revokeToken(refreshToken);
+    }
+    clearCookie(response, REFRESH_TOKEN_COOKIE, "/auth/refresh");
     return ResponseEntity.ok().build();
+  }
+
+  private void revokeToken(String refreshToken) {
+    try {
+      ClientRegistration reg = clientRegistrationRepository.findByRegistrationId(REGISTRATION_ID);
+      String credentials =
+          Base64.getEncoder()
+              .encodeToString(
+                  (reg.getClientId() + ":" + reg.getClientSecret())
+                      .getBytes(StandardCharsets.UTF_8));
+      MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
+      body.add("token", refreshToken);
+      body.add("token_type_hint", "refresh_token");
+      restClient
+          .post()
+          .uri(URI.create(authServerUrl + "/oauth2/revoke"))
+          .header("Authorization", "Basic " + credentials)
+          .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+          .body(body)
+          .retrieve()
+          .toBodilessEntity();
+    } catch (Exception ignored) {
+      // revoke 실패해도 클라이언트 쿠키는 무조건 삭제
+    }
   }
 
   /** refresh_token 쿠키로 새 access_token을 발급한다. 토큰 회전 시 새 refresh_token도 쿠키에 갱신한다. */

@@ -49,6 +49,14 @@ class AuthControllerTest {
   }
 
   @Test
+  void refresh_token_쿠키가_없어도_로그아웃은_성공한다() throws Exception {
+    mockMvc
+        .perform(post("/auth/logout"))
+        .andExpect(status().isOk())
+        .andExpect(cookie().maxAge("refresh_token", 0));
+  }
+
+  @Test
   void 콜백에서_code가_빈_문자열이면_400을_반환한다() throws Exception {
     mockMvc
         .perform(
