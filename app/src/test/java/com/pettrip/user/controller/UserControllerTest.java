@@ -126,6 +126,30 @@ class UserControllerTest {
   }
 
   @Test
+  void 깨진_JSON이면_400과_INVALID_REQUEST를_반환한다() throws Exception {
+    mockMvc
+        .perform(
+            patch("/users/me/nickname")
+                .contentType("application/json")
+                .content("{broken json}")
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+  }
+
+  @Test
+  void 잘못된_enum_값이면_400과_INVALID_REQUEST를_반환한다() throws Exception {
+    mockMvc
+        .perform(
+            patch("/users/me")
+                .contentType("application/json")
+                .content("{\"nickname\": \"테스트\", \"accountStatus\": \"INVALID_VALUE\"}")
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+  }
+
+  @Test
   void 빈_닉네임으로_변경하면_400을_반환한다() throws Exception {
     String body = objectMapper.writeValueAsString(new NicknameChangeRequest(""));
 
