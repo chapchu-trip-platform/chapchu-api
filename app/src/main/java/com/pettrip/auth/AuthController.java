@@ -148,7 +148,7 @@ public class AuthController {
     if (refreshToken != null) {
       revokeToken(refreshToken);
     }
-    clearCookie(response, REFRESH_TOKEN_COOKIE, "/auth/refresh");
+    clearCookie(response, REFRESH_TOKEN_COOKIE, "/auth");
     return ResponseEntity.ok().build();
   }
 
@@ -278,7 +278,7 @@ public class AuthController {
     Cookie cookie = new Cookie(REFRESH_TOKEN_COOKIE, refreshToken);
     cookie.setHttpOnly(true);
     cookie.setSecure(secure);
-    cookie.setPath("/auth/refresh");
+    cookie.setPath("/auth");
     cookie.setMaxAge(14 * 24 * 60 * 60);
     response.addCookie(cookie);
   }
