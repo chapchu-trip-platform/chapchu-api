@@ -37,7 +37,7 @@ class UserRepositoryTest {
   @Test
   void 유저의_선호_지역_테마_이동수단을_저장하고_조회한다() {
     Region region = regionRepository.save(new Region("서울"));
-    Theme theme = themeRepository.save(new Theme("카페"));
+    Theme theme = themeRepository.save(new Theme("관광지", 12));
     TransportMethod transportMethod = transportMethodRepository.save(new TransportMethod("자가용"));
     User user = new User("test2@example.com", "google-2");
     user.replacePreferredRegions(Set.of(region));
@@ -48,7 +48,7 @@ class UserRepositoryTest {
     User found = userRepository.findById(saved.getId()).orElseThrow();
 
     assertThat(found.getPreferredRegions()).extracting(Region::getRegionName).containsExactly("서울");
-    assertThat(found.getPreferredThemes()).extracting(Theme::getThemeName).containsExactly("카페");
+    assertThat(found.getPreferredThemes()).extracting(Theme::getThemeName).containsExactly("관광지");
     assertThat(found.getPreferredTransportMethods())
         .extracting(TransportMethod::getTransportMethodName)
         .containsExactly("자가용");

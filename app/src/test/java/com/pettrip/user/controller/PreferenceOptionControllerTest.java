@@ -43,7 +43,7 @@ class PreferenceOptionControllerTest {
   void 선호_사항_선택지를_조회한다() throws Exception {
     Mockito.when(preferenceOptionService.findRegions())
         .thenReturn(List.of(new Region("서울"), new Region("부산")));
-    Mockito.when(preferenceOptionService.findThemes()).thenReturn(List.of(new Theme("카페")));
+    Mockito.when(preferenceOptionService.findThemes()).thenReturn(List.of(new Theme("관광지", 12)));
     Mockito.when(preferenceOptionService.findTransportMethods())
         .thenReturn(List.of(new TransportMethod("자가용")));
 
@@ -52,7 +52,7 @@ class PreferenceOptionControllerTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.regions[0].name").value("서울"))
         .andExpect(jsonPath("$.regions[0].id").exists())
-        .andExpect(jsonPath("$.themes[0].name").value("카페"))
+        .andExpect(jsonPath("$.themes[0].name").value("관광지"))
         .andExpect(jsonPath("$.transportMethods[0].name").value("자가용"))
         .andDo(
             document(
