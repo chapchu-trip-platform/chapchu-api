@@ -72,10 +72,11 @@ class NicknameAvailabilityControllerTest {
   }
 
   @Test
-  void 닉네임_파라미터가_없으면_400을_반환한다() throws Exception {
+  void 닉네임_파라미터가_없으면_400과_INVALID_REQUEST를_반환한다() throws Exception {
     mockMvc
         .perform(get("/users/nickname/availability").with(jwt().jwt(j -> j.subject(USER_ID))))
-        .andExpect(status().isBadRequest());
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
   }
 
   @Test
