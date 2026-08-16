@@ -2,7 +2,10 @@ package com.pettrip.pet.service;
 
 import com.pettrip.pet.model.PetActivity;
 import com.pettrip.pet.repository.PetActivityRepository;
+import java.text.Collator;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import org.springframework.stereotype.Service;
 
 /**
@@ -23,8 +26,11 @@ public class PetActivityService {
     this.petActivityRepository = petActivityRepository;
   }
 
-  /** 이름 오름차순으로 돌려준다. 선택 목록에 그대로 뿌릴 수 있어야 한다. */
+  /** 한국어 언어 순으로 정렬해 돌려준다. 선택 목록에 그대로 뿌릴 수 있어야 한다. */
   public List<PetActivity> findAll() {
-    return petActivityRepository.findAllByOrderByActivityNameAsc();
+    List<PetActivity> activities = new ArrayList<>(petActivityRepository.findAll());
+    Collator collator = Collator.getInstance(Locale.KOREAN);
+    activities.sort((a, b) -> collator.compare(a.getActivityName(), b.getActivityName()));
+    return activities;
   }
 }

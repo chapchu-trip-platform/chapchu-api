@@ -6,7 +6,10 @@ import com.pettrip.user.model.TransportMethod;
 import com.pettrip.user.repository.RegionRepository;
 import com.pettrip.user.repository.ThemeRepository;
 import com.pettrip.user.repository.TransportMethodRepository;
+import java.text.Collator;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import org.springframework.stereotype.Service;
 
 /**
@@ -33,14 +36,24 @@ public class PreferenceOptionService {
   }
 
   public List<Region> findRegions() {
-    return regionRepository.findAll();
+    List<Region> regions = new ArrayList<>(regionRepository.findAll());
+    Collator collator = Collator.getInstance(Locale.KOREAN);
+    regions.sort((a, b) -> collator.compare(a.getRegionName(), b.getRegionName()));
+    return regions;
   }
 
   public List<Theme> findThemes() {
-    return themeRepository.findAll();
+    List<Theme> themes = new ArrayList<>(themeRepository.findAll());
+    Collator collator = Collator.getInstance(Locale.KOREAN);
+    themes.sort((a, b) -> collator.compare(a.getThemeName(), b.getThemeName()));
+    return themes;
   }
 
   public List<TransportMethod> findTransportMethods() {
-    return transportMethodRepository.findAll();
+    List<TransportMethod> methods = new ArrayList<>(transportMethodRepository.findAll());
+    Collator collator = Collator.getInstance(Locale.KOREAN);
+    methods.sort(
+        (a, b) -> collator.compare(a.getTransportMethodName(), b.getTransportMethodName()));
+    return methods;
   }
 }
