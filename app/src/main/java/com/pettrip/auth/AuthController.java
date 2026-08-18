@@ -7,13 +7,17 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
@@ -22,6 +26,7 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -136,7 +141,7 @@ public class AuthController {
     clearCookie(response, STATE_COOKIE, "/");
 
     TokenResponse tokens = exchangeCode(code, buildRedirectUri(request));
-    setRefreshTokenCookie(response, tokens.refreshToken(), request.isSecure());
+    setRefreshTokenCookie(response, tokens.refreshToken());
     response.sendRedirect(targetRedirect + "#access_token=" + tokens.accessToken());
   }
 
@@ -144,11 +149,15 @@ public class AuthController {
   @PostMapping("/logout")
   public ResponseEntity<Void> logout(
       @CookieValue(name = REFRESH_TOKEN_COOKIE, required = false) String refreshToken,
+      @RequestHeader(value = "Origin", required = false) String origin,
       HttpServletResponse response) {
+    if (!isAllowedOrigin(origin)) {
+      return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+    }
     if (refreshToken != null) {
       revokeToken(refreshToken);
     }
-    clearCookie(response, REFRESH_TOKEN_COOKIE, "/auth");
+    clearRefreshTokenCookie(response);
     return ResponseEntity.ok().build();
   }
 
@@ -180,8 +189,12 @@ public class AuthController {
   @PostMapping("/refresh")
   public ResponseEntity<Map<String, String>> refresh(
       @CookieValue(name = REFRESH_TOKEN_COOKIE, required = false) String refreshToken,
+      @RequestHeader(value = "Origin", required = false) String origin,
       HttpServletRequest request,
       HttpServletResponse response) {
+    if (!isAllowedOrigin(origin)) {
+      return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+    }
     if (refreshToken == null) {
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
     }
@@ -219,7 +232,7 @@ public class AuthController {
 
     String newRefreshToken = (String) tokenResponse.get("refresh_token");
     if (newRefreshToken != null) {
-      setRefreshTokenCookie(response, newRefreshToken, request.isSecure());
+      setRefreshTokenCookie(response, newRefreshToken);
     }
 
     return ResponseEntity.ok(Map.of("access_token", (String) tokenResponse.get("access_token")));
@@ -273,14 +286,28 @@ public class AuthController {
     return request.getScheme() + "://" + request.getServerName() + portPart + "/auth/callback";
   }
 
-  private void setRefreshTokenCookie(
-      HttpServletResponse response, String refreshToken, boolean secure) {
-    Cookie cookie = new Cookie(REFRESH_TOKEN_COOKIE, refreshToken);
-    cookie.setHttpOnly(true);
-    cookie.setSecure(secure);
-    cookie.setPath("/auth");
-    cookie.setMaxAge(14 * 24 * 60 * 60);
-    response.addCookie(cookie);
+  private void setRefreshTokenCookie(HttpServletResponse response, String refreshToken) {
+    ResponseCookie cookie =
+        ResponseCookie.from(REFRESH_TOKEN_COOKIE, refreshToken)
+            .httpOnly(true)
+            .secure(true)
+            .path("/auth")
+            .maxAge(Duration.ofDays(14))
+            .sameSite("None")
+            .build();
+    response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+  }
+
+  private void clearRefreshTokenCookie(HttpServletResponse response) {
+    ResponseCookie cookie =
+        ResponseCookie.from(REFRESH_TOKEN_COOKIE, "")
+            .httpOnly(true)
+            .secure(true)
+            .path("/auth")
+            .maxAge(Duration.ZERO)
+            .sameSite("None")
+            .build();
+    response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
   }
 
   private void clearCookie(HttpServletResponse response, String name, String path) {
@@ -288,6 +315,14 @@ public class AuthController {
     cookie.setPath(path);
     cookie.setMaxAge(0);
     response.addCookie(cookie);
+  }
+
+  private boolean isAllowedOrigin(String origin) {
+    if (origin == null) {
+      return false;
+    }
+    List<String> allowed = Arrays.stream(allowedOrigins.split(",")).map(String::trim).toList();
+    return allowed.contains(origin);
   }
 
   private record TokenResponse(String accessToken, String refreshToken) {}
