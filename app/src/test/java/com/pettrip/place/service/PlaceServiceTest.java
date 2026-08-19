@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -86,6 +87,37 @@ class PlaceServiceTest {
   @Test
   void TourAPI_결과가_없으면_빈_목록을_반환한다() {
     when(tourApiClient.fetchNearby(any(), any(), anyInt())).thenReturn(List.of());
+
+    List<Place> result =
+        placeService.searchNearby(new BigDecimal("37.5263"), new BigDecimal("126.9342"), 5000);
+
+    assertThat(result).isEmpty();
+  }
+
+  @Test
+  void pet_policy가_이미_DB에_있으면_fetchPetDetail을_호출하지_않는다() {
+    TourApiClient.NearbyItem item =
+        new TourApiClient.NearbyItem(
+            "12345678",
+            "한강공원",
+            null,
+            "서울시 영등포구",
+            new BigDecimal("37.5263"),
+            new BigDecimal("126.9342"));
+    when(tourApiClient.fetchNearby(any(), any(), anyInt())).thenReturn(List.of(item));
+    when(placeRepository.findById("12345678")).thenReturn(Optional.of(samplePlace()));
+    when(placeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    when(petPolicyRepository.existsById("12345678")).thenReturn(true);
+
+    placeService.searchNearby(new BigDecimal("37.5263"), new BigDecimal("126.9342"), 5000);
+
+    verify(tourApiClient, never()).fetchPetDetail("12345678");
+  }
+
+  @Test
+  void TourAPI_호출이_실패해도_빈_목록을_반환한다() {
+    when(tourApiClient.fetchNearby(any(), any(), anyInt()))
+        .thenThrow(new RuntimeException("TourAPI 연결 실패"));
 
     List<Place> result =
         placeService.searchNearby(new BigDecimal("37.5263"), new BigDecimal("126.9342"), 5000);

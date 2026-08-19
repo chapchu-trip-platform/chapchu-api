@@ -29,7 +29,7 @@
 - [ ] PK: `BaseEntity` 상속, `@GeneratedValue` 금지, `UUID.randomUUID()` 금지
 - [ ] 새 Entity → `BaseEntity` 상속 확인 (코드값 테이블 예외: decisions/036)
 - [ ] 새 Controller → `@WebMvcTest` + REST Docs 스니펫 세트로 작성
-- [ ] 새 Service → Testcontainers 기반 통합 테스트 작성
+- [ ] 새 Service → Mockito 기반 단위 테스트 작성 (Repository Mock 허용)
 - [ ] 모듈 의존성 방향 확인 (`app`에 비즈니스 로직 금지)
 - [ ] if-else 없이 early return으로 작성
 - [ ] 삼항 연산자 없이 작성

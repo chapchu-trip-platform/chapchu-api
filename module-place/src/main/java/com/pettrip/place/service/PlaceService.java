@@ -34,8 +34,12 @@ public class PlaceService {
 
   @Transactional
   public List<Place> searchNearby(BigDecimal lat, BigDecimal lng, int radiusMeters) {
-    List<TourApiClient.NearbyItem> items = tourApiClient.fetchNearby(lat, lng, radiusMeters);
-    return items.stream().map(item -> syncPlace(item)).toList();
+    try {
+      List<TourApiClient.NearbyItem> items = tourApiClient.fetchNearby(lat, lng, radiusMeters);
+      return items.stream().map(item -> syncPlace(item)).toList();
+    } catch (Exception e) {
+      return List.of();
+    }
   }
 
   private Place syncPlace(TourApiClient.NearbyItem item) {
@@ -76,6 +80,7 @@ public class PlaceService {
   }
 
   private void syncPetPolicy(Place place, String contentId) {
+    if (petPolicyRepository.existsById(contentId)) return;
     TourApiClient.PetDetailItem detail = tourApiClient.fetchPetDetail(contentId);
     if (detail == null) return;
 

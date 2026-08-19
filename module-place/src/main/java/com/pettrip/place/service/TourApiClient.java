@@ -40,7 +40,6 @@ public class TourApiClient {
                         .queryParam("mapX", lng)
                         .queryParam("mapY", lat)
                         .queryParam("radius", radiusMeters)
-                        .queryParam("contentTypeId", 12)
                         .queryParam("petTour", "Y")
                         .build())
             .retrieve()
