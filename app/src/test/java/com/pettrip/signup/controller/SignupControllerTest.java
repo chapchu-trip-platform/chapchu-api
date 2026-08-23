@@ -1,5 +1,6 @@
 package com.pettrip.signup.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.document;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
@@ -27,6 +28,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.restdocs.AutoConfigureRestDocs;
@@ -57,7 +59,8 @@ class SignupControllerTest {
                 "밤톨이아빠",
                 List.of(UUID.randomUUID()),
                 List.of(UUID.randomUUID()),
-                List.of(UUID.randomUUID())),
+                List.of(UUID.randomUUID()),
+                true),
             List.of(
                 new SignupRequest.PetPart("초코", 7, PetSize.SMALL, 3, List.of(UUID.randomUUID())),
                 new SignupRequest.PetPart("보리", 157, PetSize.MEDIUM, 5, List.of()))));
@@ -94,6 +97,7 @@ class SignupControllerTest {
                     fieldWithPath("user.transportMethodIds")
                         .description("선호 이동수단 ID 목록. 여러 개 선택 가능")
                         .optional(),
+                    fieldWithPath("user.locationConsent").description("위치 정보 수집 동의 여부. 필수"),
                     fieldWithPath("pets").description("등록할 반려동물. 생략하거나 비워도 된다").optional(),
                     fieldWithPath("pets[].petName").description("반려견 이름"),
                     fieldWithPath("pets[].breedId")
@@ -130,7 +134,9 @@ class SignupControllerTest {
     String body =
         objectMapper.writeValueAsString(
             new SignupRequest(
-                "eyJ0b2tlbiI.c2ln", new SignupRequest.UserPart("혼자여행", null, null, null), null));
+                "eyJ0b2tlbiI.c2ln",
+                new SignupRequest.UserPart("혼자여행", null, null, null, true),
+                null));
 
     mockMvc
         .perform(post("/auth/signup").contentType("application/json").content(body))
@@ -199,7 +205,46 @@ class SignupControllerTest {
     String body =
         objectMapper.writeValueAsString(
             new SignupRequest(
-                "eyJ0b2tlbiI.c2ln", new SignupRequest.UserPart("", null, null, null), null));
+                "eyJ0b2tlbiI.c2ln", new SignupRequest.UserPart("", null, null, null, true), null));
+
+    mockMvc
+        .perform(post("/auth/signup").contentType("application/json").content(body))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+  }
+
+  @Test
+  @DisplayName("동의하지 않아도 가입되고, 그 값이 서비스로 전달된다")
+  void locationConsentFalseIsPassedThrough() throws Exception {
+    User user = new User("nogps@example.com", "google-signup-003");
+    user.registerNickname("위치싫어");
+    Mockito.when(signupService.signUp(any())).thenReturn(new SignupResult(user, List.of()));
+
+    String body =
+        objectMapper.writeValueAsString(
+            new SignupRequest(
+                "eyJ0b2tlbiI.c2ln",
+                new SignupRequest.UserPart("위치싫어", null, null, null, false),
+                null));
+
+    mockMvc
+        .perform(post("/auth/signup").contentType("application/json").content(body))
+        .andExpect(status().isCreated());
+
+    ArgumentCaptor<SignupRequest> captor = ArgumentCaptor.forClass(SignupRequest.class);
+    Mockito.verify(signupService).signUp(captor.capture());
+    assertThat(captor.getValue().user().locationConsent()).isFalse();
+  }
+
+  @Test
+  @DisplayName("위치 동의 여부를 보내지 않으면 400")
+  void missingLocationConsentReturns400() throws Exception {
+    String body =
+        objectMapper.writeValueAsString(
+            new SignupRequest(
+                "eyJ0b2tlbiI.c2ln",
+                new SignupRequest.UserPart("밤톨이아빠", null, null, null, null),
+                null));
 
     mockMvc
         .perform(post("/auth/signup").contentType("application/json").content(body))

@@ -79,7 +79,7 @@ class SignupServiceTest {
   }
 
   private SignupRequest.UserPart plainUser() {
-    return new SignupRequest.UserPart("밤톨이아빠", null, null, null);
+    return new SignupRequest.UserPart("밤톨이아빠", null, null, null, true);
   }
 
   @Test
@@ -118,7 +118,8 @@ class SignupServiceTest {
 
     SignupResult result =
         signupService.signUp(
-            request(new SignupRequest.UserPart("밤톨이아빠", List.of(regionId), null, null), null));
+            request(
+                new SignupRequest.UserPart("밤톨이아빠", List.of(regionId), null, null, true), null));
 
     assertThat(result.user().getPreferredRegions()).containsExactly(seoul);
   }
@@ -174,7 +175,7 @@ class SignupServiceTest {
             () ->
                 signupService.signUp(
                     request(
-                        new SignupRequest.UserPart("밤톨이아빠", List.of(real, ghost), null, null),
+                        new SignupRequest.UserPart("밤톨이아빠", List.of(real, ghost), null, null, true),
                         null)))
         .isInstanceOf(RegionNotFoundException.class);
   }
@@ -226,5 +227,25 @@ class SignupServiceTest {
 
     verify(userRepository, never()).saveAndFlush(any());
     verify(petRepository, never()).save(any());
+  }
+
+  @Test
+  @DisplayName("위치 정보 수집에 동의하지 않으면 그대로 저장한다")
+  void storesLocationConsentFalse() {
+    SignupResult result =
+        signupService.signUp(
+            request(new SignupRequest.UserPart("밤톨이아빠", null, null, null, false), null));
+
+    assertThat(result.user().isLocationConsent()).isFalse();
+  }
+
+  @Test
+  @DisplayName("동의를 명시하면 그대로 저장한다")
+  void storesLocationConsentTrue() {
+    SignupResult result =
+        signupService.signUp(
+            request(new SignupRequest.UserPart("밤톨이아빠", null, null, null, true), null));
+
+    assertThat(result.user().isLocationConsent()).isTrue();
   }
 }

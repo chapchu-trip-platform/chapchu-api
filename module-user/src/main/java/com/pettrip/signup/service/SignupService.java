@@ -94,6 +94,7 @@ public class SignupService {
   private User createUser(VerifiedRegistration verified, SignupRequest.UserPart part) {
     User user = new User(verified.email(), verified.googleUserId());
     user.registerNickname(part.nickname());
+    user.updateLocationConsent(part.locationConsent());
 
     if (part.regionIds() != null) {
       user.replacePreferredRegions(
