@@ -27,12 +27,14 @@ public record SignupRequest(
   /**
    * @param regionIds 선호 지역. {@code GET /preferences/options}로 선택지를 받는다
    * @param transportMethodIds 이동수단은 여러 개를 고를 수 있어 지역·테마와 같이 배열로 받는다
+   * @param locationConsent 위치 정보 수집 동의 여부. 필수다. 생략하면 400
    */
   public record UserPart(
       @NotBlank @Size(max = 30) String nickname,
       List<UUID> regionIds,
       List<UUID> themeIds,
-      List<UUID> transportMethodIds) {}
+      List<UUID> transportMethodIds,
+      @NotNull Boolean locationConsent) {}
 
   /**
    * @param breedId {@code GET /breeds}로 선택지를 받는 정수 ID. 순종이 아니면 `믹스견`을 고른다
