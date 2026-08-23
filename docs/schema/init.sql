@@ -73,14 +73,15 @@ CREATE TABLE stamps (
 -- ============================================================
 
 CREATE TABLE users (
-    user_id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    google_user_id VARCHAR(255) UNIQUE,
-    email          VARCHAR(255) UNIQUE NOT NULL,
-    nickname       VARCHAR(30) UNIQUE,
-    role           VARCHAR(20) DEFAULT 'USER',
-    account_status VARCHAR(20) DEFAULT 'ACTIVE',
-    created_at     TIMESTAMP DEFAULT now(),
-    updated_at     TIMESTAMP DEFAULT now()
+    user_id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    google_user_id    VARCHAR(255) UNIQUE,
+    email             VARCHAR(255) UNIQUE NOT NULL,
+    nickname          VARCHAR(30) UNIQUE,
+    role              VARCHAR(20) DEFAULT 'USER',
+    account_status    VARCHAR(20) DEFAULT 'ACTIVE',
+    location_consent  BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at        TIMESTAMP DEFAULT now(),
+    updated_at        TIMESTAMP DEFAULT now()
 );
 
 -- 기존 user_preferences(단일 row) → 3개 junction table로 분리

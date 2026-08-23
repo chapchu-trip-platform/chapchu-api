@@ -36,6 +36,9 @@ public class User extends BaseEntity {
   @Column(name = "account_status", length = 20)
   private AccountStatus accountStatus;
 
+  @Column(name = "location_consent", nullable = false)
+  private boolean locationConsent = true;
+
   @ManyToMany(fetch = FetchType.LAZY)
   @JoinTable(
       name = "user_preference_regions",
@@ -101,6 +104,14 @@ public class User extends BaseEntity {
 
   public AccountStatus getAccountStatus() {
     return accountStatus;
+  }
+
+  public boolean isLocationConsent() {
+    return locationConsent;
+  }
+
+  public void updateLocationConsent(boolean locationConsent) {
+    this.locationConsent = locationConsent;
   }
 
   public void replacePreferredRegions(Set<Region> regions) {
