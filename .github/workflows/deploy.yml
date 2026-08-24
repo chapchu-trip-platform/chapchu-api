@@ -58,11 +58,12 @@ jobs:
         env:
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           CHAPCHU_API_CLIENT_SECRET: ${{ secrets.CHAPCHU_API_CLIENT_SECRET }}
+          TOUR_API_KEY: ${{ secrets.TOUR_API_KEY }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          envs: DB_PASSWORD,CHAPCHU_API_CLIENT_SECRET
+          envs: DB_PASSWORD,CHAPCHU_API_CLIENT_SECRET,TOUR_API_KEY
           script: |
             export KUBECONFIG=/home/ubuntu/.kube/config
             kubectl create secret generic postgres-secret \
@@ -71,6 +72,7 @@ jobs:
             kubectl create secret generic chapchu-api-secret \
               --from-literal=SPRING_DATASOURCE_PASSWORD="$DB_PASSWORD" \
               --from-literal=CHAPCHU_API_CLIENT_SECRET="$CHAPCHU_API_CLIENT_SECRET" \
+              --from-literal=TOUR_API_KEY="$TOUR_API_KEY" \
               -n chapchu --dry-run=client -o yaml | kubectl apply -f -
             kubectl apply -f ~/k8s/k8s/chapchu-api-configmap.yaml
 
