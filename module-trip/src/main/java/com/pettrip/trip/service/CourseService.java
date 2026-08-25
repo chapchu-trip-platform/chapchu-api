@@ -3,6 +3,8 @@ package com.pettrip.trip.service;
 import com.pettrip.place.model.Place;
 import com.pettrip.place.repository.PlaceRepository;
 import com.pettrip.place.service.PlaceService;
+import com.pettrip.recommendation.service.PlaceInfo;
+import com.pettrip.recommendation.service.RouteOptimizationService;
 import com.pettrip.trip.model.CoursePlace;
 import com.pettrip.trip.model.StartCourse;
 import com.pettrip.trip.model.TravelCourse;
@@ -24,16 +26,19 @@ public class CourseService {
 
   private final PlaceService placeService;
   private final PlaceRepository placeRepository;
+  private final RouteOptimizationService routeOptimizationService;
   private final TravelCourseRepository travelCourseRepository;
   private final CoursePlaceRepository coursePlaceRepository;
 
   public CourseService(
       PlaceService placeService,
       PlaceRepository placeRepository,
+      RouteOptimizationService routeOptimizationService,
       TravelCourseRepository travelCourseRepository,
       CoursePlaceRepository coursePlaceRepository) {
     this.placeService = placeService;
     this.placeRepository = placeRepository;
+    this.routeOptimizationService = routeOptimizationService;
     this.travelCourseRepository = travelCourseRepository;
     this.coursePlaceRepository = coursePlaceRepository;
   }
@@ -48,14 +53,27 @@ public class CourseService {
       String startLocation) {
     List<Place> places = placeService.searchNearby(lat, lng, radiusMeters);
 
+    List<PlaceInfo> placeInfos =
+        places.stream()
+            .map(
+                p ->
+                    new PlaceInfo(
+                        p.getExternalPlaceId(),
+                        p.getPlaceName(),
+                        p.getAddress(),
+                        p.getLatitude(),
+                        p.getLongitude()))
+            .toList();
+    List<String> orderedIds = routeOptimizationService.optimizeOrder(placeInfos);
+
     StartCourse startCourse = new StartCourse(startLocation, LocalDateTime.now());
     TravelCourse course = new TravelCourse(userId, startCourse, travelDate);
     travelCourseRepository.save(course);
 
-    for (int i = 0; i < places.size(); i++) {
-      boolean isLast = (i == places.size() - 1);
-      coursePlaceRepository.save(
-          new CoursePlace(course, places.get(i).getExternalPlaceId(), (short) (i + 1), isLast));
+    for (int i = 0; i < orderedIds.size(); i++) {
+      boolean isLast = (i == orderedIds.size() - 1);
+      String placeId = orderedIds.get(i);
+      coursePlaceRepository.save(new CoursePlace(course, placeId, (short) (i + 1), isLast));
     }
 
     return course;

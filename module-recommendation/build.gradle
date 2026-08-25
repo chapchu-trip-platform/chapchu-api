@@ -1,9 +1,11 @@
 dependencies {
     implementation project(':module-common')
     implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.ai:spring-ai-starter-model-openai'
 
-    // RAG 파이프라인 구현 시 활성화 (Spring AI BOM 버전 확인 후 추가)
-    // implementation 'org.springframework.ai:spring-ai-anthropic-spring-boot-starter'
-    // implementation 'org.springframework.ai:spring-ai-openai-spring-boot-starter'
-    // implementation 'org.springframework.ai:spring-ai-pgvector-store-spring-boot-starter'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testImplementation 'org.assertj:assertj-core:3.25.3'
+    testImplementation 'org.mockito:mockito-junit-jupiter:5.21.0'
+    testImplementation 'com.fasterxml.jackson.core:jackson-databind'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
