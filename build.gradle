@@ -49,7 +49,7 @@ subprojects {
     dependencyManagement {
         imports {
             mavenBom "org.springframework.boot:spring-boot-dependencies:3.4.5"
-            // mavenBom "org.springframework.ai:spring-ai-bom:1.0.0"  // RAG 구현 시 버전 확인 후 활성화
+            mavenBom "org.springframework.ai:spring-ai-bom:1.0.0"
             mavenBom "software.amazon.awssdk:bom:2.26.0"
         }
     }

@@ -1,0 +1,3 @@
+ALTER TABLE start_course
+    ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT now(),
+    ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT now();

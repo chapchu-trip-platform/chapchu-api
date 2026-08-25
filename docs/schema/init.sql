@@ -184,7 +184,9 @@ CREATE TABLE place_embeddings (
 CREATE TABLE start_course (
     start_course_id       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     start_course_location VARCHAR(255),
-    start_course_time     TIMESTAMP
+    start_course_time     TIMESTAMP,
+    created_at            TIMESTAMP DEFAULT now(),
+    updated_at            TIMESTAMP DEFAULT now()
 );
 
 CREATE TABLE travel_courses (
