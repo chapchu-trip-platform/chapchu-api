@@ -4,6 +4,7 @@ import com.pettrip.place.model.Place;
 import com.pettrip.place.repository.PlaceRepository;
 import com.pettrip.place.service.PlaceService;
 import com.pettrip.recommendation.service.PlaceInfo;
+import com.pettrip.recommendation.service.PlaceRagService;
 import com.pettrip.recommendation.service.RouteOptimizationService;
 import com.pettrip.trip.model.CoursePlace;
 import com.pettrip.trip.model.StartCourse;
@@ -15,6 +16,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -27,6 +29,7 @@ public class CourseService {
   private final PlaceService placeService;
   private final PlaceRepository placeRepository;
   private final RouteOptimizationService routeOptimizationService;
+  private final PlaceRagService placeRagService;
   private final TravelCourseRepository travelCourseRepository;
   private final CoursePlaceRepository coursePlaceRepository;
 
@@ -34,11 +37,13 @@ public class CourseService {
       PlaceService placeService,
       PlaceRepository placeRepository,
       RouteOptimizationService routeOptimizationService,
+      PlaceRagService placeRagService,
       TravelCourseRepository travelCourseRepository,
       CoursePlaceRepository coursePlaceRepository) {
     this.placeService = placeService;
     this.placeRepository = placeRepository;
     this.routeOptimizationService = routeOptimizationService;
+    this.placeRagService = placeRagService;
     this.travelCourseRepository = travelCourseRepository;
     this.coursePlaceRepository = coursePlaceRepository;
   }
@@ -53,8 +58,16 @@ public class CourseService {
       String startLocation) {
     List<Place> places = placeService.searchNearby(lat, lng, radiusMeters);
 
+    Map<String, Place> placeMap =
+        places.stream().collect(Collectors.toMap(Place::getExternalPlaceId, Function.identity()));
+
+    List<String> rawIds = places.stream().map(Place::getExternalPlaceId).toList();
+    List<String> ragRankedIds = placeRagService.rankByReviewSimilarity(rawIds);
+
     List<PlaceInfo> placeInfos =
-        places.stream()
+        ragRankedIds.stream()
+            .map(placeMap::get)
+            .filter(Objects::nonNull)
             .map(
                 p ->
                     new PlaceInfo(

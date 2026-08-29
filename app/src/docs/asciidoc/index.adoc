@@ -926,6 +926,24 @@ include::{snippets}/review-recommendation-delete/http-response.adoc[]
 
 == 여행 API
 
+=== 코스 생성
+
+`POST /courses`
+
+JWT 인증이 필요합니다. 현재 위치 주변 반려동물 동반 장소를 TourAPI로 검색하고, 리뷰 임베딩 기반 RAG 랭킹 후 AI 경로 최적화로 코스를 생성합니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/course-create/http-request.adoc[]
+include::{snippets}/course-create/request-fields.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/course-create/http-response.adoc[]
+include::{snippets}/course-create/response-fields.adoc[]
+
 === 코스 조회
 
 `GET /courses/{courseId}`

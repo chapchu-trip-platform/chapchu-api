@@ -60,6 +60,7 @@ subprojects {
     }
 
     checkstyle {
+        toolVersion = '10.24.0'
         maxWarnings = 0
         configFile = rootProject.file("config/checkstyle/checkstyle-rules.xml")
     }
