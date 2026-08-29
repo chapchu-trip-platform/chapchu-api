@@ -1,0 +1,1 @@
+ALTER TABLE reviews ADD COLUMN weather VARCHAR(20);

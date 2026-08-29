@@ -8,4 +8,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface ReviewRepository extends JpaRepository<Review, UUID> {
 
   List<Review> findByUserIdOrderByCreatedAtDesc(UUID userId);
+
+  List<Review> findByPlaceIdOrderByCreatedAtDesc(String placeId);
 }

@@ -19,8 +19,10 @@ class ReviewRepositoryTest {
   void findByUserIdOrderByCreatedAtDesc는_해당_유저의_리뷰만_조회한다() {
     UUID ownerId = UUID.randomUUID();
     UUID otherId = UUID.randomUUID();
-    reviewRepository.save(new Review("place-1", ownerId, UUID.randomUUID(), (short) 5, "최고예요"));
-    reviewRepository.save(new Review("place-2", otherId, UUID.randomUUID(), (short) 3, "그냥 그래요"));
+    reviewRepository.save(
+        new Review("place-1", ownerId, UUID.randomUUID(), (short) 5, "최고예요", null));
+    reviewRepository.save(
+        new Review("place-2", otherId, UUID.randomUUID(), (short) 3, "그냥 그래요", null));
 
     var result = reviewRepository.findByUserIdOrderByCreatedAtDesc(ownerId);
 
