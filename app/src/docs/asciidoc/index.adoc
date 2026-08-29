@@ -469,6 +469,8 @@ include::{snippets}/my-review-list/http-request.adoc[]
 include::{snippets}/my-review-list/http-response.adoc[]
 include::{snippets}/my-review-list/response-fields.adoc[]
 
+
+
 == 반려동물 API
 
 === 견종 목록 조회
@@ -837,6 +839,60 @@ include::{snippets}/comment-delete/path-parameters.adoc[]
 include::{snippets}/comment-delete/http-response.adoc[]
 
 == 리뷰 API
+
+=== 리뷰 작성
+
+`POST /reviews`
+
+JWT 인증이 필요합니다. `petId`는 본인 반려동물이어야 하며, 타인의 반려동물 ID를 사용하면 403이 반환됩니다.
+코스 여행 중 작성하는 경우 `coursePlaceId`를 함께 전달하면 해당 방문 장소와 연결됩니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/review-create/http-request.adoc[]
+include::{snippets}/review-create/request-fields.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/review-create/http-response.adoc[]
+include::{snippets}/review-create/response-fields.adoc[]
+
+=== 리뷰 삭제
+
+`DELETE /reviews/{reviewId}`
+
+JWT 인증이 필요합니다. 본인이 작성한 리뷰만 삭제할 수 있습니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/review-delete/http-request.adoc[]
+include::{snippets}/review-delete/path-parameters.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/review-delete/http-response.adoc[]
+
+=== 장소별 리뷰 목록
+
+`GET /places/{placeId}/reviews`
+
+인증이 필요 없습니다. 최신순으로 반환됩니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/place-review-list/http-request.adoc[]
+include::{snippets}/place-review-list/path-parameters.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/place-review-list/http-response.adoc[]
+include::{snippets}/place-review-list/response-fields.adoc[]
 
 === 리뷰 추천
 
