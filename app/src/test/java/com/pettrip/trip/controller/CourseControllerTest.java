@@ -1,16 +1,20 @@
 package com.pettrip.trip.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.when;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.document;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
+import static org.springframework.restdocs.payload.PayloadDocumentation.requestFields;
 import static org.springframework.restdocs.payload.PayloadDocumentation.responseFields;
 import static org.springframework.restdocs.request.RequestDocumentation.parameterWithName;
 import static org.springframework.restdocs.request.RequestDocumentation.pathParameters;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pettrip.config.SecurityConfig;
 import com.pettrip.place.model.Place;
 import com.pettrip.trip.model.CoursePlace;
@@ -45,13 +49,12 @@ class CourseControllerTest {
   private static final UUID USER_ID = UUID.fromString("0198f3a0-1234-7000-8000-000000000001");
 
   @Autowired private MockMvc mockMvc;
+  @Autowired private ObjectMapper objectMapper;
 
   @MockitoBean private CourseService courseService;
   @MockitoBean private JwtDecoder jwtDecoder;
 
-  @Test
-  void 내_코스를_조회한다() throws Exception {
-    UUID courseId = UUID.fromString("0198f3a0-9999-7000-8000-000000000002");
+  private TravelCourseDetail sampleDetail() {
     StartCourse start = new StartCourse("강남구", LocalDateTime.now());
     TravelCourse course = new TravelCourse(USER_ID, start, LocalDate.of(2026, 8, 30));
     Place place =
@@ -67,8 +70,60 @@ class CourseControllerTest {
             null,
             null);
     CoursePlace cp = new CoursePlace(course, "ext-001", (short) 1, true);
-    TravelCourseDetail detail =
-        new TravelCourseDetail(course, List.of(cp), Map.of("ext-001", place));
+    return new TravelCourseDetail(course, List.of(cp), Map.of("ext-001", place));
+  }
+
+  @Test
+  void 코스를_생성한다() throws Exception {
+    TravelCourseDetail detail = sampleDetail();
+    when(courseService.createCourse(any(), any(), any(), anyInt(), any(), any()))
+        .thenReturn(detail.course());
+    when(courseService.getCourse(any(), any())).thenReturn(detail);
+
+    CreateCourseRequest request =
+        new CreateCourseRequest(
+            new BigDecimal("37.5"),
+            new BigDecimal("127.0"),
+            5000,
+            LocalDate.of(2026, 8, 30),
+            "강남구");
+
+    mockMvc
+        .perform(
+            post("/courses")
+                .contentType("application/json")
+                .content(objectMapper.writeValueAsString(request))
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isCreated())
+        .andDo(
+            document(
+                "course-create",
+                requestFields(
+                    fieldWithPath("lat").description("위도"),
+                    fieldWithPath("lng").description("경도"),
+                    fieldWithPath("radiusMeters")
+                        .description("검색 반경(미터). 0이면 기본값 5000m 적용")
+                        .type(JsonFieldType.NUMBER),
+                    fieldWithPath("travelDate").description("여행 날짜"),
+                    fieldWithPath("startLocation").description("출발 위치")),
+                responseFields(
+                    fieldWithPath("courseId").description("코스 ID"),
+                    fieldWithPath("travelDate").description("여행 날짜"),
+                    fieldWithPath("startLocation").description("출발 위치"),
+                    fieldWithPath("places").description("방문 장소 목록").type(JsonFieldType.ARRAY),
+                    fieldWithPath("places[].coursePlaceId").description("코스 장소 ID (방문 체크인에 사용)"),
+                    fieldWithPath("places[].externalPlaceId").description("장소 외부 ID"),
+                    fieldWithPath("places[].placeName").description("장소 이름"),
+                    fieldWithPath("places[].visitOrder")
+                        .description("방문 순서")
+                        .type(JsonFieldType.NUMBER),
+                    fieldWithPath("places[].finalPlace").description("마지막 방문 장소 여부"))));
+  }
+
+  @Test
+  void 내_코스를_조회한다() throws Exception {
+    UUID courseId = UUID.fromString("0198f3a0-9999-7000-8000-000000000002");
+    TravelCourseDetail detail = sampleDetail();
     when(courseService.getCourse(any(), any())).thenReturn(detail);
 
     mockMvc
@@ -85,6 +140,7 @@ class CourseControllerTest {
                     fieldWithPath("travelDate").description("여행 날짜"),
                     fieldWithPath("startLocation").description("출발 위치"),
                     fieldWithPath("places").description("방문 장소 목록").type(JsonFieldType.ARRAY),
+                    fieldWithPath("places[].coursePlaceId").description("코스 장소 ID (방문 체크인에 사용)"),
                     fieldWithPath("places[].externalPlaceId").description("장소 외부 ID"),
                     fieldWithPath("places[].placeName").description("장소 이름"),
                     fieldWithPath("places[].visitOrder")

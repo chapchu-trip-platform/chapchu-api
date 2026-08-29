@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 import com.pettrip.place.model.Place;
 import com.pettrip.place.repository.PlaceRepository;
 import com.pettrip.place.service.PlaceService;
+import com.pettrip.recommendation.service.PlaceRagService;
 import com.pettrip.recommendation.service.RouteOptimizationService;
 import com.pettrip.trip.model.CoursePlace;
 import com.pettrip.trip.model.StartCourse;
@@ -36,6 +37,7 @@ class CourseServiceTest {
   @Mock private TravelCourseRepository travelCourseRepository;
   @Mock private CoursePlaceRepository coursePlaceRepository;
   @Mock private RouteOptimizationService routeOptimizationService;
+  @Mock private PlaceRagService placeRagService;
 
   @InjectMocks private CourseService courseService;
 
@@ -66,6 +68,7 @@ class CourseServiceTest {
   void 주변_장소로_코스를_생성한다() {
     List<Place> places = List.of(samplePlace("p1", "장소A"), samplePlace("p2", "장소B"));
     when(placeService.searchNearby(any(), any(), anyInt())).thenReturn(places);
+    when(placeRagService.rankByReviewSimilarity(any())).thenAnswer(inv -> inv.getArgument(0));
     when(routeOptimizationService.optimizeOrder(any())).thenReturn(List.of("p1", "p2"));
     when(travelCourseRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
     when(coursePlaceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -88,6 +91,7 @@ class CourseServiceTest {
     List<Place> places =
         List.of(samplePlace("p1", "A"), samplePlace("p2", "B"), samplePlace("p3", "C"));
     when(placeService.searchNearby(any(), any(), anyInt())).thenReturn(places);
+    when(placeRagService.rankByReviewSimilarity(any())).thenAnswer(inv -> inv.getArgument(0));
     when(routeOptimizationService.optimizeOrder(any())).thenReturn(List.of("p1", "p2", "p3"));
     when(travelCourseRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -115,6 +119,7 @@ class CourseServiceTest {
   @Test
   void 주변_장소_없을때_코스생성_예외발생한다() {
     when(placeService.searchNearby(any(), any(), anyInt())).thenReturn(List.of());
+    when(placeRagService.rankByReviewSimilarity(any())).thenAnswer(inv -> inv.getArgument(0));
     when(routeOptimizationService.optimizeOrder(any())).thenReturn(List.of());
 
     assertThatThrownBy(

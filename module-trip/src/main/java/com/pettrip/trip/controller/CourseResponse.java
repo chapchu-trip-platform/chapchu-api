@@ -12,7 +12,11 @@ public record CourseResponse(
     UUID courseId, LocalDate travelDate, String startLocation, List<CoursePlaceItem> places) {
 
   public record CoursePlaceItem(
-      String externalPlaceId, String placeName, short visitOrder, boolean finalPlace) {}
+      UUID coursePlaceId,
+      String externalPlaceId,
+      String placeName,
+      short visitOrder,
+      boolean finalPlace) {}
 
   public static CourseResponse from(TravelCourseDetail detail) {
     TravelCourse course = detail.course();
@@ -30,6 +34,6 @@ public record CourseResponse(
   private static CoursePlaceItem toItem(CoursePlace cp, Place place) {
     String name = place != null ? place.getPlaceName() : cp.getExternalPlaceId();
     return new CoursePlaceItem(
-        cp.getExternalPlaceId(), name, cp.getVisitOrder(), cp.isFinalPlace());
+        cp.getId(), cp.getExternalPlaceId(), name, cp.getVisitOrder(), cp.isFinalPlace());
   }
 }
