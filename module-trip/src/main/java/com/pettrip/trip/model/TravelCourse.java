@@ -65,4 +65,8 @@ public class TravelCourse extends BaseEntity {
   public List<CoursePlace> getCoursePlaces() {
     return coursePlaces;
   }
+
+  public void complete() {
+    this.isCompleted = true;
+  }
 }

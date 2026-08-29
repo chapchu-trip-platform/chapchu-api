@@ -36,12 +36,12 @@ public class CourseController {
             request.radiusMeters() > 0 ? request.radiusMeters() : 5000,
             request.travelDate(),
             request.startLocation());
-    TravelCourseDetail detail = courseService.getCourse(course.getId());
+    TravelCourseDetail detail = courseService.getCourse(userId, course.getId());
     return CourseResponse.from(detail);
   }
 
   @GetMapping("/{courseId}")
-  public CourseResponse getCourse(@PathVariable UUID courseId) {
-    return CourseResponse.from(courseService.getCourse(courseId));
+  public CourseResponse getCourse(@CurrentUserId UUID userId, @PathVariable UUID courseId) {
+    return CourseResponse.from(courseService.getCourse(userId, courseId));
   }
 }
