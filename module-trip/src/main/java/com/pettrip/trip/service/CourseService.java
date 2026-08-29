@@ -64,7 +64,11 @@ public class CourseService {
                         p.getLatitude(),
                         p.getLongitude()))
             .toList();
+
     List<String> orderedIds = routeOptimizationService.optimizeOrder(placeInfos);
+    if (orderedIds.isEmpty()) {
+      throw new NoPlacesFoundException();
+    }
 
     StartCourse startCourse = new StartCourse(startLocation, LocalDateTime.now());
     TravelCourse course = new TravelCourse(userId, startCourse, travelDate);
@@ -80,9 +84,12 @@ public class CourseService {
   }
 
   @Transactional(readOnly = true)
-  public TravelCourseDetail getCourse(UUID courseId) {
+  public TravelCourseDetail getCourse(UUID userId, UUID courseId) {
     TravelCourse course =
         travelCourseRepository.findById(courseId).orElseThrow(CourseNotFoundException::new);
+    if (!userId.equals(course.getUserId())) {
+      throw new CourseNotOwnerException();
+    }
 
     List<CoursePlace> coursePlaces =
         coursePlaceRepository.findByCourseIdOrderByVisitOrderAsc(courseId);
@@ -94,6 +101,26 @@ public class CourseService {
             .collect(Collectors.toMap(Place::getExternalPlaceId, Function.identity()));
 
     return new TravelCourseDetail(course, coursePlaces, placeMap);
+  }
+
+  @Transactional(readOnly = true)
+  public List<TravelCourse> listMyCourses(UUID userId) {
+    return travelCourseRepository.findByUserIdWithPlaces(userId);
+  }
+
+  @Transactional
+  public void visitPlace(UUID userId, UUID coursePlaceId) {
+    CoursePlace coursePlace =
+        coursePlaceRepository
+            .findByIdAndCourseUserId(coursePlaceId, userId)
+            .orElseThrow(CourseNotOwnerException::new);
+    if (coursePlace.isVisited()) {
+      return;
+    }
+    coursePlace.markVisited();
+    if (coursePlace.isFinalPlace()) {
+      coursePlace.getCourse().complete();
+    }
   }
 
   public record TravelCourseDetail(

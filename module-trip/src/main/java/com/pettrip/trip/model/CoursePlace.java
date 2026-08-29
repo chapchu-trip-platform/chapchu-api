@@ -67,4 +67,9 @@ public class CoursePlace extends BaseEntity {
   public LocalDateTime getVisitedAt() {
     return visitedAt;
   }
+
+  public void markVisited() {
+    this.isVisited = true;
+    this.visitedAt = LocalDateTime.now();
+  }
 }

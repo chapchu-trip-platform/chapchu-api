@@ -926,6 +926,59 @@ include::{snippets}/review-recommendation-delete/http-response.adoc[]
 
 == 여행 API
 
+=== 코스 조회
+
+`GET /courses/{courseId}`
+
+JWT 인증이 필요합니다. 본인의 코스만 조회할 수 있습니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/course-get/http-request.adoc[]
+include::{snippets}/course-get/path-parameters.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/course-get/http-response.adoc[]
+include::{snippets}/course-get/response-fields.adoc[]
+
+=== 내 코스 목록 조회
+
+`GET /users/me/courses`
+
+JWT 인증이 필요합니다. 최신순으로 반환됩니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/my-course-list/http-request.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/my-course-list/http-response.adoc[]
+include::{snippets}/my-course-list/response-fields.adoc[]
+
+=== 코스 장소 방문 체크인
+
+`PATCH /course-places/{coursePlaceId}/visit`
+
+JWT 인증이 필요합니다. 이미 체크인된 장소는 멱등 처리(200 OK)됩니다.
+마지막 장소 체크인 시 코스 완료(isCompleted=true)로 변경됩니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/course-place-visit/http-request.adoc[]
+include::{snippets}/course-place-visit/path-parameters.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/course-place-visit/http-response.adoc[]
+
 == 앨범 API
 
 == 추천 API
