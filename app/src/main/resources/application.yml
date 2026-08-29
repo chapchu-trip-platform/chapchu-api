@@ -27,6 +27,10 @@ spring:
       chat:
         options:
           model: gpt-4o-mini
+      embedding:
+        options:
+          model: text-embedding-3-small
+          dimensions: 1536
 
   security:
     oauth2:
@@ -69,13 +73,6 @@ app:
   tour-api:
     key: ${TOUR_API_KEY:}
     base-url: ${TOUR_API_BASE_URL:https://apis.data.go.kr/B551011/KorService2}
-
-  ai:
-    openai:
-      api-key: ${OPENAI_API_KEY:}
-      chat:
-        options:
-          model: gpt-4o-mini
 
 cors:
   allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}

@@ -10,8 +10,10 @@ public record ReviewResponse(
     UUID petId,
     Short rating,
     String contents,
+    String weather,
     int recommendationCount,
-    LocalDateTime createdAt) {
+    LocalDateTime createdAt,
+    UUID coursePlaceId) {
 
   public static ReviewResponse from(Review review) {
     return new ReviewResponse(
@@ -20,7 +22,9 @@ public record ReviewResponse(
         review.getPetId(),
         review.getRating(),
         review.getContents(),
+        review.getWeather(),
         review.getRecommendationCount(),
-        review.getCreatedAt());
+        review.getCreatedAt(),
+        review.getCoursePlaceId());
   }
 }

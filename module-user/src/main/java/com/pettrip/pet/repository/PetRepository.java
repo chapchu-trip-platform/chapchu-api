@@ -10,4 +10,6 @@ public interface PetRepository extends JpaRepository<Pet, UUID> {
   List<Pet> findByUserId(UUID userId);
 
   long countByUserId(UUID userId);
+
+  boolean existsByIdAndUserId(UUID id, UUID userId);
 }

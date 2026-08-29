@@ -35,6 +35,12 @@ public class Review {
   @Column(name = "contents")
   private String contents;
 
+  @Column(name = "weather", length = 20)
+  private String weather;
+
+  @Column(name = "course_place_id")
+  private UUID coursePlaceId;
+
   @Column(name = "recommendation_count")
   private int recommendationCount = 0;
 
@@ -44,12 +50,14 @@ public class Review {
 
   protected Review() {}
 
-  public Review(String placeId, UUID userId, UUID petId, Short rating, String contents) {
+  public Review(
+      String placeId, UUID userId, UUID petId, Short rating, String contents, String weather) {
     this.placeId = placeId;
     this.userId = userId;
     this.petId = petId;
     this.rating = rating;
     this.contents = contents;
+    this.weather = weather;
   }
 
   public void incrementRecommendationCount() {
@@ -82,6 +90,18 @@ public class Review {
 
   public String getContents() {
     return contents;
+  }
+
+  public String getWeather() {
+    return weather;
+  }
+
+  public UUID getCoursePlaceId() {
+    return coursePlaceId;
+  }
+
+  public void setCoursePlaceId(UUID coursePlaceId) {
+    this.coursePlaceId = coursePlaceId;
   }
 
   public int getRecommendationCount() {

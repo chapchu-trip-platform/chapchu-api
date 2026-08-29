@@ -285,6 +285,8 @@ CREATE TABLE reviews (
     pet_id               UUID NOT NULL REFERENCES pets(pet_id),
     rating               SMALLINT,
     contents             TEXT,
+    weather              VARCHAR(20),
+    course_place_id      UUID NULL REFERENCES course_places(course_place_id),
     recommendation_count INT DEFAULT 0,
     created_at           TIMESTAMP DEFAULT now()
 );
@@ -294,6 +296,12 @@ CREATE TABLE review_recommendations (
     user_id    UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     created_at TIMESTAMP DEFAULT now(),
     PRIMARY KEY (review_id, user_id)
+);
+
+CREATE TABLE review_embeddings (
+    review_id  UUID PRIMARY KEY REFERENCES reviews(review_id) ON DELETE CASCADE,
+    embedding  vector(1536) NOT NULL,
+    created_at TIMESTAMP DEFAULT now()
 );
 
 -- ============================================================
@@ -400,8 +408,11 @@ CREATE INDEX idx_pets_user_id ON pets(user_id);
 CREATE INDEX idx_photos_course_place_id ON photos(course_place_id);
 
 -- 벡터 ANN 탐색용 HNSW 인덱스 (코사인 유사도)
--- CREATE INDEX idx_course_embeddings_hnsw: HNSW 최대 2000차원 제한으로 3072차원 미지원 (failures/009 참조)
--- CREATE INDEX idx_place_embeddings_hnsw: HNSW 최대 2000차원 제한으로 3072차원 미지원 (failures/009 참조)
+-- review_embeddings: text-embedding-3-small 1536차원 → HNSW 적용 가능 (2000차원 이하)
+CREATE INDEX idx_review_embeddings_hnsw ON review_embeddings USING hnsw (embedding vector_cosine_ops);
+-- place_embeddings / course_embeddings: text-embedding-3-large 3072차원 → HNSW 미지원 (failures/009 참조)
+-- CREATE INDEX idx_course_embeddings_hnsw: 3072차원으로 HNSW 불가
+-- CREATE INDEX idx_place_embeddings_hnsw: 3072차원으로 HNSW 불가
 
 -- ============================================================
 -- COMMENTS
@@ -577,11 +588,16 @@ COMMENT ON COLUMN reviews.user_id IS 'FK → users. 탈퇴 시 NULL 유지';
 COMMENT ON COLUMN reviews.pet_id IS '리뷰 작성 시 동반한 반려동물. FK → pets';
 COMMENT ON COLUMN reviews.rating IS '별점 (1~5)';
 COMMENT ON COLUMN reviews.contents IS '리뷰 본문';
+COMMENT ON COLUMN reviews.weather IS '방문 당시 날씨. SUNNY·CLOUDY·RAINY·SNOWY. nullable';
 COMMENT ON COLUMN reviews.recommendation_count IS '추천 수. 비정규화 카운터';
 
 COMMENT ON TABLE review_recommendations IS '리뷰 추천. N:M junction table. append-only';
 COMMENT ON COLUMN review_recommendations.review_id IS 'FK → reviews';
 COMMENT ON COLUMN review_recommendations.user_id IS 'FK → users';
+
+COMMENT ON TABLE review_embeddings IS '리뷰 텍스트 임베딩. RAG 유사 리뷰/장소 검색용. append-only';
+COMMENT ON COLUMN review_embeddings.review_id IS 'PK이자 FK → reviews';
+COMMENT ON COLUMN review_embeddings.embedding IS 'OpenAI text-embedding-3-small 벡터. 차원 1536. HNSW 인덱스 적용';
 
 -- COMMUNITY DOMAIN
 COMMENT ON TABLE posts IS '커뮤니티 게시글. 여행 코스 후기 공유';

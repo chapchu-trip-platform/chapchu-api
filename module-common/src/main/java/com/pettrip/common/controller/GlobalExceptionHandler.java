@@ -3,10 +3,12 @@ package com.pettrip.common.controller;
 import com.pettrip.common.model.ErrorResponse;
 import com.pettrip.common.service.ConflictException;
 import com.pettrip.common.service.ExternalApiException;
+import com.pettrip.common.service.ForbiddenException;
 import com.pettrip.common.service.NotFoundException;
 import com.pettrip.common.service.UnauthorizedException;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -37,10 +39,23 @@ public class GlobalExceptionHandler {
         .body(new ErrorResponse("EXTERNAL_API_ERROR", e.getMessage()));
   }
 
+  @ExceptionHandler(ForbiddenException.class)
+  public ResponseEntity<ErrorResponse> handleForbidden(ForbiddenException e) {
+    return ResponseEntity.status(HttpStatus.FORBIDDEN)
+        .body(new ErrorResponse("FORBIDDEN", e.getMessage()));
+  }
+
   @ExceptionHandler(ConflictException.class)
   public ResponseEntity<ErrorResponse> handleConflict(ConflictException exception) {
     return ResponseEntity.status(HttpStatus.CONFLICT)
         .body(new ErrorResponse("CONFLICT", exception.getMessage()));
+  }
+
+  @ExceptionHandler(DataIntegrityViolationException.class)
+  public ResponseEntity<ErrorResponse> handleDataIntegrityViolation(
+      DataIntegrityViolationException e) {
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+        .body(new ErrorResponse("INVALID_REQUEST", "입력 데이터가 올바르지 않습니다."));
   }
 
   /**
