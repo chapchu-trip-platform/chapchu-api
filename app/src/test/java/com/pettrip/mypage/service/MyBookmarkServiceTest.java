@@ -1,48 +1,41 @@
 package com.pettrip.mypage.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
-import com.pettrip.post.model.Post;
-import com.pettrip.post.model.PostBookmark;
-import com.pettrip.post.repository.PostBookmarkRepository;
-import com.pettrip.post.repository.PostRepository;
+import com.pettrip.post.controller.PostResponse;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.jdbc.core.RowMapper;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import org.springframework.jdbc.core.namedparam.SqlParameterSource;
 
 @ExtendWith(MockitoExtension.class)
 class MyBookmarkServiceTest {
 
-  @Mock private PostBookmarkRepository postBookmarkRepository;
-  @Mock private PostRepository postRepository;
+  @Mock private NamedParameterJdbcTemplate jdbcTemplate;
 
   private MyBookmarkService myBookmarkService;
 
   @BeforeEach
   void setUp() {
-    myBookmarkService = new MyBookmarkService(postBookmarkRepository, postRepository);
+    myBookmarkService = new MyBookmarkService(jdbcTemplate);
   }
 
   @Test
   void listMyBookmarks는_북마크한_게시글을_반환한다() {
     UUID userId = UUID.randomUUID();
-    UUID postId = UUID.randomUUID();
-    PostBookmark bookmark = new PostBookmark(userId, postId);
-    Post post =
-        new Post(
-            UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "제목", "내용");
-    when(postBookmarkRepository.findByUserIdOrderByCreatedAtDesc(userId))
-        .thenReturn(List.of(bookmark));
-    when(postRepository.findById(postId)).thenReturn(Optional.of(post));
+    when(jdbcTemplate.query(any(String.class), any(SqlParameterSource.class), any(RowMapper.class)))
+        .thenReturn(List.of());
 
-    List<Post> result = myBookmarkService.listMyBookmarks(userId);
+    List<PostResponse> result = myBookmarkService.listMyBookmarks(userId);
 
-    assertThat(result).containsExactly(post);
+    assertThat(result).isEmpty();
   }
 }

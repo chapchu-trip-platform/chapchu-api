@@ -1,6 +1,7 @@
 package com.pettrip.post.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.document;
@@ -19,8 +20,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pettrip.config.SecurityConfig;
-import com.pettrip.post.model.Post;
 import com.pettrip.post.service.PostService;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -48,22 +49,32 @@ class PostControllerTest {
   @MockitoBean private PostService postService;
   @MockitoBean private JwtDecoder jwtDecoder;
 
+  private PostResponse samplePostResponse() {
+    return new PostResponse(
+        UUID.randomUUID(),
+        UUID.randomUUID(),
+        UUID.randomUUID(),
+        UUID.randomUUID(),
+        "첫 여행",
+        "즐거웠어요",
+        0,
+        0,
+        3,
+        "멍멍이아빠",
+        "https://example.com/photo.jpg",
+        LocalDateTime.of(2024, 1, 15, 10, 30, 0));
+  }
+
   @Test
   void 게시글_목록을_조회한다() throws Exception {
-    Post post =
-        new Post(
-            UUID.randomUUID(),
-            UUID.randomUUID(),
-            UUID.randomUUID(),
-            UUID.randomUUID(),
-            "첫 여행",
-            "즐거웠어요");
-    when(postService.listPosts(any())).thenReturn(List.of(post));
+    PostListResponse listResponse = new PostListResponse(List.of(samplePostResponse()), null);
+    when(postService.listPosts(any(), any(), anyInt())).thenReturn(listResponse);
 
     mockMvc
         .perform(
             get("/posts")
                 .param("sort", "latest")
+                .param("size", "20")
                 .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
         .andExpect(status().isOk())
         .andDo(
@@ -72,20 +83,35 @@ class PostControllerTest {
                 queryParameters(
                     parameterWithName("sort")
                         .optional()
-                        .description("정렬 기준: latest(최신순, 기본값) / popular(추천순)"))));
+                        .description("정렬 기준: latest(최신순, 기본값) / popular(추천순)"),
+                    parameterWithName("cursor")
+                        .optional()
+                        .description(
+                            "이전 페이지 마지막 항목의 커서. 형식: {createdAt}~{postId} (예: 2024-01-15T10:30:00~uuid). 첫 페이지 생략"),
+                    parameterWithName("size").optional().description("페이지 크기 (기본값: 20)")),
+                responseFields(
+                    fieldWithPath("posts[]").description("게시글 목록"),
+                    fieldWithPath("posts[].id").description("게시글 ID"),
+                    fieldWithPath("posts[].petId").description("동행한 반려견 ID"),
+                    fieldWithPath("posts[].photoId").description("대표 사진 ID"),
+                    fieldWithPath("posts[].courseId").description("여행 코스 ID"),
+                    fieldWithPath("posts[].title").description("제목"),
+                    fieldWithPath("posts[].content").description("내용"),
+                    fieldWithPath("posts[].viewCount").description("조회수"),
+                    fieldWithPath("posts[].recommendationCount").description("추천 수"),
+                    fieldWithPath("posts[].commentCount").description("댓글 수"),
+                    fieldWithPath("posts[].nickname").description("작성자 닉네임"),
+                    fieldWithPath("posts[].photoUrl").description("대표 사진 URL (null 가능)").optional(),
+                    fieldWithPath("posts[].createdAt").description("작성일시"),
+                    fieldWithPath("nextCursor")
+                        .description("다음 페이지 커서 (마지막 페이지면 null)")
+                        .optional())));
   }
 
   @Test
   void 게시글_목록을_추천순으로_조회한다() throws Exception {
-    Post post =
-        new Post(
-            UUID.randomUUID(),
-            UUID.randomUUID(),
-            UUID.randomUUID(),
-            UUID.randomUUID(),
-            "인기 여행",
-            "추천 많아요");
-    when(postService.listPosts(eq("popular"))).thenReturn(List.of(post));
+    PostListResponse listResponse = new PostListResponse(List.of(samplePostResponse()), null);
+    when(postService.listPosts(eq("popular"), any(), anyInt())).thenReturn(listResponse);
 
     mockMvc
         .perform(
@@ -98,15 +124,7 @@ class PostControllerTest {
   @Test
   void 게시글_상세를_조회한다() throws Exception {
     UUID postId = UUID.randomUUID();
-    Post post =
-        new Post(
-            UUID.randomUUID(),
-            UUID.randomUUID(),
-            UUID.randomUUID(),
-            UUID.randomUUID(),
-            "첫 여행",
-            "즐거웠어요");
-    when(postService.getPost(postId)).thenReturn(post);
+    when(postService.getPost(postId)).thenReturn(samplePostResponse());
 
     mockMvc
         .perform(get("/posts/{postId}", postId).with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
@@ -124,6 +142,9 @@ class PostControllerTest {
                     fieldWithPath("content").description("내용"),
                     fieldWithPath("viewCount").description("조회수"),
                     fieldWithPath("recommendationCount").description("추천 수"),
+                    fieldWithPath("commentCount").description("댓글 수"),
+                    fieldWithPath("nickname").description("작성자 닉네임"),
+                    fieldWithPath("photoUrl").description("대표 사진 URL (null 가능)").optional(),
                     fieldWithPath("createdAt").description("작성일시"))));
   }
 
@@ -132,10 +153,10 @@ class PostControllerTest {
     UUID petId = UUID.randomUUID();
     UUID photoId = UUID.randomUUID();
     UUID courseId = UUID.randomUUID();
-    Post post = new Post(UUID.randomUUID(), petId, photoId, courseId, "첫 여행", "즐거웠어요");
+    PostResponse response = samplePostResponse();
     when(postService.createPost(
             any(), eq(petId), eq(photoId), eq(courseId), eq("첫 여행"), eq("즐거웠어요")))
-        .thenReturn(post);
+        .thenReturn(response);
 
     String body =
         objectMapper.writeValueAsString(
@@ -166,21 +187,18 @@ class PostControllerTest {
                     fieldWithPath("content").description("내용"),
                     fieldWithPath("viewCount").description("조회수"),
                     fieldWithPath("recommendationCount").description("추천 수"),
+                    fieldWithPath("commentCount").description("댓글 수"),
+                    fieldWithPath("nickname").description("작성자 닉네임"),
+                    fieldWithPath("photoUrl").description("대표 사진 URL (null 가능)").optional(),
                     fieldWithPath("createdAt").description("작성일시"))));
   }
 
   @Test
   void 게시글을_수정한다() throws Exception {
     UUID postId = UUID.randomUUID();
-    Post post =
-        new Post(
-            UUID.randomUUID(),
-            UUID.randomUUID(),
-            UUID.randomUUID(),
-            UUID.randomUUID(),
-            "수정된 제목",
-            "수정된 내용");
-    when(postService.updatePost(any(), eq(postId), eq("수정된 제목"), eq("수정된 내용"))).thenReturn(post);
+    PostResponse response = samplePostResponse();
+    when(postService.updatePost(any(), eq(postId), eq("수정된 제목"), eq("수정된 내용")))
+        .thenReturn(response);
 
     String body = objectMapper.writeValueAsString(new PostUpdateRequest("수정된 제목", "수정된 내용"));
 
@@ -207,6 +225,9 @@ class PostControllerTest {
                     fieldWithPath("content").description("내용"),
                     fieldWithPath("viewCount").description("조회수"),
                     fieldWithPath("recommendationCount").description("추천 수"),
+                    fieldWithPath("commentCount").description("댓글 수"),
+                    fieldWithPath("nickname").description("작성자 닉네임"),
+                    fieldWithPath("photoUrl").description("대표 사진 URL (null 가능)").optional(),
                     fieldWithPath("createdAt").description("작성일시"))));
   }
 

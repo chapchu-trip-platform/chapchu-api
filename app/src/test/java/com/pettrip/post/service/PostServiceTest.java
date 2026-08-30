@@ -6,11 +6,14 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.pettrip.post.controller.PostResponse;
 import com.pettrip.post.model.Post;
 import com.pettrip.post.repository.PostBookmarkRepository;
 import com.pettrip.post.repository.PostRecommendationRepository;
 import com.pettrip.post.repository.PostReportRepository;
 import com.pettrip.post.repository.PostRepository;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,6 +21,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.jdbc.core.RowMapper;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import org.springframework.jdbc.core.namedparam.SqlParameterSource;
 
 @ExtendWith(MockitoExtension.class)
 class PostServiceTest {
@@ -26,6 +32,7 @@ class PostServiceTest {
   @Mock private PostRecommendationRepository postRecommendationRepository;
   @Mock private PostBookmarkRepository postBookmarkRepository;
   @Mock private PostReportRepository postReportRepository;
+  @Mock private NamedParameterJdbcTemplate jdbcTemplate;
 
   private PostService postService;
 
@@ -36,13 +43,30 @@ class PostServiceTest {
             postRepository,
             postRecommendationRepository,
             postBookmarkRepository,
-            postReportRepository);
+            postReportRepository,
+            jdbcTemplate);
+  }
+
+  private PostResponse samplePostResponse(UUID userId) {
+    return new PostResponse(
+        UUID.randomUUID(),
+        UUID.randomUUID(),
+        UUID.randomUUID(),
+        UUID.randomUUID(),
+        "제목",
+        "내용",
+        0,
+        0,
+        0,
+        "닉네임",
+        null,
+        LocalDateTime.now());
   }
 
   @Test
   void getPost는_없으면_예외를_던진다() {
     UUID postId = UUID.randomUUID();
-    when(postRepository.findById(postId)).thenReturn(Optional.empty());
+    when(postRepository.incrementViewCount(postId)).thenReturn(0);
 
     assertThatThrownBy(() -> postService.getPost(postId)).isInstanceOf(PostNotFoundException.class);
   }
@@ -50,15 +74,15 @@ class PostServiceTest {
   @Test
   void getPost는_조회수를_증가시킨다() {
     UUID postId = UUID.randomUUID();
-    Post post =
-        new Post(
-            UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "제목", "내용");
-    when(postRepository.findById(postId)).thenReturn(Optional.of(post));
-    when(postRepository.save(any(Post.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    PostResponse expected = samplePostResponse(UUID.randomUUID());
+    when(postRepository.incrementViewCount(postId)).thenReturn(1);
+    when(jdbcTemplate.query(any(String.class), any(SqlParameterSource.class), any(RowMapper.class)))
+        .thenReturn(List.of(expected));
 
-    Post result = postService.getPost(postId);
+    PostResponse result = postService.getPost(postId);
 
-    assertThat(result.getViewCount()).isEqualTo(1);
+    assertThat(result).isEqualTo(expected);
+    verify(postRepository).incrementViewCount(postId);
   }
 
   @Test
@@ -67,12 +91,14 @@ class PostServiceTest {
     UUID petId = UUID.randomUUID();
     UUID photoId = UUID.randomUUID();
     UUID courseId = UUID.randomUUID();
+    PostResponse expected = samplePostResponse(userId);
     when(postRepository.save(any(Post.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    when(jdbcTemplate.query(any(String.class), any(SqlParameterSource.class), any(RowMapper.class)))
+        .thenReturn(List.of(expected));
 
-    Post result = postService.createPost(userId, petId, photoId, courseId, "제목", "내용");
+    PostResponse result = postService.createPost(userId, petId, photoId, courseId, "제목", "내용");
 
-    assertThat(result.getTitle()).isEqualTo("제목");
-    assertThat(result.getUserId()).isEqualTo(userId);
+    assertThat(result).isEqualTo(expected);
   }
 
   @Test

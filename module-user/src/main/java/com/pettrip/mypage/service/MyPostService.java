@@ -1,21 +1,53 @@
 package com.pettrip.mypage.service;
 
-import com.pettrip.post.model.Post;
-import com.pettrip.post.repository.PostRepository;
+import com.pettrip.post.controller.PostResponse;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.jdbc.core.RowMapper;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 
 @Service
 public class MyPostService {
 
-  private final PostRepository postRepository;
+  private static final String MY_POSTS_SQL =
+      """
+      SELECT p.post_id, p.user_id, p.pet_id, p.photo_id, p.course_id,
+             p.title, p.content, p.view_count, p.recommendation_count, p.comment_count, p.created_at,
+             COALESCE(u.nickname, '(탈퇴한 사용자)') AS nickname,
+             ph.photo_url
+      FROM posts p
+      LEFT JOIN users u ON p.user_id = u.user_id
+      LEFT JOIN photos ph ON p.photo_id = ph.photo_id
+      WHERE p.user_id = :userId
+      ORDER BY p.created_at DESC
+      """;
 
-  public MyPostService(PostRepository postRepository) {
-    this.postRepository = postRepository;
+  private static final RowMapper<PostResponse> POST_ROW_MAPPER =
+      (rs, rowNum) ->
+          new PostResponse(
+              rs.getObject("post_id", UUID.class),
+              rs.getObject("pet_id", UUID.class),
+              rs.getObject("photo_id", UUID.class),
+              rs.getObject("course_id", UUID.class),
+              rs.getString("title"),
+              rs.getString("content"),
+              rs.getInt("view_count"),
+              rs.getInt("recommendation_count"),
+              rs.getInt("comment_count"),
+              rs.getString("nickname"),
+              rs.getString("photo_url"),
+              rs.getTimestamp("created_at").toLocalDateTime());
+
+  private final NamedParameterJdbcTemplate jdbcTemplate;
+
+  public MyPostService(NamedParameterJdbcTemplate jdbcTemplate) {
+    this.jdbcTemplate = jdbcTemplate;
   }
 
-  public List<Post> listMyPosts(UUID userId) {
-    return postRepository.findByUserIdOrderByCreatedAtDesc(userId);
+  public List<PostResponse> listMyPosts(UUID userId) {
+    MapSqlParameterSource params = new MapSqlParameterSource().addValue("userId", userId);
+    return jdbcTemplate.query(MY_POSTS_SQL, params, POST_ROW_MAPPER);
   }
 }

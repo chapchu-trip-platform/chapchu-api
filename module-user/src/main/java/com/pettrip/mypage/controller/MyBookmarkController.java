@@ -21,6 +21,6 @@ public class MyBookmarkController {
 
   @GetMapping
   public List<PostResponse> listMyBookmarks(@CurrentUserId UUID userId) {
-    return myBookmarkService.listMyBookmarks(userId).stream().map(PostResponse::from).toList();
+    return myBookmarkService.listMyBookmarks(userId);
   }
 }

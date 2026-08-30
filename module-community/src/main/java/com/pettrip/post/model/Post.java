@@ -44,6 +44,9 @@ public class Post {
   @Column(name = "recommendation_count")
   private int recommendationCount = 0;
 
+  @Column(name = "comment_count")
+  private int commentCount = 0;
+
   @CreatedDate
   @Column(name = "created_at", updatable = false)
   private LocalDateTime createdAt;
@@ -114,6 +117,10 @@ public class Post {
 
   public int getRecommendationCount() {
     return recommendationCount;
+  }
+
+  public int getCommentCount() {
+    return commentCount;
   }
 
   public LocalDateTime getCreatedAt() {

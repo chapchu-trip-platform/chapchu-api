@@ -21,6 +21,6 @@ public class MyPostController {
 
   @GetMapping
   public List<PostResponse> listMyPosts(@CurrentUserId UUID userId) {
-    return myPostService.listMyPosts(userId).stream().map(PostResponse::from).toList();
+    return myPostService.listMyPosts(userId);
   }
 }

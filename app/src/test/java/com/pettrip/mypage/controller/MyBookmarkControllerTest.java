@@ -8,7 +8,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.pettrip.config.SecurityConfig;
 import com.pettrip.mypage.service.MyBookmarkService;
-import com.pettrip.post.model.Post;
+import com.pettrip.post.controller.PostResponse;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -37,10 +38,21 @@ class MyBookmarkControllerTest {
 
   @Test
   void 북마크한_게시글_목록을_조회한다() throws Exception {
-    Post post =
-        new Post(
-            UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "제목", "내용");
-    when(myBookmarkService.listMyBookmarks(USER_ID)).thenReturn(List.of(post));
+    PostResponse response =
+        new PostResponse(
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            "제목",
+            "내용",
+            0,
+            0,
+            0,
+            "닉네임",
+            null,
+            LocalDateTime.now());
+    when(myBookmarkService.listMyBookmarks(USER_ID)).thenReturn(List.of(response));
 
     mockMvc
         .perform(get("/users/me/bookmarks").with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
