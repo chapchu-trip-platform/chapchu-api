@@ -16,8 +16,8 @@
 --   comments.post_comment_id → parent_comment_id, NULL 허용 (최상위 댓글 지원)
 --   pets.Field         → 삭제 (용도 불명 컬럼)
 --   place_pet_policies.indoor_outdoor_type → VARCHAR(20) (BOOLEAN 표현력 부족)
---   course_embeddings  → 신규 (RAG 파이프라인)
---   place_embeddings   → 신규 (장소 기반 RAG)
+--   course_embeddings  → V17에서 제거 (코드 0건, 3072차원으로 인덱스 불가, decisions/042)
+--   place_embeddings   → V17에서 제거 (코드 0건, 3072차원으로 인덱스 불가, decisions/042)
 --   모든 FK 제약조건   → 인라인 선언으로 통일
 
 CREATE EXTENSION IF NOT EXISTS vector;
@@ -171,11 +171,7 @@ CREATE TABLE place_pet_policies (
     updated_at        TIMESTAMP DEFAULT now()
 );
 
-CREATE TABLE place_embeddings (
-    external_place_id VARCHAR(255) PRIMARY KEY REFERENCES places(external_place_id),
-    embedding         vector(3072) NOT NULL,
-    created_at        TIMESTAMP DEFAULT now()
-);
+-- place_embeddings: V17에서 DROP (decisions/042 참조)
 
 -- ============================================================
 -- TRIP DOMAIN
@@ -268,11 +264,7 @@ CREATE TABLE visit_verifications (
     updated_at            TIMESTAMP DEFAULT now()
 );
 
-CREATE TABLE course_embeddings (
-    course_id  UUID PRIMARY KEY REFERENCES travel_courses(course_id) ON DELETE CASCADE,
-    embedding  vector(3072) NOT NULL,
-    created_at TIMESTAMP DEFAULT now()
-);
+-- course_embeddings: V17에서 DROP (decisions/042 참조)
 
 -- ============================================================
 -- REVIEW DOMAIN
@@ -410,9 +402,7 @@ CREATE INDEX idx_photos_course_place_id ON photos(course_place_id);
 -- 벡터 ANN 탐색용 HNSW 인덱스 (코사인 유사도)
 -- review_embeddings: text-embedding-3-small 1536차원 → HNSW 적용 가능 (2000차원 이하)
 CREATE INDEX idx_review_embeddings_hnsw ON review_embeddings USING hnsw (embedding vector_cosine_ops);
--- place_embeddings / course_embeddings: text-embedding-3-large 3072차원 → HNSW 미지원 (failures/009 참조)
--- CREATE INDEX idx_course_embeddings_hnsw: 3072차원으로 HNSW 불가
--- CREATE INDEX idx_place_embeddings_hnsw: 3072차원으로 HNSW 불가
+-- place_embeddings / course_embeddings: V17에서 DROP (decisions/042 참조)
 
 -- ============================================================
 -- COMMENTS
@@ -507,9 +497,7 @@ COMMENT ON COLUMN place_pet_policies.indoor_outdoor_type IS '실내외 구분. E
 COMMENT ON COLUMN place_pet_policies.parking IS '주차 가능 여부';
 COMMENT ON COLUMN place_pet_policies.place_caution IS '기타 주의사항';
 
-COMMENT ON TABLE place_embeddings IS '장소 텍스트 임베딩. RAG 장소 유사도 검색용. append-only';
-COMMENT ON COLUMN place_embeddings.external_place_id IS 'PK이자 FK → places';
-COMMENT ON COLUMN place_embeddings.embedding IS 'OpenAI text-embedding-3-large 벡터. 차원 3072';
+-- place_embeddings COMMENT: V17에서 테이블 제거됨
 
 -- TRIP DOMAIN
 COMMENT ON TABLE start_course IS '여행 코스 출발지 정보';
@@ -576,9 +564,7 @@ COMMENT ON COLUMN visit_verifications.verification_longitude IS '인증 시점 G
 COMMENT ON COLUMN visit_verifications.verification_status IS '인증 상태. ENUM(PENDING, APPROVED, REJECTED)';
 COMMENT ON COLUMN visit_verifications.verified_at IS '인증 처리 시각';
 
-COMMENT ON TABLE course_embeddings IS '여행 코스 임베딩. RAG 유사 코스 추천용. append-only';
-COMMENT ON COLUMN course_embeddings.course_id IS 'PK이자 FK → travel_courses';
-COMMENT ON COLUMN course_embeddings.embedding IS 'OpenAI text-embedding-3-large 벡터. 차원 3072';
+-- course_embeddings COMMENT: V17에서 테이블 제거됨
 
 -- REVIEW DOMAIN
 COMMENT ON TABLE reviews IS '장소 방문 후 작성하는 리뷰. 반려동물 동반 경험 중심';
