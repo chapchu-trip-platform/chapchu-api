@@ -122,7 +122,7 @@ public class CourseService {
   }
 
   @Transactional
-  public void visitPlace(UUID userId, UUID coursePlaceId) {
+  public void visitPlace(UUID userId, UUID coursePlaceId, double lat, double lng) {
     CoursePlace coursePlace =
         coursePlaceRepository
             .findByIdAndCourseUserId(coursePlaceId, userId)
@@ -130,10 +130,33 @@ public class CourseService {
     if (coursePlace.isVisited()) {
       return;
     }
+    Place place =
+        placeRepository
+            .findById(coursePlace.getExternalPlaceId())
+            .orElseThrow(CourseNotOwnerException::new);
+    double distanceM =
+        haversineMeters(
+            lat, lng, place.getLatitude().doubleValue(), place.getLongitude().doubleValue());
+    if (distanceM > 500) {
+      throw new TooFarFromPlaceException();
+    }
     coursePlace.markVisited();
     if (coursePlace.isFinalPlace()) {
       coursePlace.getCourse().complete();
     }
+  }
+
+  private static double haversineMeters(double lat1, double lng1, double lat2, double lng2) {
+    double r = 6_371_000;
+    double dLat = Math.toRadians(lat2 - lat1);
+    double dLng = Math.toRadians(lng2 - lng1);
+    double a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2)
+            + Math.cos(Math.toRadians(lat1))
+                * Math.cos(Math.toRadians(lat2))
+                * Math.sin(dLng / 2)
+                * Math.sin(dLng / 2);
+    return r * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
   public record TravelCourseDetail(
