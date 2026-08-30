@@ -174,8 +174,9 @@ class CourseServiceTest {
     CoursePlace coursePlace = sampleCoursePlace(course, false);
     when(coursePlaceRepository.findByIdAndCourseUserId(coursePlaceId, userId))
         .thenReturn(Optional.of(coursePlace));
+    when(placeRepository.findById("place-1")).thenReturn(Optional.of(samplePlace("place-1", "장소")));
 
-    courseService.visitPlace(userId, coursePlaceId);
+    courseService.visitPlace(userId, coursePlaceId, 37.5, 127.0);
 
     assertThat(coursePlace.isVisited()).isTrue();
     assertThat(coursePlace.getVisitedAt()).isNotNull();
@@ -189,8 +190,9 @@ class CourseServiceTest {
     CoursePlace coursePlace = sampleCoursePlace(course, true);
     when(coursePlaceRepository.findByIdAndCourseUserId(coursePlaceId, userId))
         .thenReturn(Optional.of(coursePlace));
+    when(placeRepository.findById("place-1")).thenReturn(Optional.of(samplePlace("place-1", "장소")));
 
-    courseService.visitPlace(userId, coursePlaceId);
+    courseService.visitPlace(userId, coursePlaceId, 37.5, 127.0);
 
     assertThat(course.isCompleted()).isTrue();
   }
@@ -202,7 +204,7 @@ class CourseServiceTest {
     when(coursePlaceRepository.findByIdAndCourseUserId(coursePlaceId, otherId))
         .thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> courseService.visitPlace(otherId, coursePlaceId))
+    assertThatThrownBy(() -> courseService.visitPlace(otherId, coursePlaceId, 37.5, 127.0))
         .isInstanceOf(CourseNotOwnerException.class);
   }
 
@@ -216,9 +218,23 @@ class CourseServiceTest {
     when(coursePlaceRepository.findByIdAndCourseUserId(coursePlaceId, userId))
         .thenReturn(Optional.of(coursePlace));
 
-    courseService.visitPlace(userId, coursePlaceId);
+    courseService.visitPlace(userId, coursePlaceId, 37.5, 127.0);
 
     assertThat(coursePlace.isVisited()).isTrue();
     assertThat(course.isCompleted()).isFalse();
+  }
+
+  @Test
+  void 장소에서_500m_초과시_예외발생한다() {
+    UUID userId = UUID.randomUUID();
+    UUID coursePlaceId = UUID.randomUUID();
+    TravelCourse course = sampleCourse(userId);
+    CoursePlace coursePlace = sampleCoursePlace(course, false);
+    when(coursePlaceRepository.findByIdAndCourseUserId(coursePlaceId, userId))
+        .thenReturn(Optional.of(coursePlace));
+    when(placeRepository.findById("place-1")).thenReturn(Optional.of(samplePlace("place-1", "장소")));
+
+    assertThatThrownBy(() -> courseService.visitPlace(userId, coursePlaceId, 0.0, 0.0))
+        .isInstanceOf(TooFarFromPlaceException.class);
   }
 }

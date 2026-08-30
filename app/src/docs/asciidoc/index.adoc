@@ -988,12 +988,14 @@ include::{snippets}/my-course-list/response-fields.adoc[]
 
 JWT 인증이 필요합니다. 이미 체크인된 장소는 멱등 처리(200 OK)됩니다.
 마지막 장소 체크인 시 코스 완료(isCompleted=true)로 변경됩니다.
+현재 위치(lat, lng)가 장소에서 500m 이상 떨어진 경우 400을 반환합니다.
 
 [.request]
 ==== 요청
 
 include::{snippets}/course-place-visit/http-request.adoc[]
 include::{snippets}/course-place-visit/path-parameters.adoc[]
+include::{snippets}/course-place-visit/request-fields.adoc[]
 
 [.response]
 ==== 응답

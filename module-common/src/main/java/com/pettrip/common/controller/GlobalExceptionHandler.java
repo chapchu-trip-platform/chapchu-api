@@ -1,6 +1,7 @@
 package com.pettrip.common.controller;
 
 import com.pettrip.common.model.ErrorResponse;
+import com.pettrip.common.service.BadRequestException;
 import com.pettrip.common.service.ConflictException;
 import com.pettrip.common.service.ExternalApiException;
 import com.pettrip.common.service.ForbiddenException;
@@ -19,6 +20,12 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+  @ExceptionHandler(BadRequestException.class)
+  public ResponseEntity<ErrorResponse> handleBadRequest(BadRequestException exception) {
+    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+        .body(new ErrorResponse("BAD_REQUEST", exception.getMessage()));
+  }
 
   @ExceptionHandler(NotFoundException.class)
   public ResponseEntity<ErrorResponse> handleNotFound(NotFoundException exception) {
