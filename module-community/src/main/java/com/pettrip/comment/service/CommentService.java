@@ -6,6 +6,7 @@ import com.pettrip.post.repository.PostRepository;
 import com.pettrip.post.service.PostNotFoundException;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class CommentService {
@@ -18,6 +19,7 @@ public class CommentService {
     this.postRepository = postRepository;
   }
 
+  @Transactional
   public Comment createComment(UUID userId, UUID postId, UUID parentCommentId, String content) {
     if (!postRepository.existsById(postId)) {
       throw new PostNotFoundException();
@@ -29,10 +31,13 @@ public class CommentService {
       depth = parent.getDepth() + 1;
     }
     int order = (int) commentRepository.countByPostId(postId) + 1;
-    return commentRepository.save(
-        new Comment(postId, userId, parentCommentId, depth, order, content));
+    Comment comment =
+        commentRepository.save(new Comment(postId, userId, parentCommentId, depth, order, content));
+    postRepository.incrementCommentCount(postId);
+    return comment;
   }
 
+  @Transactional
   public void deleteComment(UUID userId, UUID commentId) {
     Comment comment =
         commentRepository.findById(commentId).orElseThrow(CommentNotFoundException::new);
@@ -40,5 +45,6 @@ public class CommentService {
       throw new CommentNotFoundException();
     }
     commentRepository.delete(comment);
+    postRepository.decrementCommentCount(comment.getPostId());
   }
 }

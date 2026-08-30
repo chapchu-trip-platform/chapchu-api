@@ -310,6 +310,7 @@ CREATE TABLE posts (
     content              TEXT,
     view_count           INT DEFAULT 0,
     recommendation_count INT DEFAULT 0,
+    comment_count        INT DEFAULT 0,
     created_at           TIMESTAMP DEFAULT now()
 );
 
@@ -596,6 +597,7 @@ COMMENT ON COLUMN posts.title IS '게시글 제목';
 COMMENT ON COLUMN posts.content IS '게시글 본문';
 COMMENT ON COLUMN posts.view_count IS '조회수. 비정규화 카운터';
 COMMENT ON COLUMN posts.recommendation_count IS '추천 수. 비정규화 카운터';
+COMMENT ON COLUMN posts.comment_count IS '댓글 수. 비정규화 카운터. V18에서 추가';
 
 COMMENT ON TABLE comments IS '게시글 댓글. parent_comment_id NULL이면 최상위 댓글';
 COMMENT ON COLUMN comments.comment_id IS '기본키. UUID v7';
