@@ -6,7 +6,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.when;
 
+import com.pettrip.pet.model.Pet;
+import com.pettrip.pet.model.PetSize;
+import com.pettrip.pet.repository.PetRepository;
+import com.pettrip.pet.service.PetNotFoundException;
 import com.pettrip.place.model.Place;
+import com.pettrip.place.repository.PlacePetPolicyRepository;
 import com.pettrip.place.repository.PlaceRepository;
 import com.pettrip.place.service.PlaceService;
 import com.pettrip.recommendation.service.PlaceRagService;
@@ -28,12 +33,17 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class CourseServiceTest {
 
   @Mock private PlaceService placeService;
   @Mock private PlaceRepository placeRepository;
+  @Mock private PlacePetPolicyRepository petPolicyRepository;
+  @Mock private PetRepository petRepository;
   @Mock private TravelCourseRepository travelCourseRepository;
   @Mock private CoursePlaceRepository coursePlaceRepository;
   @Mock private RouteOptimizationService routeOptimizationService;
@@ -55,6 +65,10 @@ class CourseServiceTest {
         null);
   }
 
+  private Pet samplePet(UUID userId) {
+    return new Pet(userId, null, "초코", PetSize.SMALL, 3);
+  }
+
   private TravelCourse sampleCourse(UUID userId) {
     StartCourse start = new StartCourse("강남구", LocalDateTime.now());
     return new TravelCourse(userId, start, LocalDate.now());
@@ -64,23 +78,39 @@ class CourseServiceTest {
     return new CoursePlace(course, "place-1", (short) 1, finalPlace);
   }
 
+  private void mockPetAndPolicy(UUID userId, UUID petId) {
+    when(petRepository.existsByIdAndUserId(petId, userId)).thenReturn(true);
+    when(petRepository.findById(petId)).thenReturn(Optional.of(samplePet(userId)));
+    when(petPolicyRepository.findAllById(any())).thenReturn(List.of());
+  }
+
   @Test
   void 주변_장소로_코스를_생성한다() {
+    UUID userId = UUID.randomUUID();
+    UUID petId = UUID.randomUUID();
+    mockPetAndPolicy(userId, petId);
+
     List<Place> places = List.of(samplePlace("p1", "장소A"), samplePlace("p2", "장소B"));
     when(placeService.searchNearby(any(), any(), anyInt())).thenReturn(places);
-    when(placeRagService.rankByReviewSimilarity(any())).thenAnswer(inv -> inv.getArgument(0));
-    when(routeOptimizationService.optimizeOrder(any())).thenReturn(List.of("p1", "p2"));
+    when(placeRagService.rankByReviewSimilarity(any(), any()))
+        .thenAnswer(inv -> inv.getArgument(0));
+    when(routeOptimizationService.optimizeOrder(any(), any(), any(), any(), any()))
+        .thenReturn(List.of("p1", "p2"));
     when(travelCourseRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
     when(coursePlaceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
     TravelCourse result =
         courseService.createCourse(
-            UUID.randomUUID(),
+            userId,
+            petId,
             new BigDecimal("37.5"),
             new BigDecimal("127.0"),
             5000,
             LocalDate.now(),
-            "강남구");
+            "강남구",
+            null,
+            null,
+            null);
 
     assertThat(result).isNotNull();
     assertThat(result.getTravelDate()).isEqualTo(LocalDate.now());
@@ -88,11 +118,17 @@ class CourseServiceTest {
 
   @Test
   void 마지막_장소에_finalPlace_true가_설정된다() {
+    UUID userId = UUID.randomUUID();
+    UUID petId = UUID.randomUUID();
+    mockPetAndPolicy(userId, petId);
+
     List<Place> places =
         List.of(samplePlace("p1", "A"), samplePlace("p2", "B"), samplePlace("p3", "C"));
     when(placeService.searchNearby(any(), any(), anyInt())).thenReturn(places);
-    when(placeRagService.rankByReviewSimilarity(any())).thenAnswer(inv -> inv.getArgument(0));
-    when(routeOptimizationService.optimizeOrder(any())).thenReturn(List.of("p1", "p2", "p3"));
+    when(placeRagService.rankByReviewSimilarity(any(), any()))
+        .thenAnswer(inv -> inv.getArgument(0));
+    when(routeOptimizationService.optimizeOrder(any(), any(), any(), any(), any()))
+        .thenReturn(List.of("p1", "p2", "p3"));
     when(travelCourseRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
     var saved = new ArrayList<CoursePlace>();
@@ -104,12 +140,16 @@ class CourseServiceTest {
             });
 
     courseService.createCourse(
-        UUID.randomUUID(),
+        userId,
+        petId,
         new BigDecimal("37.5"),
         new BigDecimal("127.0"),
         5000,
         LocalDate.now(),
-        "강남구");
+        "강남구",
+        null,
+        null,
+        null);
 
     assertThat(saved).hasSize(3);
     assertThat(saved.get(0).isFinalPlace()).isFalse();
@@ -118,20 +158,52 @@ class CourseServiceTest {
 
   @Test
   void 주변_장소_없을때_코스생성_예외발생한다() {
+    UUID userId = UUID.randomUUID();
+    UUID petId = UUID.randomUUID();
+    mockPetAndPolicy(userId, petId);
+
     when(placeService.searchNearby(any(), any(), anyInt())).thenReturn(List.of());
-    when(placeRagService.rankByReviewSimilarity(any())).thenAnswer(inv -> inv.getArgument(0));
-    when(routeOptimizationService.optimizeOrder(any())).thenReturn(List.of());
+    when(placeRagService.rankByReviewSimilarity(any(), any()))
+        .thenAnswer(inv -> inv.getArgument(0));
+    when(routeOptimizationService.optimizeOrder(any(), any(), any(), any(), any()))
+        .thenReturn(List.of());
 
     assertThatThrownBy(
             () ->
                 courseService.createCourse(
-                    UUID.randomUUID(),
+                    userId,
+                    petId,
                     new BigDecimal("0"),
                     new BigDecimal("0"),
                     5000,
                     LocalDate.now(),
-                    "외딴곳"))
+                    "외딴곳",
+                    null,
+                    null,
+                    null))
         .isInstanceOf(NoPlacesFoundException.class);
+  }
+
+  @Test
+  void 타인의_petId로_코스_생성시_예외발생한다() {
+    UUID userId = UUID.randomUUID();
+    UUID petId = UUID.randomUUID();
+    when(petRepository.existsByIdAndUserId(petId, userId)).thenReturn(false);
+
+    assertThatThrownBy(
+            () ->
+                courseService.createCourse(
+                    userId,
+                    petId,
+                    new BigDecimal("37.5"),
+                    new BigDecimal("127.0"),
+                    5000,
+                    LocalDate.now(),
+                    "강남구",
+                    null,
+                    null,
+                    null))
+        .isInstanceOf(PetNotFoundException.class);
   }
 
   @Test

@@ -18,7 +18,7 @@ import org.springframework.stereotype.Service;
 public class PlaceRagService {
 
   private static final Logger log = LoggerFactory.getLogger(PlaceRagService.class);
-  private static final String TRAVEL_QUERY = "반려동물 동반 즐거운 여행 좋은 장소";
+  private static final String FALLBACK_QUERY = "반려동물 동반 즐거운 여행 좋은 장소";
   private static final String RANK_SQL =
       "SELECT r.place_id"
           + " FROM reviews r"
@@ -29,7 +29,7 @@ public class PlaceRagService {
 
   private final EmbeddingModel embeddingModel;
   private final JdbcTemplate jdbcTemplate;
-  private String cachedVectorStr;
+  private String cachedFallbackVectorStr;
 
   public PlaceRagService(EmbeddingModel embeddingModel, JdbcTemplate jdbcTemplate) {
     this.embeddingModel = embeddingModel;
@@ -39,26 +39,46 @@ public class PlaceRagService {
   @PostConstruct
   void init() {
     try {
-      float[] vector = embeddingModel.embed(TRAVEL_QUERY);
-      cachedVectorStr = buildVectorString(vector);
+      float[] vector = embeddingModel.embed(FALLBACK_QUERY);
+      cachedFallbackVectorStr = buildVectorString(vector);
       log.info("[RAG] 여행 테마 임베딩 캐싱 완료 (dim={})", vector.length);
     } catch (Exception e) {
       log.warn("[RAG] 임베딩 캐싱 실패 — RAG 랭킹 비활성화: {}", e.getMessage());
     }
   }
 
-  public List<String> rankByReviewSimilarity(List<String> placeIds) {
-    if (placeIds.isEmpty() || cachedVectorStr == null) {
+  public List<String> rankByReviewSimilarity(List<String> placeIds, String queryText) {
+    if (placeIds.isEmpty()) {
       return placeIds;
     }
+    String vectorStr = embedQuery(queryText);
+    if (vectorStr == null) {
+      return placeIds;
+    }
+    return executeRankQuery(placeIds, vectorStr);
+  }
+
+  private String embedQuery(String queryText) {
+    if (queryText == null || queryText.isBlank()) {
+      return cachedFallbackVectorStr;
+    }
+    try {
+      float[] vector = embeddingModel.embed(queryText);
+      return buildVectorString(vector);
+    } catch (Exception e) {
+      log.warn("[RAG] 동적 임베딩 실패 — fallback 사용: {}", e.getMessage());
+      return cachedFallbackVectorStr;
+    }
+  }
+
+  private List<String> executeRankQuery(List<String> placeIds, String vectorStr) {
     try {
       Connection conn = DataSourceUtils.getConnection(jdbcTemplate.getDataSource());
       Array pgArray = conn.createArrayOf("text", placeIds.toArray(String[]::new));
       DataSourceUtils.releaseConnection(conn, jdbcTemplate.getDataSource());
 
       List<String> ranked =
-          jdbcTemplate.query(
-              RANK_SQL, (rs, n) -> rs.getString("place_id"), pgArray, cachedVectorStr);
+          jdbcTemplate.query(RANK_SQL, (rs, n) -> rs.getString("place_id"), pgArray, vectorStr);
 
       Set<String> seen = new LinkedHashSet<>(ranked);
       placeIds.stream().filter(id -> !seen.contains(id)).forEach(seen::add);

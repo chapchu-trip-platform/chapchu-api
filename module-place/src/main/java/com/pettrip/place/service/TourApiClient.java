@@ -40,7 +40,7 @@ public class TourApiClient {
                         .queryParam("mapX", lng)
                         .queryParam("mapY", lat)
                         .queryParam("radius", radiusMeters)
-                        .queryParam("petTour", "Y")
+                        .queryParam("arrange", "E")
                         .build())
             .retrieve()
             .body(new ParameterizedTypeReference<>() {});
@@ -92,11 +92,13 @@ public class TourApiClient {
   private NearbyItem toNearbyItem(Map<String, Object> map) {
     return new NearbyItem(
         str(map, "contentid"),
+        str(map, "contenttypeid"),
         str(map, "title"),
         str(map, "firstimage"),
         str(map, "addr1"),
         decimal(map, "mapy"),
-        decimal(map, "mapx"));
+        decimal(map, "mapx"),
+        decimal(map, "dist"));
   }
 
   private PetDetailItem toPetDetailItem(Map<String, Object> map) {
@@ -105,7 +107,7 @@ public class TourApiClient {
         str(map, "acmpyPsblCpam"),
         str(map, "acmpyNeedMtr"),
         str(map, "etcAcmpyInfo"),
-        str(map, "relaPrkge"));
+        str(map, "relaAcdntRiskMtr"));
   }
 
   private String str(Map<String, Object> map, String key) {
@@ -125,16 +127,18 @@ public class TourApiClient {
 
   public record NearbyItem(
       String contentId,
+      String contentTypeId,
       String title,
       String firstImage,
       String addr1,
       BigDecimal lat,
-      BigDecimal lng) {}
+      BigDecimal lng,
+      BigDecimal dist) {}
 
   public record PetDetailItem(
       String acmpyTypeCd,
       String acmpyPsblCpam,
       String acmpyNeedMtr,
       String etcAcmpyInfo,
-      String relaPrkge) {}
+      String relaAcdntRiskMtr) {}
 }

@@ -49,6 +49,9 @@ public class Place {
 
   @Column private Short rating;
 
+  @Column(name = "content_type_id")
+  private Short contentTypeId;
+
   @Column(name = "review_num")
   private Integer reviewNum = 0;
 
@@ -100,7 +103,8 @@ public class Place {
       BigDecimal longitude,
       String businessHours,
       String phoneNumber,
-      Short rating) {
+      Short rating,
+      Short contentTypeId) {
     if (themeId != null) this.themeId = themeId;
     if (placeName != null) this.placeName = placeName;
     if (placeImageUrl != null) this.placeImageUrl = placeImageUrl;
@@ -110,6 +114,7 @@ public class Place {
     if (businessHours != null) this.businessHours = businessHours;
     if (phoneNumber != null) this.phoneNumber = phoneNumber;
     if (rating != null) this.rating = rating;
+    if (contentTypeId != null) this.contentTypeId = contentTypeId;
   }
 
   public void incrementReviewNum() {
@@ -166,6 +171,10 @@ public class Place {
 
   public Integer getVisitNum() {
     return visitNum;
+  }
+
+  public Short getContentTypeId() {
+    return contentTypeId;
   }
 
   public PlacePetPolicy getPetPolicy() {

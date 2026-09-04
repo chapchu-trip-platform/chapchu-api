@@ -48,7 +48,7 @@ class PlaceRagServiceTest {
     when(jdbcTemplate.query(any(String.class), any(RowMapper.class), any(), any()))
         .thenReturn(List.of("p1", "p3"));
 
-    List<String> result = placeRagService.rankByReviewSimilarity(List.of("p1", "p2", "p3"));
+    List<String> result = placeRagService.rankByReviewSimilarity(List.of("p1", "p2", "p3"), null);
 
     assertThat(result).containsExactly("p1", "p3", "p2");
   }
@@ -59,7 +59,7 @@ class PlaceRagServiceTest {
     when(jdbcTemplate.query(any(String.class), any(RowMapper.class), any(), any()))
         .thenReturn(List.of());
 
-    List<String> result = placeRagService.rankByReviewSimilarity(List.of("p1", "p2"));
+    List<String> result = placeRagService.rankByReviewSimilarity(List.of("p1", "p2"), null);
 
     assertThat(result).containsExactly("p1", "p2");
   }
@@ -69,14 +69,14 @@ class PlaceRagServiceTest {
   void 예외_발생시_원본_목록_그대로_반환된다() throws SQLException {
     when(connection.createArrayOf(any(), any())).thenThrow(new SQLException("DB error"));
 
-    List<String> result = placeRagService.rankByReviewSimilarity(List.of("p1", "p2"));
+    List<String> result = placeRagService.rankByReviewSimilarity(List.of("p1", "p2"), null);
 
     assertThat(result).containsExactly("p1", "p2");
   }
 
   @Test
   void 빈_목록이면_즉시_반환된다() {
-    List<String> result = placeRagService.rankByReviewSimilarity(List.of());
+    List<String> result = placeRagService.rankByReviewSimilarity(List.of(), null);
 
     assertThat(result).isEmpty();
   }

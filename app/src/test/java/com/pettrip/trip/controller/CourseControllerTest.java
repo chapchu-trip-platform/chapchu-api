@@ -70,23 +70,28 @@ class CourseControllerTest {
             null,
             null);
     CoursePlace cp = new CoursePlace(course, "ext-001", (short) 1, true);
-    return new TravelCourseDetail(course, List.of(cp), Map.of("ext-001", place));
+    return new TravelCourseDetail(course, List.of(cp), Map.of("ext-001", place), Map.of());
   }
 
   @Test
   void 코스를_생성한다() throws Exception {
     TravelCourseDetail detail = sampleDetail();
-    when(courseService.createCourse(any(), any(), any(), anyInt(), any(), any()))
+    when(courseService.createCourse(
+            any(), any(), any(), any(), anyInt(), any(), any(), any(), any(), any()))
         .thenReturn(detail.course());
     when(courseService.getCourse(any(), any())).thenReturn(detail);
 
     CreateCourseRequest request =
         new CreateCourseRequest(
+            UUID.randomUUID(),
             new BigDecimal("37.5"),
             new BigDecimal("127.0"),
             5000,
             LocalDate.of(2026, 8, 30),
-            "강남구");
+            "강남구",
+            null,
+            null,
+            null);
 
     mockMvc
         .perform(
@@ -99,25 +104,33 @@ class CourseControllerTest {
             document(
                 "course-create",
                 requestFields(
+                    fieldWithPath("petId").description("반려동물 ID (필수)"),
                     fieldWithPath("lat").description("위도"),
                     fieldWithPath("lng").description("경도"),
                     fieldWithPath("radiusMeters")
                         .description("검색 반경(미터). 0이면 기본값 5000m 적용")
                         .type(JsonFieldType.NUMBER),
                     fieldWithPath("travelDate").description("여행 날짜"),
-                    fieldWithPath("startLocation").description("출발 위치")),
+                    fieldWithPath("startLocation").description("출발 위치"),
+                    fieldWithPath("temperature").description("기온(℃) — FE 제공, 선택").optional(),
+                    fieldWithPath("humidity").description("습도(%) — FE 제공, 선택").optional(),
+                    fieldWithPath("weatherStatus").description("날씨 상태 — FE 제공, 선택").optional()),
                 responseFields(
                     fieldWithPath("courseId").description("코스 ID"),
                     fieldWithPath("travelDate").description("여행 날짜"),
                     fieldWithPath("startLocation").description("출발 위치"),
                     fieldWithPath("places").description("방문 장소 목록").type(JsonFieldType.ARRAY),
-                    fieldWithPath("places[].coursePlaceId").description("코스 장소 ID (방문 체크인에 사용)"),
+                    fieldWithPath("places[].coursePlaceId").description("코스 장소 ID"),
                     fieldWithPath("places[].externalPlaceId").description("장소 외부 ID"),
                     fieldWithPath("places[].placeName").description("장소 이름"),
+                    fieldWithPath("places[].placeImageUrl").description("장소 이미지 URL").optional(),
+                    fieldWithPath("places[].latitude").description("위도").optional(),
+                    fieldWithPath("places[].longitude").description("경도").optional(),
                     fieldWithPath("places[].visitOrder")
                         .description("방문 순서")
                         .type(JsonFieldType.NUMBER),
-                    fieldWithPath("places[].finalPlace").description("마지막 방문 장소 여부"))));
+                    fieldWithPath("places[].finalPlace").description("마지막 방문 장소 여부"),
+                    fieldWithPath("places[].petPolicy").description("반려동물 정책").optional())));
   }
 
   @Test
@@ -140,12 +153,16 @@ class CourseControllerTest {
                     fieldWithPath("travelDate").description("여행 날짜"),
                     fieldWithPath("startLocation").description("출발 위치"),
                     fieldWithPath("places").description("방문 장소 목록").type(JsonFieldType.ARRAY),
-                    fieldWithPath("places[].coursePlaceId").description("코스 장소 ID (방문 체크인에 사용)"),
+                    fieldWithPath("places[].coursePlaceId").description("코스 장소 ID"),
                     fieldWithPath("places[].externalPlaceId").description("장소 외부 ID"),
                     fieldWithPath("places[].placeName").description("장소 이름"),
+                    fieldWithPath("places[].placeImageUrl").description("장소 이미지 URL").optional(),
+                    fieldWithPath("places[].latitude").description("위도").optional(),
+                    fieldWithPath("places[].longitude").description("경도").optional(),
                     fieldWithPath("places[].visitOrder")
                         .description("방문 순서")
                         .type(JsonFieldType.NUMBER),
-                    fieldWithPath("places[].finalPlace").description("마지막 방문 장소 여부"))));
+                    fieldWithPath("places[].finalPlace").description("마지막 방문 장소 여부"),
+                    fieldWithPath("places[].petPolicy").description("반려동물 정책").optional())));
   }
 }
