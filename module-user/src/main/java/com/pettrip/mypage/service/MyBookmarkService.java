@@ -16,7 +16,10 @@ public class MyBookmarkService {
       SELECT p.post_id, p.user_id, p.pet_id, p.photo_id, p.course_id,
              p.title, p.content, p.view_count, p.recommendation_count, p.comment_count, p.created_at,
              COALESCE(u.nickname, '(탈퇴한 사용자)') AS nickname,
-             ph.photo_url
+             ph.photo_url,
+             EXISTS(SELECT 1 FROM post_recommendations pr
+                    WHERE pr.post_id = p.post_id AND pr.user_id = :userId) AS recommended,
+             TRUE AS bookmarked
       FROM post_bookmarks pb
       JOIN posts p ON pb.post_id = p.post_id
       LEFT JOIN users u ON p.user_id = u.user_id
@@ -37,6 +40,8 @@ public class MyBookmarkService {
               rs.getInt("view_count"),
               rs.getInt("recommendation_count"),
               rs.getInt("comment_count"),
+              rs.getBoolean("recommended"),
+              rs.getBoolean("bookmarked"),
               rs.getString("nickname"),
               rs.getString("photo_url"),
               rs.getTimestamp("created_at").toLocalDateTime());

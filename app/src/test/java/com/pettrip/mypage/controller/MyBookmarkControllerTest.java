@@ -49,6 +49,8 @@ class MyBookmarkControllerTest {
             0,
             0,
             0,
+            true,
+            false,
             "닉네임",
             null,
             LocalDateTime.now());

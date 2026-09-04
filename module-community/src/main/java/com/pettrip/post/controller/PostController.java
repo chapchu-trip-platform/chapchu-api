@@ -28,15 +28,16 @@ public class PostController {
 
   @GetMapping
   public PostListResponse listPosts(
+      @CurrentUserId UUID userId,
       @RequestParam(name = "sort", defaultValue = "latest") String sort,
       @RequestParam(name = "cursor", required = false) String cursor,
       @RequestParam(name = "size", defaultValue = "20") int size) {
-    return postService.listPosts(sort, cursor, size);
+    return postService.listPosts(userId, sort, cursor, size);
   }
 
   @GetMapping("/{postId}")
-  public PostResponse getPost(@PathVariable UUID postId) {
-    return postService.getPost(postId);
+  public PostResponse getPost(@CurrentUserId UUID userId, @PathVariable UUID postId) {
+    return postService.getPost(userId, postId);
   }
 
   @PostMapping

@@ -29,7 +29,11 @@ public class PostService {
       SELECT p.post_id, p.user_id, p.pet_id, p.photo_id, p.course_id,
              p.title, p.content, p.view_count, p.recommendation_count, p.comment_count, p.created_at,
              COALESCE(u.nickname, '(탈퇴한 사용자)') AS nickname,
-             ph.photo_url
+             ph.photo_url,
+             EXISTS(SELECT 1 FROM post_recommendations pr
+                    WHERE pr.post_id = p.post_id AND pr.user_id = :userId) AS recommended,
+             EXISTS(SELECT 1 FROM post_bookmarks pb
+                    WHERE pb.post_id = p.post_id AND pb.user_id = :userId) AS bookmarked
       FROM posts p
       LEFT JOIN users u ON p.user_id = u.user_id
       LEFT JOIN photos ph ON p.photo_id = ph.photo_id
@@ -58,6 +62,8 @@ public class PostService {
               rs.getInt("view_count"),
               rs.getInt("recommendation_count"),
               rs.getInt("comment_count"),
+              rs.getBoolean("recommended"),
+              rs.getBoolean("bookmarked"),
               rs.getString("nickname"),
               rs.getString("photo_url"),
               rs.getTimestamp("created_at").toLocalDateTime());
@@ -81,25 +87,25 @@ public class PostService {
     this.jdbcTemplate = jdbcTemplate;
   }
 
-  public PostListResponse listPosts(String sort, String cursor, int size) {
+  public PostListResponse listPosts(UUID userId, String sort, String cursor, int size) {
     if ("popular".equals(sort)) {
-      return queryPopular(size);
+      return queryPopular(userId, size);
     }
-    return queryLatest(cursor, size);
+    return queryLatest(userId, cursor, size);
   }
 
   @Transactional
-  public PostResponse getPost(UUID postId) {
+  public PostResponse getPost(UUID userId, UUID postId) {
     int updated = postRepository.incrementViewCount(postId);
     if (updated == 0) throw new PostNotFoundException();
-    return fetchEnrichedPost(postId);
+    return fetchEnrichedPost(userId, postId);
   }
 
   @Transactional
   public PostResponse createPost(
       UUID userId, UUID petId, UUID photoId, UUID courseId, String title, String content) {
     Post post = postRepository.save(new Post(userId, petId, photoId, courseId, title, content));
-    return fetchEnrichedPost(post.getId());
+    return fetchEnrichedPost(userId, post.getId());
   }
 
   @Transactional
@@ -107,7 +113,7 @@ public class PostService {
     Post post = getOwnedPost(userId, postId);
     post.update(title, content);
     postRepository.save(post);
-    return fetchEnrichedPost(postId);
+    return fetchEnrichedPost(userId, postId);
   }
 
   public void deletePost(UUID userId, UUID postId) {
@@ -137,6 +143,7 @@ public class PostService {
     postRepository.save(post);
   }
 
+  @Transactional
   public void bookmark(UUID userId, UUID postId) {
     findPost(postId);
     if (postBookmarkRepository.existsByUserIdAndPostId(userId, postId)) {
@@ -145,6 +152,7 @@ public class PostService {
     postBookmarkRepository.save(new PostBookmark(userId, postId));
   }
 
+  @Transactional
   public void cancelBookmark(UUID userId, UUID postId) {
     findPost(postId);
     if (!postBookmarkRepository.existsByUserIdAndPostId(userId, postId)) {
@@ -153,6 +161,7 @@ public class PostService {
     postBookmarkRepository.deleteByUserIdAndPostId(userId, postId);
   }
 
+  @Transactional
   public void report(UUID userId, UUID postId, String reportReason, String reportDetail) {
     findPost(postId);
     if (postReportRepository.existsByPostIdAndUserId(postId, userId)) {
@@ -161,8 +170,9 @@ public class PostService {
     postReportRepository.save(new PostReport(postId, userId, reportReason, reportDetail));
   }
 
-  private PostListResponse queryLatest(String cursor, int size) {
-    MapSqlParameterSource params = new MapSqlParameterSource().addValue("size", size);
+  private PostListResponse queryLatest(UUID userId, String cursor, int size) {
+    MapSqlParameterSource params =
+        new MapSqlParameterSource().addValue("userId", userId).addValue("size", size);
     if (cursor == null) {
       List<PostResponse> posts = jdbcTemplate.query(LATEST_SQL, params, POST_ROW_MAPPER);
       return toListResponse(posts, size);
@@ -176,8 +186,9 @@ public class PostService {
     return toListResponse(posts, size);
   }
 
-  private PostListResponse queryPopular(int size) {
-    MapSqlParameterSource params = new MapSqlParameterSource().addValue("size", size);
+  private PostListResponse queryPopular(UUID userId, int size) {
+    MapSqlParameterSource params =
+        new MapSqlParameterSource().addValue("userId", userId).addValue("size", size);
     List<PostResponse> posts = jdbcTemplate.query(POPULAR_SQL, params, POST_ROW_MAPPER);
     return new PostListResponse(posts, null);
   }
@@ -192,8 +203,9 @@ public class PostService {
     return new PostListResponse(posts, nextCursor);
   }
 
-  private PostResponse fetchEnrichedPost(UUID postId) {
-    MapSqlParameterSource params = new MapSqlParameterSource().addValue("postId", postId);
+  private PostResponse fetchEnrichedPost(UUID userId, UUID postId) {
+    MapSqlParameterSource params =
+        new MapSqlParameterSource().addValue("userId", userId).addValue("postId", postId);
     return jdbcTemplate.query(DETAIL_SQL, params, POST_ROW_MAPPER).stream()
         .findFirst()
         .orElseThrow(PostNotFoundException::new);
