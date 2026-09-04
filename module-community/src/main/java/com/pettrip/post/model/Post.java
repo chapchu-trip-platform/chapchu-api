@@ -26,7 +26,8 @@ public class Post {
   @Column(name = "pet_id", nullable = false)
   private UUID petId;
 
-  @Column(name = "photo_id", nullable = false)
+  /** 사진 없는 게시글을 허용한다. 마이그레이션 V21 참고. */
+  @Column(name = "photo_id")
   private UUID photoId;
 
   @Column(name = "course_id", nullable = false)

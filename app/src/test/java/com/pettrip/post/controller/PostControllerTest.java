@@ -185,7 +185,7 @@ class PostControllerTest {
                 "post-create",
                 requestFields(
                     fieldWithPath("petId").description("동행한 반려견 ID"),
-                    fieldWithPath("photoId").description("대표 사진 ID"),
+                    fieldWithPath("photoId").description("대표 사진 ID (선택). 생략하면 사진 없는 글").optional(),
                     fieldWithPath("courseId").description("여행 코스 ID"),
                     fieldWithPath("title").description("제목 (선택). 최대 100자").optional(),
                     fieldWithPath("content").description("내용 (선택)").optional()),
@@ -266,9 +266,47 @@ class PostControllerTest {
                 .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
-        .andExpect(jsonPath("$.fieldErrors.length()").value(3))
-        .andExpect(
-            jsonPath("$.fieldErrors[*].field", containsInAnyOrder("petId", "photoId", "courseId")));
+        .andExpect(jsonPath("$.fieldErrors.length()").value(2))
+        .andExpect(jsonPath("$.fieldErrors[*].field", containsInAnyOrder("petId", "courseId")));
+  }
+
+  @Test
+  void 사진_없이_게시글을_작성할_수_있다() throws Exception {
+    UUID petId = UUID.randomUUID();
+    UUID courseId = UUID.randomUUID();
+    when(postService.createPost(any(), eq(petId), isNull(), eq(courseId), any(), any()))
+        .thenReturn(samplePostResponse());
+
+    String body =
+        objectMapper.writeValueAsString(
+            new PostCreateRequest(petId, null, courseId, "사진 없는 글", "내용"));
+
+    mockMvc
+        .perform(
+            post("/posts")
+                .contentType("application/json")
+                .content(body)
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isCreated());
+  }
+
+  @Test
+  void 게시글_작성_시_photoId_키를_생략해도_작성된다() throws Exception {
+    UUID petId = UUID.randomUUID();
+    UUID courseId = UUID.randomUUID();
+    when(postService.createPost(any(), eq(petId), isNull(), eq(courseId), any(), any()))
+        .thenReturn(samplePostResponse());
+
+    String body =
+        "{\"petId\":\"" + petId + "\",\"courseId\":\"" + courseId + "\",\"title\":\"제목\"}";
+
+    mockMvc
+        .perform(
+            post("/posts")
+                .contentType("application/json")
+                .content(body)
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isCreated());
   }
 
   @Test
