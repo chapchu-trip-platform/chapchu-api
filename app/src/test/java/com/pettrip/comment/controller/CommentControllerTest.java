@@ -59,14 +59,29 @@ class CommentControllerTest {
         1,
         content,
         "밤톨이아빠",
+        false,
         LocalDateTime.of(2024, 1, 15, 10, 30, 0));
+  }
+
+  /** 삭제된 댓글은 행이 남아 대댓글 스레드를 유지한다. 내용은 가려지고 닉네임은 null이다. */
+  private CommentResponse deletedResponse(UUID postId) {
+    return new CommentResponse(
+        UUID.randomUUID(),
+        postId,
+        null,
+        0,
+        2,
+        "삭제된 댓글입니다",
+        null,
+        true,
+        LocalDateTime.of(2024, 1, 15, 11, 0, 0));
   }
 
   @Test
   void 댓글_목록을_조회한다() throws Exception {
     UUID postId = UUID.randomUUID();
     when(commentService.listComments(postId))
-        .thenReturn(List.of(sampleResponse(postId, "좋은 글이네요")));
+        .thenReturn(List.of(sampleResponse(postId, "좋은 글이네요"), deletedResponse(postId)));
 
     mockMvc
         .perform(
@@ -74,6 +89,9 @@ class CommentControllerTest {
                 .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[0].nickname").value("밤톨이아빠"))
+        .andExpect(jsonPath("$[1].deleted").value(true))
+        .andExpect(jsonPath("$[1].content").value("삭제된 댓글입니다"))
+        .andExpect(jsonPath("$[1].nickname").doesNotExist())
         .andDo(
             document(
                 "comment-list",
@@ -88,7 +106,12 @@ class CommentControllerTest {
                     fieldWithPath("[].depth").description("댓글 깊이"),
                     fieldWithPath("[].commentOrder").description("같은 글 내 정렬 순서"),
                     fieldWithPath("[].content").description("댓글 내용"),
-                    fieldWithPath("[].nickname").description("작성자 닉네임. 탈퇴한 사용자면 (탈퇴한 사용자)"),
+                    fieldWithPath("[].nickname")
+                        .description("작성자 닉네임. 탈퇴한 사용자면 (탈퇴한 사용자), 삭제된 댓글이면 null")
+                        .type(JsonFieldType.STRING)
+                        .optional(),
+                    fieldWithPath("[].deleted")
+                        .description("삭제된 댓글인지. true면 content가 \"삭제된 댓글입니다\""),
                     fieldWithPath("[].createdAt").description("작성일시"))));
   }
 
@@ -127,7 +150,11 @@ class CommentControllerTest {
                     fieldWithPath("depth").description("댓글 깊이"),
                     fieldWithPath("commentOrder").description("같은 글 내 정렬 순서"),
                     fieldWithPath("content").description("댓글 내용"),
-                    fieldWithPath("nickname").description("작성자 닉네임"),
+                    fieldWithPath("nickname")
+                        .description("작성자 닉네임")
+                        .type(JsonFieldType.STRING)
+                        .optional(),
+                    fieldWithPath("deleted").description("삭제된 댓글인지. true면 content가 \"삭제된 댓글입니다\""),
                     fieldWithPath("createdAt").description("작성일시"))));
   }
 
@@ -163,7 +190,11 @@ class CommentControllerTest {
                     fieldWithPath("depth").description("댓글 깊이"),
                     fieldWithPath("commentOrder").description("같은 글 내 정렬 순서"),
                     fieldWithPath("content").description("댓글 내용"),
-                    fieldWithPath("nickname").description("작성자 닉네임"),
+                    fieldWithPath("nickname")
+                        .description("작성자 닉네임")
+                        .type(JsonFieldType.STRING)
+                        .optional(),
+                    fieldWithPath("deleted").description("삭제된 댓글인지. true면 content가 \"삭제된 댓글입니다\""),
                     fieldWithPath("createdAt").description("작성일시"))));
   }
 

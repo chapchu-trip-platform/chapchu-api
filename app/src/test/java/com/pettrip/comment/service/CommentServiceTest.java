@@ -3,6 +3,7 @@ package com.pettrip.comment.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -48,6 +49,7 @@ class CommentServiceTest {
         1,
         content,
         "밤톨이아빠",
+        false,
         LocalDateTime.of(2024, 1, 15, 10, 30, 0));
   }
 
@@ -167,7 +169,7 @@ class CommentServiceTest {
   }
 
   @Test
-  void deleteComment는_소유한_댓글을_삭제한다() {
+  void deleteComment는_행을_지우지_않고_삭제_표시만_한다() {
     UUID userId = UUID.randomUUID();
     UUID postId = UUID.randomUUID();
     UUID commentId = UUID.randomUUID();
@@ -176,7 +178,33 @@ class CommentServiceTest {
 
     commentService.deleteComment(userId, commentId);
 
-    verify(commentRepository).delete(comment);
+    assertThat(comment.isDeleted()).isTrue();
+    verify(commentRepository).saveAndFlush(comment);
+    verify(commentRepository, never()).delete(comment);
     verify(postRepository).decrementCommentCount(postId);
+  }
+
+  @Test
+  void deleteComment는_이미_삭제된_댓글이면_예외를_던진다() {
+    UUID userId = UUID.randomUUID();
+    UUID commentId = UUID.randomUUID();
+    Comment comment = new Comment(UUID.randomUUID(), userId, null, 0, 1, "내용");
+    comment.softDelete(LocalDateTime.now());
+    when(commentRepository.findById(commentId)).thenReturn(Optional.of(comment));
+
+    assertThatThrownBy(() -> commentService.deleteComment(userId, commentId))
+        .isInstanceOf(CommentNotFoundException.class);
+  }
+
+  @Test
+  void updateComment는_삭제된_댓글이면_예외를_던진다() {
+    UUID userId = UUID.randomUUID();
+    UUID commentId = UUID.randomUUID();
+    Comment comment = new Comment(UUID.randomUUID(), userId, null, 0, 1, "내용");
+    comment.softDelete(LocalDateTime.now());
+    when(commentRepository.findById(commentId)).thenReturn(Optional.of(comment));
+
+    assertThatThrownBy(() -> commentService.updateComment(userId, commentId, "고친 내용"))
+        .isInstanceOf(CommentNotFoundException.class);
   }
 }

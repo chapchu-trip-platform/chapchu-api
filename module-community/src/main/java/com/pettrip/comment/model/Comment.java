@@ -42,6 +42,9 @@ public class Comment {
   @Column(name = "created_at", updatable = false)
   private LocalDateTime createdAt;
 
+  @Column(name = "deleted_at")
+  private LocalDateTime deletedAt;
+
   protected Comment() {}
 
   public Comment(
@@ -52,6 +55,15 @@ public class Comment {
     this.depth = depth;
     this.commentOrder = commentOrder;
     this.content = content;
+  }
+
+  /** 행을 남기고 삭제 표시만 한다. 하드 삭제하면 {@code parent_comment_id}의 ON DELETE CASCADE 때문에 대댓글까지 함께 사라진다. */
+  public void softDelete(LocalDateTime deletedAt) {
+    this.deletedAt = deletedAt;
+  }
+
+  public boolean isDeleted() {
+    return deletedAt != null;
   }
 
   public void update(String newContent) {
@@ -90,5 +102,9 @@ public class Comment {
 
   public LocalDateTime getCreatedAt() {
     return createdAt;
+  }
+
+  public LocalDateTime getDeletedAt() {
+    return deletedAt;
   }
 }
