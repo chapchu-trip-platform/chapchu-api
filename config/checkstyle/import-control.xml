@@ -6,7 +6,6 @@
     <allow pkg="javax"/>
     <allow pkg="jakarta"/>
     <allow pkg="org.springframework"/>
-    <allow pkg="org.slf4j"/>
     <allow pkg="com.pettrip"/>
     <allow pkg="com.github.f4b6a3"/>
     <allow pkg="software.amazon"/>

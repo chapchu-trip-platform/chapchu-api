@@ -73,9 +73,7 @@ class PlaceServiceTest {
     when(tourApiClient.fetchNearby(any(), any(), anyInt())).thenReturn(List.of(item));
     when(placeRepository.findById("12345678")).thenReturn(Optional.empty());
     when(placeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-    when(tourApiClient.fetchPetDetail("12345678"))
-        .thenReturn(new TourApiClient.PetDetailItem(null, null, null, null, null));
-    when(petPolicyRepository.existsById("12345678")).thenReturn(false, true);
+    when(tourApiClient.fetchPetDetail("12345678")).thenReturn(null);
 
     List<Place> result =
         placeService.searchNearby(new BigDecimal("37.5263"), new BigDecimal("126.9342"), 5000);
@@ -109,7 +107,7 @@ class PlaceServiceTest {
     when(tourApiClient.fetchNearby(any(), any(), anyInt())).thenReturn(List.of(item));
     when(placeRepository.findById("12345678")).thenReturn(Optional.of(existing));
     when(placeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-    when(petPolicyRepository.existsById("12345678")).thenReturn(true);
+    when(tourApiClient.fetchPetDetail("12345678")).thenReturn(null);
 
     List<Place> result =
         placeService.searchNearby(new BigDecimal("37.5263"), new BigDecimal("126.9342"), 5000);
