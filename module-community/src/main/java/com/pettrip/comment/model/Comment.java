@@ -54,6 +54,12 @@ public class Comment {
     this.content = content;
   }
 
+  public void update(String newContent) {
+    if (newContent != null) {
+      this.content = newContent;
+    }
+  }
+
   public UUID getId() {
     return id;
   }
