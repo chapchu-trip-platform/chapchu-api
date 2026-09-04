@@ -3,6 +3,7 @@ package com.pettrip.post.controller;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.when;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.document;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
@@ -176,8 +177,8 @@ class PostControllerTest {
                     fieldWithPath("petId").description("동행한 반려견 ID"),
                     fieldWithPath("photoId").description("대표 사진 ID"),
                     fieldWithPath("courseId").description("여행 코스 ID"),
-                    fieldWithPath("title").description("제목"),
-                    fieldWithPath("content").description("내용")),
+                    fieldWithPath("title").description("제목 (선택). 최대 100자").optional(),
+                    fieldWithPath("content").description("내용 (선택)").optional()),
                 responseFields(
                     fieldWithPath("id").description("게시글 ID"),
                     fieldWithPath("petId").description("동행한 반려견 ID"),
@@ -191,6 +192,56 @@ class PostControllerTest {
                     fieldWithPath("nickname").description("작성자 닉네임"),
                     fieldWithPath("photoUrl").description("대표 사진 URL (null 가능)").optional(),
                     fieldWithPath("createdAt").description("작성일시"))));
+  }
+
+  @Test
+  void 게시글_작성_시_제목이_100자를_넘으면_400() throws Exception {
+    String body =
+        objectMapper.writeValueAsString(
+            new PostCreateRequest(
+                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "가".repeat(101), "즐거웠어요"));
+
+    mockMvc
+        .perform(
+            post("/posts")
+                .contentType("application/json")
+                .content(body)
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void 게시글_작성_시_제목과_내용은_생략할_수_있다() throws Exception {
+    UUID petId = UUID.randomUUID();
+    UUID photoId = UUID.randomUUID();
+    UUID courseId = UUID.randomUUID();
+    when(postService.createPost(any(), eq(petId), eq(photoId), eq(courseId), isNull(), isNull()))
+        .thenReturn(samplePostResponse());
+
+    String body =
+        objectMapper.writeValueAsString(
+            new PostCreateRequest(petId, photoId, courseId, null, null));
+
+    mockMvc
+        .perform(
+            post("/posts")
+                .contentType("application/json")
+                .content(body)
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isCreated());
+  }
+
+  @Test
+  void 게시글_수정_시_제목이_100자를_넘으면_400() throws Exception {
+    String body = objectMapper.writeValueAsString(new PostUpdateRequest("가".repeat(101), null));
+
+    mockMvc
+        .perform(
+            patch("/posts/{postId}", UUID.randomUUID())
+                .contentType("application/json")
+                .content(body)
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isBadRequest());
   }
 
   @Test
@@ -214,8 +265,8 @@ class PostControllerTest {
                 "post-update",
                 pathParameters(parameterWithName("postId").description("게시글 ID")),
                 requestFields(
-                    fieldWithPath("title").description("제목 (선택)"),
-                    fieldWithPath("content").description("내용 (선택)")),
+                    fieldWithPath("title").description("제목 (선택). 최대 100자").optional(),
+                    fieldWithPath("content").description("내용 (선택)").optional()),
                 responseFields(
                     fieldWithPath("id").description("게시글 ID"),
                     fieldWithPath("petId").description("동행한 반려견 ID"),
