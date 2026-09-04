@@ -2,4 +2,11 @@ package com.pettrip.recommendation.service;
 
 import java.math.BigDecimal;
 
-public record PlaceInfo(String id, String name, String address, BigDecimal lat, BigDecimal lng) {}
+public record PlaceInfo(
+    String id,
+    String name,
+    String address,
+    BigDecimal lat,
+    BigDecimal lng,
+    String categoryLabel,
+    String indoorOutdoor) {}

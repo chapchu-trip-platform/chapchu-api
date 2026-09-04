@@ -43,6 +43,18 @@ class PlaceServiceTest {
         (short) 4);
   }
 
+  private TourApiClient.NearbyItem sampleItem(String contentId, String name) {
+    return new TourApiClient.NearbyItem(
+        contentId,
+        "12",
+        name,
+        null,
+        "서울시 영등포구",
+        new BigDecimal("37.5263"),
+        new BigDecimal("126.9342"),
+        new BigDecimal("100"));
+  }
+
   @Test
   void 존재하는_장소를_조회한다() {
     when(placeRepository.findById("12345678")).thenReturn(Optional.of(samplePlace()));
@@ -63,18 +75,11 @@ class PlaceServiceTest {
 
   @Test
   void TourAPI_결과를_DB에_동기화하고_반환한다() {
-    TourApiClient.NearbyItem item =
-        new TourApiClient.NearbyItem(
-            "12345678",
-            "한강공원",
-            null,
-            "서울시 영등포구",
-            new BigDecimal("37.5263"),
-            new BigDecimal("126.9342"));
+    TourApiClient.NearbyItem item = sampleItem("12345678", "한강공원");
     when(tourApiClient.fetchNearby(any(), any(), anyInt())).thenReturn(List.of(item));
     when(placeRepository.findById("12345678")).thenReturn(Optional.empty());
     when(placeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-    when(tourApiClient.fetchPetDetail("12345678")).thenReturn(null);
+    when(petPolicyRepository.existsById("12345678")).thenReturn(true);
 
     List<Place> result =
         placeService.searchNearby(new BigDecimal("37.5263"), new BigDecimal("126.9342"), 5000);
@@ -96,14 +101,7 @@ class PlaceServiceTest {
 
   @Test
   void pet_policy가_이미_DB에_있으면_fetchPetDetail을_호출하지_않는다() {
-    TourApiClient.NearbyItem item =
-        new TourApiClient.NearbyItem(
-            "12345678",
-            "한강공원",
-            null,
-            "서울시 영등포구",
-            new BigDecimal("37.5263"),
-            new BigDecimal("126.9342"));
+    TourApiClient.NearbyItem item = sampleItem("12345678", "한강공원");
     when(tourApiClient.fetchNearby(any(), any(), anyInt())).thenReturn(List.of(item));
     when(placeRepository.findById("12345678")).thenReturn(Optional.of(samplePlace()));
     when(placeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -128,18 +126,11 @@ class PlaceServiceTest {
   @Test
   void 이미_캐시된_장소는_정보를_갱신한다() {
     Place existing = samplePlace();
-    TourApiClient.NearbyItem item =
-        new TourApiClient.NearbyItem(
-            "12345678",
-            "한강공원(업데이트)",
-            null,
-            "서울시 영등포구",
-            new BigDecimal("37.5263"),
-            new BigDecimal("126.9342"));
+    TourApiClient.NearbyItem item = sampleItem("12345678", "한강공원(업데이트)");
     when(tourApiClient.fetchNearby(any(), any(), anyInt())).thenReturn(List.of(item));
     when(placeRepository.findById("12345678")).thenReturn(Optional.of(existing));
     when(placeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-    when(tourApiClient.fetchPetDetail("12345678")).thenReturn(null);
+    when(petPolicyRepository.existsById("12345678")).thenReturn(true);
 
     List<Place> result =
         placeService.searchNearby(new BigDecimal("37.5263"), new BigDecimal("126.9342"), 5000);

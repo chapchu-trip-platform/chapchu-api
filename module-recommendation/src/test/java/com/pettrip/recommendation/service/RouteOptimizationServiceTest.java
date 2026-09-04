@@ -37,10 +37,24 @@ class RouteOptimizationServiceTest {
 
     List<PlaceInfo> places =
         List.of(
-            new PlaceInfo("p1", "장소A", "주소A", new BigDecimal("37.5"), new BigDecimal("127.0")),
-            new PlaceInfo("p2", "장소B", "주소B", new BigDecimal("37.6"), new BigDecimal("127.1")));
+            new PlaceInfo(
+                "p1",
+                "장소A",
+                "주소A",
+                new BigDecimal("37.5"),
+                new BigDecimal("127.0"),
+                "관광지",
+                "OUTDOOR"),
+            new PlaceInfo(
+                "p2",
+                "장소B",
+                "주소B",
+                new BigDecimal("37.6"),
+                new BigDecimal("127.1"),
+                "음식점",
+                "INDOOR"));
 
-    List<String> result = service.optimizeOrder(places);
+    List<String> result = service.optimizeOrder(places, "소형", 3, "맑음", (short) 25);
 
     assertThat(result).containsExactly("p2", "p1");
   }
@@ -51,10 +65,10 @@ class RouteOptimizationServiceTest {
 
     List<PlaceInfo> places =
         List.of(
-            new PlaceInfo("p1", "장소A", "주소A", BigDecimal.ONE, BigDecimal.ONE),
-            new PlaceInfo("p2", "장소B", "주소B", BigDecimal.ONE, BigDecimal.ONE));
+            new PlaceInfo("p1", "장소A", "주소A", BigDecimal.ONE, BigDecimal.ONE, null, null),
+            new PlaceInfo("p2", "장소B", "주소B", BigDecimal.ONE, BigDecimal.ONE, null, null));
 
-    List<String> result = service.optimizeOrder(places);
+    List<String> result = service.optimizeOrder(places, null, null, null, null);
 
     assertThat(result).containsExactly("p1", "p2");
   }
@@ -68,10 +82,10 @@ class RouteOptimizationServiceTest {
 
     List<PlaceInfo> places =
         List.of(
-            new PlaceInfo("p1", "장소A", "주소A", BigDecimal.ONE, BigDecimal.ONE),
-            new PlaceInfo("p2", "장소B", "주소B", BigDecimal.ONE, BigDecimal.ONE));
+            new PlaceInfo("p1", "장소A", "주소A", BigDecimal.ONE, BigDecimal.ONE, null, null),
+            new PlaceInfo("p2", "장소B", "주소B", BigDecimal.ONE, BigDecimal.ONE, null, null));
 
-    List<String> result = service.optimizeOrder(places);
+    List<String> result = service.optimizeOrder(places, null, null, null, null);
 
     assertThat(result).containsExactly("p1", "p2");
   }
@@ -79,9 +93,9 @@ class RouteOptimizationServiceTest {
   @Test
   void 장소가_하나면_AI_호출_없이_그대로_반환한다() {
     List<PlaceInfo> places =
-        List.of(new PlaceInfo("p1", "장소A", "주소A", BigDecimal.ONE, BigDecimal.ONE));
+        List.of(new PlaceInfo("p1", "장소A", "주소A", BigDecimal.ONE, BigDecimal.ONE, null, null));
 
-    List<String> result = service.optimizeOrder(places);
+    List<String> result = service.optimizeOrder(places, null, null, null, null);
 
     assertThat(result).containsExactly("p1");
   }

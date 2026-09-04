@@ -4,6 +4,45 @@
 > 코드 한 줄 작성 전에 아래 체크리스트를 반드시 완료하라.
 > 전역 `~/.claude/CLAUDE.md`와 충돌 시 이 파일이 우선한다.
 
+---
+
+## 코스 생성 도메인 불변 규칙 (절대 어기지 마라)
+
+> 아래 규칙은 `POST /courses` 코스 생성 플로우 전반에 적용된다.
+> Opus 모델 검증 + 팀 합의로 확정된 결정이므로 "이번만", "빠르게" 이유로 우회 금지.
+
+### TourAPI
+- **반드시 `KorPetTourService2` 사용.** `KorService2` + `petTour=Y` 조합은 반려동물 전용 API가 아님 → 절대 금지
+- base-url: `https://apis.data.go.kr/B551011/KorPetTourService2`
+- `locationBasedList2` 호출 시 `petTour=Y` 파라미터 포함 금지. 이 서비스는 이미 전량 반려동물 데이터임
+- 파싱 필수 필드: `contenttypeid`(카테고리), `dist`(거리), `mapx/mapy`(좌표), `firstimage`
+- `detailPetTour2` 파싱 필수 필드: `acmpyTypeCd`(실내외), `acmpyPsblCpam`(가능견종/크기), `acmpyNeedMtr`(필수조건), `etcAcmpyInfo`
+
+### 코스 생성 파라미터
+- `POST /courses`에 `petId`는 **필수값(@NotNull)**. petId 없으면 코스 생성 불가 (400 반환)
+- 날씨 정보(`temperature`, `humidity`, `weatherStatus`)는 **FE가 수집해서 요청에 포함**. 백엔드에서 기상청 API 직접 호출 금지
+- 경로/지도 계산(거리, polyline)은 **FE가 처리**. 백엔드에서 카카오 Directions API 직접 호출 금지
+
+### 장소 필터링
+- 코스에 포함되는 장소는 **반드시 `place_pet_policies` 레코드가 있어야 함**
+- `PlacePetPolicy.allowedPetSize` vs `Pet.size` 하드 필터 필수:
+  - `AllowedPetSize.SMALL` 장소 → `PetSize.SMALL`만 입장 가능
+  - `AllowedPetSize.MEDIUM` 장소 → `SMALL`, `MEDIUM` 입장 가능
+  - `AllowedPetSize.LARGE` 또는 `ALL` → 전 견종 가능
+
+### RAG / LLM
+- `PlaceRagService` 고정 쿼리 `"반려동물 동반 즐거운 여행 좋은 장소"` 사용 금지
+  → pet 정보 + 날씨 기반 동적 쿼리 생성 필수
+- `RouteOptimizationService` LLM 프롬프트에 반드시 포함해야 할 컨텍스트:
+  - 반려동물 크기/나이 요약
+  - 날씨(맑음/비/흐림, 기온)
+  - 각 장소의 `category`(음식점/관광지 등), `indoorOutdoor`(실내/실외/전구역)
+
+### Flyway 마이그레이션 번호
+- 현재 최신: **V17**. 신규 마이그레이션은 **V18부터** 시작할 것
+
+---
+
 ## 세션 시작 체크리스트 (매 세션 필수)
 
 1. `AGENTS.md` 전체를 읽고 하네스 규칙을 재확인하라.

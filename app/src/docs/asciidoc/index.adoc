@@ -933,7 +933,9 @@ include::{snippets}/review-recommendation-delete/http-response.adoc[]
 
 `POST /courses`
 
-JWT 인증이 필요합니다. 현재 위치 주변 반려동물 동반 장소를 TourAPI로 검색하고, 리뷰 임베딩 기반 RAG 랭킹 후 AI 경로 최적화로 코스를 생성합니다.
+JWT 인증이 필요합니다. `petId`(본인 반려동물)가 필수이며, FE가 수집한 날씨 정보(temperature, humidity, weatherStatus)를 함께 전달합니다.
+KorPetTourService2로 주변 반려동물 동반 장소를 탐색하고, 반려동물 크기 하드 필터 → 리뷰 임베딩 RAG 랭킹 → AI 경로 최적화 순으로 코스를 생성합니다.
+응답에 각 장소의 위경도, 이미지, 반려동물 정책이 포함됩니다.
 
 [.request]
 ==== 요청

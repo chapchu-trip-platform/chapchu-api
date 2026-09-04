@@ -31,11 +31,15 @@ public class CourseController {
     var course =
         courseService.createCourse(
             userId,
+            request.petId(),
             request.lat(),
             request.lng(),
             request.radiusMeters() > 0 ? request.radiusMeters() : 5000,
             request.travelDate(),
-            request.startLocation());
+            request.startLocation(),
+            request.temperature(),
+            request.humidity(),
+            request.weatherStatus());
     TravelCourseDetail detail = courseService.getCourse(userId, course.getId());
     return CourseResponse.from(detail);
   }
