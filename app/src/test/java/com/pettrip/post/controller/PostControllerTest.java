@@ -60,6 +60,8 @@ class PostControllerTest {
         0,
         0,
         3,
+        true,
+        false,
         "멍멍이아빠",
         "https://example.com/photo.jpg",
         LocalDateTime.of(2024, 1, 15, 10, 30, 0));
@@ -68,7 +70,7 @@ class PostControllerTest {
   @Test
   void 게시글_목록을_조회한다() throws Exception {
     PostListResponse listResponse = new PostListResponse(List.of(samplePostResponse()), null);
-    when(postService.listPosts(any(), any(), anyInt())).thenReturn(listResponse);
+    when(postService.listPosts(any(), any(), any(), anyInt())).thenReturn(listResponse);
 
     mockMvc
         .perform(
@@ -100,6 +102,9 @@ class PostControllerTest {
                     fieldWithPath("posts[].viewCount").description("조회수"),
                     fieldWithPath("posts[].recommendationCount").description("추천 수"),
                     fieldWithPath("posts[].commentCount").description("댓글 수"),
+                    fieldWithPath("posts[].recommended")
+                        .description("요청한 사용자가 추천했는지. 추천 취소 버튼 노출 판단용"),
+                    fieldWithPath("posts[].bookmarked").description("요청한 사용자가 북마크했는지"),
                     fieldWithPath("posts[].nickname").description("작성자 닉네임"),
                     fieldWithPath("posts[].photoUrl").description("대표 사진 URL (null 가능)").optional(),
                     fieldWithPath("posts[].createdAt").description("작성일시"),
@@ -111,7 +116,7 @@ class PostControllerTest {
   @Test
   void 게시글_목록을_추천순으로_조회한다() throws Exception {
     PostListResponse listResponse = new PostListResponse(List.of(samplePostResponse()), null);
-    when(postService.listPosts(eq("popular"), any(), anyInt())).thenReturn(listResponse);
+    when(postService.listPosts(any(), eq("popular"), any(), anyInt())).thenReturn(listResponse);
 
     mockMvc
         .perform(
@@ -124,7 +129,7 @@ class PostControllerTest {
   @Test
   void 게시글_상세를_조회한다() throws Exception {
     UUID postId = UUID.randomUUID();
-    when(postService.getPost(postId)).thenReturn(samplePostResponse());
+    when(postService.getPost(USER_ID, postId)).thenReturn(samplePostResponse());
 
     mockMvc
         .perform(get("/posts/{postId}", postId).with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
@@ -143,6 +148,8 @@ class PostControllerTest {
                     fieldWithPath("viewCount").description("조회수"),
                     fieldWithPath("recommendationCount").description("추천 수"),
                     fieldWithPath("commentCount").description("댓글 수"),
+                    fieldWithPath("recommended").description("요청한 사용자가 추천했는지. 추천 취소 버튼 노출 판단용"),
+                    fieldWithPath("bookmarked").description("요청한 사용자가 북마크했는지"),
                     fieldWithPath("nickname").description("작성자 닉네임"),
                     fieldWithPath("photoUrl").description("대표 사진 URL (null 가능)").optional(),
                     fieldWithPath("createdAt").description("작성일시"))));
@@ -188,6 +195,8 @@ class PostControllerTest {
                     fieldWithPath("viewCount").description("조회수"),
                     fieldWithPath("recommendationCount").description("추천 수"),
                     fieldWithPath("commentCount").description("댓글 수"),
+                    fieldWithPath("recommended").description("요청한 사용자가 추천했는지. 추천 취소 버튼 노출 판단용"),
+                    fieldWithPath("bookmarked").description("요청한 사용자가 북마크했는지"),
                     fieldWithPath("nickname").description("작성자 닉네임"),
                     fieldWithPath("photoUrl").description("대표 사진 URL (null 가능)").optional(),
                     fieldWithPath("createdAt").description("작성일시"))));
@@ -226,6 +235,8 @@ class PostControllerTest {
                     fieldWithPath("viewCount").description("조회수"),
                     fieldWithPath("recommendationCount").description("추천 수"),
                     fieldWithPath("commentCount").description("댓글 수"),
+                    fieldWithPath("recommended").description("요청한 사용자가 추천했는지. 추천 취소 버튼 노출 판단용"),
+                    fieldWithPath("bookmarked").description("요청한 사용자가 북마크했는지"),
                     fieldWithPath("nickname").description("작성자 닉네임"),
                     fieldWithPath("photoUrl").description("대표 사진 URL (null 가능)").optional(),
                     fieldWithPath("createdAt").description("작성일시"))));

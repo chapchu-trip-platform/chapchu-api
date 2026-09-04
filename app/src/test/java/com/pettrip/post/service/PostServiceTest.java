@@ -19,6 +19,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.jdbc.core.RowMapper;
@@ -58,6 +59,8 @@ class PostServiceTest {
         0,
         0,
         0,
+        true,
+        false,
         "닉네임",
         null,
         LocalDateTime.now());
@@ -68,7 +71,8 @@ class PostServiceTest {
     UUID postId = UUID.randomUUID();
     when(postRepository.incrementViewCount(postId)).thenReturn(0);
 
-    assertThatThrownBy(() -> postService.getPost(postId)).isInstanceOf(PostNotFoundException.class);
+    assertThatThrownBy(() -> postService.getPost(UUID.randomUUID(), postId))
+        .isInstanceOf(PostNotFoundException.class);
   }
 
   @Test
@@ -79,7 +83,7 @@ class PostServiceTest {
     when(jdbcTemplate.query(any(String.class), any(SqlParameterSource.class), any(RowMapper.class)))
         .thenReturn(List.of(expected));
 
-    PostResponse result = postService.getPost(postId);
+    PostResponse result = postService.getPost(UUID.randomUUID(), postId);
 
     assertThat(result).isEqualTo(expected);
     verify(postRepository).incrementViewCount(postId);
@@ -212,6 +216,36 @@ class PostServiceTest {
 
     assertThatThrownBy(() -> postService.cancelBookmark(userId, postId))
         .isInstanceOf(PostBookmarkNotFoundException.class);
+  }
+
+  @Test
+  void cancelBookmark는_북마크를_삭제한다() {
+    UUID userId = UUID.randomUUID();
+    UUID postId = UUID.randomUUID();
+    Post post =
+        new Post(
+            UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "제목", "내용");
+    when(postRepository.findById(postId)).thenReturn(Optional.of(post));
+    when(postBookmarkRepository.existsByUserIdAndPostId(userId, postId)).thenReturn(true);
+
+    postService.cancelBookmark(userId, postId);
+
+    verify(postBookmarkRepository).deleteByUserIdAndPostId(userId, postId);
+  }
+
+  @Test
+  void getPost는_요청한_사용자_기준으로_추천_북마크_여부를_조회한다() {
+    UUID userId = UUID.randomUUID();
+    UUID postId = UUID.randomUUID();
+    when(postRepository.incrementViewCount(postId)).thenReturn(1);
+    when(jdbcTemplate.query(any(String.class), any(SqlParameterSource.class), any(RowMapper.class)))
+        .thenReturn(List.of(samplePostResponse(userId)));
+
+    postService.getPost(userId, postId);
+
+    ArgumentCaptor<SqlParameterSource> captor = ArgumentCaptor.forClass(SqlParameterSource.class);
+    verify(jdbcTemplate).query(any(String.class), captor.capture(), any(RowMapper.class));
+    assertThat(captor.getValue().getValue("userId")).isEqualTo(userId);
   }
 
   @Test
