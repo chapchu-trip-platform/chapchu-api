@@ -56,7 +56,7 @@ public class PostController {
   public PostResponse updatePost(
       @CurrentUserId UUID userId,
       @PathVariable UUID postId,
-      @RequestBody PostUpdateRequest request) {
+      @RequestBody @Valid PostUpdateRequest request) {
     return postService.updatePost(userId, postId, request.title(), request.content());
   }
 
