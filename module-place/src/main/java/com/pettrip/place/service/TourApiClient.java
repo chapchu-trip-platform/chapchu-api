@@ -4,19 +4,13 @@ import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.util.DefaultUriBuilderFactory;
-import org.springframework.web.util.DefaultUriBuilderFactory.EncodingMode;
 
 @Component
 public class TourApiClient {
-
-  private static final Logger log = LoggerFactory.getLogger(TourApiClient.class);
 
   private final RestClient restClient;
   private final String serviceKey;
@@ -25,13 +19,7 @@ public class TourApiClient {
       RestClient.Builder builder,
       @Value("${app.tour-api.base-url}") String baseUrl,
       @Value("${app.tour-api.key}") String serviceKey) {
-    // 공공데이터포털 serviceKey는 이미 퍼센트 인코딩된 형태(%2B 등)로 발급된다.
-    // 기본 인코딩 모드(TEMPLATE_AND_VALUES)는 이 '%'를 '%25'로 이중 인코딩해 인증을 깨뜨린다.
-    // VALUES_ONLY 모드는 URI 템플릿 문자열(우리가 직접 붙인 serviceKey 포함)은 그대로 두고,
-    // {변수}로 넘긴 값(mapX, mapY 등)만 정상 인코딩한다.
-    DefaultUriBuilderFactory uriFactory = new DefaultUriBuilderFactory(baseUrl);
-    uriFactory.setEncodingMode(EncodingMode.VALUES_ONLY);
-    this.restClient = builder.uriBuilderFactory(uriFactory).build();
+    this.restClient = builder.baseUrl(baseUrl).build();
     this.serviceKey = serviceKey;
   }
 
@@ -43,21 +31,18 @@ public class TourApiClient {
                 uriBuilder ->
                     uriBuilder
                         .path("/locationBasedList2")
-                        .query("serviceKey=" + serviceKey)
+                        .queryParam("serviceKey", serviceKey)
                         .queryParam("numOfRows", 20)
                         .queryParam("pageNo", 1)
                         .queryParam("MobileOS", "ETC")
                         .queryParam("MobileApp", "chapchu")
                         .queryParam("_type", "json")
-                        .queryParam("mapX", "{mapX}")
-                        .queryParam("mapY", "{mapY}")
-                        .queryParam("radius", "{radius}")
-                        .queryParam("arrange", "E")
-                        .build(
-                            Map.of(
-                                "mapX", lng,
-                                "mapY", lat,
-                                "radius", radiusMeters)))
+                        .queryParam("mapX", lng)
+                        .queryParam("mapY", lat)
+                        .queryParam("radius", radiusMeters)
+                        .queryParam("contentTypeId", 12)
+                        .queryParam("petTour", "Y")
+                        .build())
             .retrieve()
             .body(new ParameterizedTypeReference<>() {});
 
@@ -72,12 +57,12 @@ public class TourApiClient {
                 uriBuilder ->
                     uriBuilder
                         .path("/detailPetTour2")
-                        .query("serviceKey=" + serviceKey)
+                        .queryParam("serviceKey", serviceKey)
                         .queryParam("MobileOS", "ETC")
                         .queryParam("MobileApp", "chapchu")
                         .queryParam("_type", "json")
-                        .queryParam("contentId", "{contentId}")
-                        .build(Map.of("contentId", contentId)))
+                        .queryParam("contentId", contentId)
+                        .build())
             .retrieve()
             .body(new ParameterizedTypeReference<>() {});
 
@@ -88,17 +73,7 @@ public class TourApiClient {
 
   @SuppressWarnings("unchecked")
   private List<Map<String, Object>> extractItems(Map<String, Object> body) {
-    if (body == null) {
-      log.warn("TourAPI 응답 본문이 null 입니다");
-      return Collections.emptyList();
-    }
-
-    String resultCode = resultCode(body);
-    if (resultCode != null && !"0000".equals(resultCode)) {
-      log.warn("TourAPI 인증/처리 실패 resultCode={} body={}", resultCode, body);
-      return Collections.emptyList();
-    }
-
+    if (body == null) return Collections.emptyList();
     try {
       Map<String, Object> response = (Map<String, Object>) body.get("response");
       Map<String, Object> responseBody = (Map<String, Object>) response.get("body");
@@ -110,24 +85,9 @@ public class TourApiClient {
       if (item instanceof Map<?, ?> single) {
         return List.of((Map<String, Object>) single);
       }
-    } catch (Exception e) {
-      log.warn("TourAPI 응답 파싱 실패 {}: {}", e.getClass().getSimpleName(), e.getMessage(), e);
+    } catch (Exception ignored) {
     }
     return Collections.emptyList();
-  }
-
-  @SuppressWarnings("unchecked")
-  private String resultCode(Map<String, Object> body) {
-    try {
-      Map<String, Object> response = (Map<String, Object>) body.get("response");
-      Map<String, Object> header = (Map<String, Object>) response.get("header");
-      Object code = header.get("resultCode");
-      if (code == null) return null;
-      return code.toString();
-    } catch (Exception e) {
-      log.warn("TourAPI resultCode 파싱 실패 {}: {}", e.getClass().getSimpleName(), e.getMessage());
-      return null;
-    }
   }
 
   private NearbyItem toNearbyItem(Map<String, Object> map) {
@@ -146,7 +106,7 @@ public class TourApiClient {
         str(map, "acmpyPsblCpam"),
         str(map, "acmpyNeedMtr"),
         str(map, "etcAcmpyInfo"),
-        str(map, "relaAcdntRiskMtr"));
+        str(map, "relaPrkge"));
   }
 
   private String str(Map<String, Object> map, String key) {
@@ -177,5 +137,5 @@ public class TourApiClient {
       String acmpyPsblCpam,
       String acmpyNeedMtr,
       String etcAcmpyInfo,
-      String relaAcdntRiskMtr) {}
+      String relaPrkge) {}
 }
