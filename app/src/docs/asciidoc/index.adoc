@@ -127,15 +127,54 @@ const redirect = encodeURIComponent(window.location.origin + '/auth/callback');
 window.location.href = `https://api.chapchu.site/auth/login?redirect=${redirect}`;
 ----
 
+include::{snippets}/auth-login/http-request.adoc[]
+
 [.response]
 ==== 응답
 
 로그인 완료 후 `{redirect}` 경로로 리다이렉트합니다.
 
+include::{snippets}/auth-login/http-response.adoc[]
+include::{snippets}/auth-login/response-headers.adoc[]
+
 * *기존 유저*: `{redirect}#access_token={JWT}`
 * *신규 유저*: `{redirect}?registration_token={token}`
 
 NOTE: access_token은 URL fragment(`#`)로 전달됩니다. 서버 로그에 남지 않으며 FE 스크립트에서만 읽을 수 있습니다.
+
+=== OAuth 콜백
+
+`GET /auth/callback`
+
+구글 로그인 완료 후 chapchu-auth가 인가 코드를 이 엔드포인트로 리다이렉트합니다.
+서버가 코드를 토큰으로 교환하고, 결과에 따라 FE 콜백으로 다시 리다이렉트합니다.
+
+* *기존 유저*: `code`·`state`를 검증하고 access_token을 발급해 `{redirect}#access_token={JWT}`로 리다이렉트합니다.
+* *신규 유저*: `registration_token`을 담아 `{redirect}?registration_token={token}`로 리다이렉트합니다.
+
+[.request]
+==== 요청 (기존 유저)
+
+include::{snippets}/auth-callback-success/http-request.adoc[]
+include::{snippets}/auth-callback-success/query-parameters.adoc[]
+
+[.response]
+==== 응답 (기존 유저)
+
+include::{snippets}/auth-callback-success/http-response.adoc[]
+include::{snippets}/auth-callback-success/response-headers.adoc[]
+
+[.request]
+==== 요청 (신규 유저)
+
+include::{snippets}/auth-callback-onboarding/http-request.adoc[]
+include::{snippets}/auth-callback-onboarding/query-parameters.adoc[]
+
+[.response]
+==== 응답 (신규 유저)
+
+include::{snippets}/auth-callback-onboarding/http-response.adoc[]
+include::{snippets}/auth-callback-onboarding/response-headers.adoc[]
 
 === 신규 유저 등록
 
@@ -146,19 +185,13 @@ NOTE: access_token은 URL fragment(`#`)로 전달됩니다. 서버 로그에 남
 [.request]
 ==== 요청
 
-[source,http]
-----
-POST /auth/register HTTP/1.1
-Content-Type: application/json
-
-{
-  "registrationToken": "온보딩 콜백에서 받은 토큰",
-  "nickname": "사용자 닉네임"
-}
-----
+include::{snippets}/auth-register/http-request.adoc[]
+include::{snippets}/auth-register/request-fields.adoc[]
 
 [.response]
 ==== 응답
+
+include::{snippets}/auth-register/http-response.adoc[]
 
 * `200 OK` — 등록 성공
 * `400 Bad Request` — 토큰 만료 또는 닉네임 중복
@@ -219,21 +252,22 @@ refresh_token 쿠키가 자동으로 포함되므로 FE는 별도 헤더 없이 
 [.request]
 ==== 요청
 
-[source,http]
-----
-POST /auth/refresh HTTP/1.1
-Cookie: refresh_token={token}
-----
+include::{snippets}/auth-refresh/http-request.adoc[]
+include::{snippets}/auth-refresh/request-cookies.adoc[]
 
 [.response]
-==== 응답
+==== 응답 (성공)
 
-[source,json]
-----
-{
-  "access_token": "새로 발급된 JWT"
-}
-----
+include::{snippets}/auth-refresh/http-response.adoc[]
+include::{snippets}/auth-refresh/response-fields.adoc[]
+
+[.response]
+==== 응답 (쿠키 없음)
+
+refresh_token 쿠키가 없으면 `401 Unauthorized`를 반환합니다. FE는 `/auth/login`으로 이동시킵니다.
+
+include::{snippets}/auth-refresh-no-cookie/http-request.adoc[]
+include::{snippets}/auth-refresh-no-cookie/http-response.adoc[]
 
 * `401 Unauthorized` — refresh_token 없음 또는 만료 → FE에서 `/auth/login`으로 이동
 
@@ -358,6 +392,43 @@ include::{snippets}/user-update-me/request-fields.adoc[]
 include::{snippets}/user-update-me/http-response.adoc[]
 include::{snippets}/user-update-me/response-fields.adoc[]
 
+=== 닉네임 중복 확인 (check)
+
+`GET /users/nickname/check?nickname={nickname}`
+
+닉네임 사용 가능 여부를 조회합니다. `GET /users/nickname/availability`와 마찬가지로 예약 효과가 없으며,
+최종 판정은 닉네임 등록/변경 요청의 응답으로 처리하세요.
+
+[.request]
+==== 요청
+
+include::{snippets}/user-nickname-check/http-request.adoc[]
+include::{snippets}/user-nickname-check/query-parameters.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/user-nickname-check/http-response.adoc[]
+include::{snippets}/user-nickname-check/response-fields.adoc[]
+
+=== 닉네임 변경
+
+`PATCH /users/me/nickname`
+
+닉네임만 변경합니다. 이미 다른 유저가 사용 중인 닉네임이면 `409 Conflict`를 반환합니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/user-change-nickname/http-request.adoc[]
+include::{snippets}/user-change-nickname/request-fields.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/user-change-nickname/http-response.adoc[]
+include::{snippets}/user-change-nickname/response-fields.adoc[]
+
 === 선호 사항 선택지 조회
 
 `GET /preferences/options`
@@ -408,6 +479,24 @@ include::{snippets}/user-preferences-get/http-request.adoc[]
 
 include::{snippets}/user-preferences-get/http-response.adoc[]
 include::{snippets}/user-preferences-get/response-fields.adoc[]
+
+=== 선호 사항 등록
+
+`POST /users/me/preferences`
+
+지역·테마·이동수단을 UUID로 받아 선호 사항을 등록합니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/user-preferences-register/http-request.adoc[]
+include::{snippets}/user-preferences-register/request-fields.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/user-preferences-register/http-response.adoc[]
+include::{snippets}/user-preferences-register/response-fields.adoc[]
 
 === 선호 사항 수정
 
@@ -653,8 +742,8 @@ include::{snippets}/photo-create/response-fields.adoc[]
 
 == 장소 API
 
-NOTE: 장소 등록(`POST /places`)과 정책 등록/수정은 아직 구현되지 않았습니다.
-현재 장소 데이터는 TourAPI에서 가져와 채웁니다 (`docs/decisions/030` 참고).
+NOTE: 평상시 장소 데이터는 TourAPI에서 가져와 채웁니다 (`docs/decisions/030` 참고).
+직접 등록(`POST /places`)과 정책 등록/수정(`PUT /places/{externalPlaceId}/policy`)도 지원합니다.
 
 === 장소 조회
 
@@ -687,6 +776,43 @@ include::{snippets}/place-nearby/query-parameters.adoc[]
 
 include::{snippets}/place-nearby/http-response.adoc[]
 include::{snippets}/place-nearby/response-fields.adoc[]
+
+=== 장소 등록
+
+`POST /places`
+
+장소를 직접 등록합니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/place-register/http-request.adoc[]
+include::{snippets}/place-register/request-fields.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/place-register/http-response.adoc[]
+include::{snippets}/place-register/response-fields.adoc[]
+
+=== 장소 반려동물 정책 등록/수정
+
+`PUT /places/{externalPlaceId}/policy`
+
+장소의 반려동물 동반 정책을 등록하거나 수정합니다. 이미 정책이 있으면 덮어씁니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/place-policy-upsert/http-request.adoc[]
+include::{snippets}/place-policy-upsert/path-parameters.adoc[]
+include::{snippets}/place-policy-upsert/request-fields.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/place-policy-upsert/http-response.adoc[]
+include::{snippets}/place-policy-upsert/response-fields.adoc[]
 
 == 커뮤니티 API
 
@@ -1091,6 +1217,24 @@ include::{snippets}/course-place-visit/request-fields.adoc[]
 
 include::{snippets}/course-place-visit/http-response.adoc[]
 
+=== 코스 완료
+
+`POST /courses/{courseId}/complete`
+
+JWT 인증이 필요합니다. 코스 소유자만 호출할 수 있습니다 (타인 호출 시 403).
+이미 완료된 코스를 재호출해도 200 OK(멱등)를 반환합니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/course-complete/http-request.adoc[]
+include::{snippets}/course-complete/path-parameters.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/course-complete/http-response.adoc[]
+
 == 날씨 기록 API
 
 === 날씨 기록 저장
@@ -1137,4 +1281,26 @@ include::{snippets}/weather-record-list/response-fields.adoc[]
 
 == 앨범 API
 
+NOTE: 현재 준비 중입니다.
+
 == 추천 API
+
+=== 장소 추천
+
+`POST /recommended-places`
+
+JWT 인증이 필요합니다. 기준 좌표를 기반으로 반려동물 동반 가능 장소를 추천합니다.
+DB에 저장되지 않습니다. 코스 생성 전 미리보기 또는 단독 탐색 용도로 사용합니다.
+반려동물 크기 하드 필터 → 리뷰 임베딩 RAG 랭킹 순서로 결과를 반환합니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/recommended-places/http-request.adoc[]
+include::{snippets}/recommended-places/request-fields.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/recommended-places/http-response.adoc[]
+include::{snippets}/recommended-places/response-fields.adoc[]
