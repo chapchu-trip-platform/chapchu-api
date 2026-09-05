@@ -3,6 +3,7 @@ package com.pettrip.post.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -141,6 +142,51 @@ class PostServiceTest {
     ArgumentCaptor<SqlParameterSource> captor = ArgumentCaptor.forClass(SqlParameterSource.class);
     verify(jdbcTemplate).queryForObject(any(String.class), captor.capture(), any(RowMapper.class));
     assertThat(captor.getValue().hasValue("photoId")).isFalse();
+  }
+
+  @Test
+  void createPost는_petId와_courseId가_null이면_해당_검증을_건너뛴다() {
+    UUID userId = UUID.randomUUID();
+    PostResponse expected = samplePostResponse(userId);
+    stubReferenceCheck(false, true, false);
+    when(postRepository.save(any(Post.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    when(jdbcTemplate.query(any(String.class), any(SqlParameterSource.class), any(RowMapper.class)))
+        .thenReturn(List.of(expected));
+
+    PostResponse result =
+        postService.createPost(userId, null, UUID.randomUUID(), null, "자유게시판 글", "내용");
+
+    assertThat(result).isEqualTo(expected);
+  }
+
+  @Test
+  void createPost는_참조가_모두_null이면_확인_쿼리를_돌리지_않는다() {
+    UUID userId = UUID.randomUUID();
+    when(postRepository.save(any(Post.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    when(jdbcTemplate.query(any(String.class), any(SqlParameterSource.class), any(RowMapper.class)))
+        .thenReturn(List.of(samplePostResponse(userId)));
+
+    postService.createPost(userId, null, null, null, "자유게시판 글", "내용");
+
+    verify(jdbcTemplate, never())
+        .queryForObject(any(String.class), any(SqlParameterSource.class), any(RowMapper.class));
+  }
+
+  @Test
+  void createPost는_petId가_null이면_petId를_쿼리_파라미터에서_뺀다() {
+    UUID userId = UUID.randomUUID();
+    UUID courseId = UUID.randomUUID();
+    stubReferenceCheck(false, false, true);
+    when(postRepository.save(any(Post.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    when(jdbcTemplate.query(any(String.class), any(SqlParameterSource.class), any(RowMapper.class)))
+        .thenReturn(List.of(samplePostResponse(userId)));
+
+    postService.createPost(userId, null, null, courseId, "제목", "내용");
+
+    ArgumentCaptor<SqlParameterSource> captor = ArgumentCaptor.forClass(SqlParameterSource.class);
+    verify(jdbcTemplate).queryForObject(any(String.class), captor.capture(), any(RowMapper.class));
+    assertThat(captor.getValue().hasValue("petId")).isFalse();
+    assertThat(captor.getValue().hasValue("courseId")).isTrue();
   }
 
   @Test
