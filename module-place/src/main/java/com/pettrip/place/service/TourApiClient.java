@@ -30,7 +30,7 @@ public class TourApiClient {
     DefaultUriBuilderFactory uriFactory = new DefaultUriBuilderFactory(baseUrl);
     uriFactory.setEncodingMode(EncodingMode.VALUES_ONLY);
     this.restClient = builder.uriBuilderFactory(uriFactory).build();
-    this.serviceKey = serviceKey;
+    this.serviceKey = serviceKey.strip();
   }
 
   public List<NearbyItem> fetchNearby(BigDecimal lat, BigDecimal lng, int radiusMeters) {
