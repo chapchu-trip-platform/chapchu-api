@@ -122,8 +122,8 @@ class CourseControllerTest {
                     fieldWithPath("endLocation").description("도착지 이름"),
                     fieldWithPath("endLat").description("도착지 위도"),
                     fieldWithPath("endLng").description("도착지 경도"),
-                    fieldWithPath("totalStopCount")
-                        .description("출발지+도착지 포함 총 장소 수 (최소 2)")
+                    fieldWithPath("intermediateStopCount")
+                        .description("출발지·도착지를 제외한 중간 경유 장소 수 (최소 0)")
                         .type(JsonFieldType.NUMBER),
                     fieldWithPath("temperature").description("기온 (선택)").optional(),
                     fieldWithPath("humidity").description("습도 (선택)").optional(),

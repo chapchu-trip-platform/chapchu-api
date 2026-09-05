@@ -7,7 +7,10 @@ import com.pettrip.place.model.PlacePetPolicy;
 import com.pettrip.place.repository.PlacePetPolicyRepository;
 import com.pettrip.place.repository.PlaceRepository;
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -39,7 +42,12 @@ public class PlaceService {
   @Transactional
   public List<Place> searchNearby(BigDecimal lat, BigDecimal lng, int radiusMeters) {
     try {
-      List<TourApiClient.NearbyItem> items = tourApiClient.fetchNearby(lat, lng, radiusMeters);
+      List<TourApiClient.NearbyItem> raw = tourApiClient.fetchNearby(lat, lng, radiusMeters);
+      Map<String, TourApiClient.NearbyItem> dedupMap = new LinkedHashMap<>();
+      for (TourApiClient.NearbyItem item : raw) {
+        dedupMap.putIfAbsent(item.contentId(), item);
+      }
+      List<TourApiClient.NearbyItem> items = new ArrayList<>(dedupMap.values());
       log.info(
           "TourAPI fetchNearby 결과 {}건 (lat={}, lng={}, radius={})",
           items.size(),

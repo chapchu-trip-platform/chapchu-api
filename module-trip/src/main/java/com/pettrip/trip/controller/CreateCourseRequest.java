@@ -16,7 +16,7 @@ public record CreateCourseRequest(
     @NotBlank String endLocation,
     @NotNull BigDecimal endLat,
     @NotNull BigDecimal endLng,
-    @NotNull @Min(2) int totalStopCount,
+    @Min(0) int intermediateStopCount,
     Short temperature,
     Short humidity,
     String weatherStatus) {}

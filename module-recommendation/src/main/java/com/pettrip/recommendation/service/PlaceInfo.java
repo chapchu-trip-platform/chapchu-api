@@ -9,4 +9,12 @@ public record PlaceInfo(
     BigDecimal lat,
     BigDecimal lng,
     String categoryLabel,
-    String indoorOutdoor) {}
+    String indoorOutdoor,
+    PlaceGroup group) {
+
+  public enum PlaceGroup {
+    START,
+    MIDDLE,
+    END
+  }
+}
