@@ -56,6 +56,45 @@ Content-Type: application/json
 | `500 Internal Server Error` | 서버 오류
 |===
 
+=== 오류 응답 형식
+
+모든 오류는 같은 형태로 내려간다.
+
+[source,json]
+----
+{
+  "code": "INVALID_REQUEST",
+  "message": "photoId: 필수 값입니다."
+}
+----
+
+어느 필드가 잘못됐는지 특정할 수 있으면 `fieldErrors`가 함께 내려간다. 여러 필드가 동시에
+틀렸으면 전부 담긴다. `message`는 그중 첫 번째를 사람이 읽기 좋게 옮긴 요약이다.
+
+[source,json]
+----
+{
+  "code": "INVALID_REQUEST",
+  "message": "petId: 필수 값입니다.",
+  "fieldErrors": [
+    { "field": "petId", "message": "필수 값입니다." },
+    { "field": "photoId", "message": "필수 값입니다." },
+    { "field": "courseId", "message": "UUID 형식이 아닙니다." }
+  ]
+}
+----
+
+`fieldErrors`가 붙는 경우는 셋이다.
+
+* 요청 본문 검증 위반 (`@NotNull`, `@Size` 등)
+* UUID·숫자·enum 역직렬화 실패 — 값 형식이 틀려 검증까지 가지 못한 경우
+* 요청이 가리키는 자원이 없거나 본인 것이 아닌 경우
+
+마지막 경우 "없음"과 "남의 것"을 구분하지 않는다. 구분하면 남의 자원 ID가 존재하는지
+확인해 주는 셈이 되기 때문이다.
+
+필드를 특정할 수 없는 오류(본문 자체가 깨진 JSON 등)에서는 `fieldErrors`가 생략된다.
+
 == 인증 API (BFF)
 
 chapchu-api가 OAuth2 Confidential Client로서 구글 로그인 흐름 전체를 대리 처리합니다.
@@ -688,6 +727,9 @@ include::{snippets}/post-detail/response-fields.adoc[]
 === 게시글 작성
 
 `POST /posts`
+
+`petId`, `photoId`, `courseId`는 필수이며 **모두 요청한 사용자 본인의 것**이어야 한다.
+없거나 남의 것이면 400이고, `fieldErrors`에 어느 필드인지 담긴다.
 
 [.request]
 ==== 요청

@@ -1,5 +1,6 @@
 package com.pettrip.post.controller;
 
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
@@ -17,9 +18,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.pettrip.common.service.InvalidReferenceException;
 import com.pettrip.config.SecurityConfig;
 import com.pettrip.post.service.PostService;
 import java.time.LocalDateTime;
@@ -251,6 +254,70 @@ class PostControllerTest {
                 .content(body)
                 .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
         .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void 게시글_작성_시_빠진_필수_필드를_전부_알려준다() throws Exception {
+    mockMvc
+        .perform(
+            post("/posts")
+                .contentType("application/json")
+                .content("{\"title\":\"제목만 보냄\"}")
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+        .andExpect(jsonPath("$.fieldErrors.length()").value(3))
+        .andExpect(
+            jsonPath("$.fieldErrors[*].field", containsInAnyOrder("petId", "photoId", "courseId")));
+  }
+
+  @Test
+  void 게시글_작성_시_검증_메시지가_한글로_나온다() throws Exception {
+    mockMvc
+        .perform(
+            post("/posts")
+                .contentType("application/json")
+                .content("{\"title\":\"제목만 보냄\"}")
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.fieldErrors[0].message").value("필수 값입니다."));
+  }
+
+  @Test
+  void 게시글_작성_시_UUID_형식이_틀리면_어느_필드인지_알려준다() throws Exception {
+    String id = UUID.randomUUID().toString();
+    String body = "{\"petId\":\"1\",\"photoId\":\"" + id + "\",\"courseId\":\"" + id + "\"}";
+
+    mockMvc
+        .perform(
+            post("/posts")
+                .contentType("application/json")
+                .content(body)
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+        .andExpect(jsonPath("$.fieldErrors[0].field").value("petId"))
+        .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("petId")));
+  }
+
+  @Test
+  void 게시글_작성_시_참조가_잘못되면_어느_필드인지_알려준다() throws Exception {
+    UUID id = UUID.randomUUID();
+    when(postService.createPost(any(), any(), any(), any(), any(), any()))
+        .thenThrow(new InvalidReferenceException("photoId", "존재하지 않거나 접근할 수 없는 사진입니다."));
+
+    String body = objectMapper.writeValueAsString(new PostCreateRequest(id, id, id, "제목", "내용"));
+
+    mockMvc
+        .perform(
+            post("/posts")
+                .contentType("application/json")
+                .content(body)
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
+        .andExpect(jsonPath("$.fieldErrors[0].field").value("photoId"))
+        .andExpect(jsonPath("$.fieldErrors[0].message").value("존재하지 않거나 접근할 수 없는 사진입니다."));
   }
 
   @Test

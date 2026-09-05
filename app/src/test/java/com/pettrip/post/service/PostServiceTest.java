@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.pettrip.common.service.InvalidReferenceException;
 import com.pettrip.post.controller.PostResponse;
 import com.pettrip.post.model.Post;
 import com.pettrip.post.repository.PostBookmarkRepository;
@@ -96,6 +97,7 @@ class PostServiceTest {
     UUID photoId = UUID.randomUUID();
     UUID courseId = UUID.randomUUID();
     PostResponse expected = samplePostResponse(userId);
+    stubReferenceCheck(true, true, true);
     when(postRepository.save(any(Post.class))).thenAnswer(invocation -> invocation.getArgument(0));
     when(jdbcTemplate.query(any(String.class), any(SqlParameterSource.class), any(RowMapper.class)))
         .thenReturn(List.of(expected));
@@ -103,6 +105,54 @@ class PostServiceTest {
     PostResponse result = postService.createPost(userId, petId, photoId, courseId, "제목", "내용");
 
     assertThat(result).isEqualTo(expected);
+  }
+
+  private void stubReferenceCheck(boolean petOk, boolean photoOk, boolean courseOk) {
+    when(jdbcTemplate.queryForObject(
+            any(String.class), any(SqlParameterSource.class), any(RowMapper.class)))
+        .thenReturn(new PostService.ReferenceCheck(petOk, photoOk, courseOk));
+  }
+
+  @Test
+  void createPost는_남의_반려동물이면_예외를_던진다() {
+    UUID userId = UUID.randomUUID();
+    stubReferenceCheck(false, true, true);
+
+    assertThatThrownBy(
+            () ->
+                postService.createPost(
+                    userId, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "제목", "내용"))
+        .isInstanceOf(InvalidReferenceException.class)
+        .extracting("field")
+        .isEqualTo("petId");
+  }
+
+  @Test
+  void createPost는_남의_사진이면_예외를_던진다() {
+    UUID userId = UUID.randomUUID();
+    stubReferenceCheck(true, false, true);
+
+    assertThatThrownBy(
+            () ->
+                postService.createPost(
+                    userId, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "제목", "내용"))
+        .isInstanceOf(InvalidReferenceException.class)
+        .extracting("field")
+        .isEqualTo("photoId");
+  }
+
+  @Test
+  void createPost는_남의_코스면_예외를_던진다() {
+    UUID userId = UUID.randomUUID();
+    stubReferenceCheck(true, true, false);
+
+    assertThatThrownBy(
+            () ->
+                postService.createPost(
+                    userId, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "제목", "내용"))
+        .isInstanceOf(InvalidReferenceException.class)
+        .extracting("field")
+        .isEqualTo("courseId");
   }
 
   @Test

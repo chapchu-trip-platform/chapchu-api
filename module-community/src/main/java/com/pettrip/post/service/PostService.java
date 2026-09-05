@@ -1,5 +1,6 @@
 package com.pettrip.post.service;
 
+import com.pettrip.common.service.InvalidReferenceException;
 import com.pettrip.post.controller.PostListResponse;
 import com.pettrip.post.controller.PostResponse;
 import com.pettrip.post.model.Post;
@@ -49,6 +50,30 @@ public class PostService {
       ENRICHED_SELECT
           + "ORDER BY p.recommendation_count DESC, p.created_at DESC, p.post_id DESC LIMIT :size";
   private static final String DETAIL_SQL = ENRICHED_SELECT + "WHERE p.post_id = :postId";
+
+  /**
+   * 글이 가리키는 반려동물·사진·코스가 실제로 있고 작성자 것인지 한 번에 확인한다.
+   *
+   * <p>확인 없이 INSERT하면 FK 위반이 DataIntegrityViolationException으로 올라와 "입력 데이터가 올바르지 않습니다."라는 응답만 남는다.
+   * 어느 값이 틀렸는지 알 수 없고, 남의 반려동물 ID를 붙여 글을 쓰는 것도 막지 못한다.
+   */
+  private static final String REFERENCE_CHECK_SQL =
+      """
+      SELECT EXISTS(SELECT 1 FROM pets
+                    WHERE pet_id = :petId AND user_id = :userId) AS pet_ok,
+             EXISTS(SELECT 1 FROM photos
+                    WHERE photo_id = :photoId AND user_id = :userId) AS photo_ok,
+             EXISTS(SELECT 1 FROM travel_courses
+                    WHERE course_id = :courseId AND user_id = :userId) AS course_ok
+      """;
+
+  /** {@link #REFERENCE_CHECK_SQL} 결과. */
+  public record ReferenceCheck(boolean petOk, boolean photoOk, boolean courseOk) {}
+
+  private static final RowMapper<ReferenceCheck> REFERENCE_CHECK_ROW_MAPPER =
+      (rs, rowNum) ->
+          new ReferenceCheck(
+              rs.getBoolean("pet_ok"), rs.getBoolean("photo_ok"), rs.getBoolean("course_ok"));
 
   private static final RowMapper<PostResponse> POST_ROW_MAPPER =
       (rs, rowNum) ->
@@ -104,6 +129,7 @@ public class PostService {
   @Transactional
   public PostResponse createPost(
       UUID userId, UUID petId, UUID photoId, UUID courseId, String title, String content) {
+    verifyReferences(userId, petId, photoId, courseId);
     Post post = postRepository.save(new Post(userId, petId, photoId, courseId, title, content));
     return fetchEnrichedPost(userId, post.getId());
   }
@@ -209,6 +235,29 @@ public class PostService {
     return jdbcTemplate.query(DETAIL_SQL, params, POST_ROW_MAPPER).stream()
         .findFirst()
         .orElseThrow(PostNotFoundException::new);
+  }
+
+  private void verifyReferences(UUID userId, UUID petId, UUID photoId, UUID courseId) {
+    MapSqlParameterSource params =
+        new MapSqlParameterSource()
+            .addValue("userId", userId)
+            .addValue("petId", petId)
+            .addValue("photoId", photoId)
+            .addValue("courseId", courseId);
+    ReferenceCheck check =
+        jdbcTemplate.queryForObject(REFERENCE_CHECK_SQL, params, REFERENCE_CHECK_ROW_MAPPER);
+    if (check == null) {
+      throw new InvalidReferenceException("petId", "참조를 확인할 수 없습니다.");
+    }
+    if (!check.petOk()) {
+      throw new InvalidReferenceException("petId", "존재하지 않거나 본인의 반려동물이 아닙니다.");
+    }
+    if (!check.photoOk()) {
+      throw new InvalidReferenceException("photoId", "존재하지 않거나 본인의 사진이 아닙니다.");
+    }
+    if (!check.courseOk()) {
+      throw new InvalidReferenceException("courseId", "존재하지 않거나 본인의 여행 코스가 아닙니다.");
+    }
   }
 
   private Post findPost(UUID postId) {
