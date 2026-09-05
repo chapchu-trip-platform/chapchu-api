@@ -126,7 +126,7 @@ public class CourseService {
       String endLocation,
       BigDecimal endLat,
       BigDecimal endLng,
-      int totalStopCount,
+      int intermediateStopCount,
       Short temperature,
       Short humidity,
       String weatherStatus) {
@@ -137,7 +137,7 @@ public class CourseService {
     Pet pet = petRepository.findById(petId).orElseThrow(PetNotFoundException::new);
 
     List<SearchPoint> searchPoints =
-        buildSearchPoints(startLat, startLng, endLat, endLng, totalStopCount);
+        buildSearchPoints(startLat, startLng, endLat, endLng, intermediateStopCount);
 
     Map<String, Place> placeMap = new LinkedHashMap<>();
     for (SearchPoint point : searchPoints) {
@@ -192,16 +192,15 @@ public class CourseService {
       BigDecimal startLng,
       BigDecimal endLat,
       BigDecimal endLng,
-      int totalStopCount) {
+      int intermediateStopCount) {
 
-    int intermediateCount = totalStopCount - 2;
-    BigDecimal divisor = BigDecimal.valueOf(totalStopCount - 1);
+    BigDecimal divisor = BigDecimal.valueOf(intermediateStopCount + 1);
     BigDecimal latDelta = endLat.subtract(startLat);
     BigDecimal lngDelta = endLng.subtract(startLng);
 
     List<SearchPoint> searchPoints = new ArrayList<>();
     searchPoints.add(new SearchPoint(startLat, startLng));
-    for (int i = 1; i <= intermediateCount; i++) {
+    for (int i = 1; i <= intermediateStopCount; i++) {
       BigDecimal ratio = BigDecimal.valueOf(i).divide(divisor, MathContext.DECIMAL64);
       BigDecimal lat = startLat.add(latDelta.multiply(ratio));
       BigDecimal lng = startLng.add(lngDelta.multiply(ratio));
@@ -239,7 +238,7 @@ public class CourseService {
   }
 
   private boolean isPetAllowed(PetSize petSize, PlacePetPolicy policy) {
-    if (policy == null) return true;
+    if (policy == null) return false;
     AllowedPetSize allowed = policy.getAllowedPetSize();
     if (allowed == null || allowed == AllowedPetSize.ALL) return true;
     return switch (petSize) {
