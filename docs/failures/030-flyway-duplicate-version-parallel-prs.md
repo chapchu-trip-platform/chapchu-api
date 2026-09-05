@@ -27,14 +27,40 @@ FlywayException: Found more than one migration with version 21
 테스트 DB(H2)는 엔티티에서 스키마를 만들기 때문이다.
 
 ## 대응
-아직 적용되지 않은 쪽의 파일명을 다음 번호로 바꾼다. 파일 내용은 그대로 두므로 체크섬 문제가 없다.
 
-```
-git mv V21__make_posts_photo_id_nullable.sql V22__make_posts_photo_id_nullable.sql
+한쪽 파일명을 다음 번호로 바꾼다. 파일 내용은 그대로 두므로 체크섬 문제가 없다.
+
+**어느 쪽을 옮길지가 이 사고의 핵심이다. 반드시 DB를 먼저 봐라.**
+
+```sql
+SELECT version, description, checksum, success
+FROM flyway_schema_history
+WHERE version = '<중복된 번호>';
 ```
 
-**이미 적용된 DB가 있다면 리네임만으로는 부족하다.** `flyway_schema_history`에 이전 버전으로
-기록이 남아 있어 불일치가 난다. 이 경우 #138과 같은 절차가 필요하다.
+- **기록이 있으면** → 그 description에 해당하는 파일을 **그 번호에 그대로 둔다.** 다른 쪽을 옮긴다
+- **기록이 없으면** → 어느 쪽을 옮겨도 된다
+
+이미 적용된 쪽을 옮기면 코드의 파일명과 `flyway_schema_history`의 기록이 어긋나 여전히 기동에
+실패한다. **중복을 고쳤는데 앱이 계속 안 뜨는 상태**가 되므로 처음보다 나쁘다.
+
+### 실제로 이 판단을 틀렸다 (#193 → #195)
+
+#191을 고칠 때 "#187이 더 큰 변경이고 먼저 머지됐으니 그쪽 V21을 남긴다"고 판단해
+`make_posts_photo_id_nullable`을 V22로 옮겼다(#193). 틀렸다.
+
+**머지 순서와 배포 순서가 달랐다.** #189가 먼저 배포되어 DB에는 이미
+`V21 = make_posts_photo_id_nullable`이 기록돼 있었다. 그래서 #195에서 다시 뒤집어야 했다.
+
+| | #193 (틀림) | #195 (맞음) |
+|---|---|---|
+| `make_posts_photo_id_nullable` | V22로 이동 | **V21 유지** (DB 기록과 일치) |
+| `restructure_travel_courses` | V21 유지 | **V22로 이동** |
+
+**판단 기준은 "어느 PR이 더 크냐"도 "어느 쪽이 먼저 머지됐냐"도 아니다. "DB에 무엇이 기록돼
+있느냐" 하나뿐이다.** 머지 순서는 배포 순서를 보장하지 않는다.
+
+DB 접근이 안 되면 추측하지 말고 접근 가능한 사람에게 물어라.
 
 ## 재발 방지
 - 마이그레이션이 포함된 PR은 **머지 직전에** 번호 선점 여부를 다시 확인한다.
