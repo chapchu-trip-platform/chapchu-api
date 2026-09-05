@@ -1,6 +1,7 @@
 package com.pettrip.trip.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.when;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.document;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
@@ -82,7 +83,8 @@ class CourseControllerTest {
   void 코스를_저장한다() throws Exception {
     TravelCourseDetail detail = sampleDetail();
     when(courseService.createCourse(
-            any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+            any(), any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), any(), any(),
+            any()))
         .thenReturn(detail.course());
     when(courseService.getCourse(any(), any())).thenReturn(detail);
 
@@ -96,7 +98,10 @@ class CourseControllerTest {
             "종로구",
             new BigDecimal("37.6"),
             new BigDecimal("126.9"),
-            List.of("ext-001"));
+            4,
+            (short) 25,
+            (short) 60,
+            "맑음");
 
     mockMvc
         .perform(
@@ -117,9 +122,12 @@ class CourseControllerTest {
                     fieldWithPath("endLocation").description("도착지 이름"),
                     fieldWithPath("endLat").description("도착지 위도"),
                     fieldWithPath("endLng").description("도착지 경도"),
-                    fieldWithPath("placeIds")
-                        .description("FE가 선택한 장소 ID 목록 (방문 순서대로)")
-                        .type(JsonFieldType.ARRAY)),
+                    fieldWithPath("totalStopCount")
+                        .description("출발지+도착지 포함 총 장소 수 (최소 2)")
+                        .type(JsonFieldType.NUMBER),
+                    fieldWithPath("temperature").description("기온 (선택)").optional(),
+                    fieldWithPath("humidity").description("습도 (선택)").optional(),
+                    fieldWithPath("weatherStatus").description("날씨 상태 (선택)").optional()),
                 responseFields(
                     fieldWithPath("courseId").description("코스 ID"),
                     fieldWithPath("travelDate").description("여행 날짜"),
@@ -171,5 +179,19 @@ class CourseControllerTest {
                         .type(JsonFieldType.NUMBER),
                     fieldWithPath("places[].finalPlace").description("마지막 방문 장소 여부"),
                     fieldWithPath("places[].petPolicy").description("반려동물 정책").optional())));
+  }
+
+  @Test
+  void 코스를_완료한다() throws Exception {
+    UUID courseId = UUID.randomUUID();
+    mockMvc
+        .perform(
+            post("/courses/{courseId}/complete", courseId)
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isOk())
+        .andDo(
+            document(
+                "course-complete",
+                pathParameters(parameterWithName("courseId").description("완료할 코스 ID"))));
   }
 }

@@ -159,10 +159,16 @@ class CourseServiceTest {
   }
 
   @Test
-  void 선택한_장소로_코스를_저장한다() {
+  void 중간좌표_검색으로_코스를_저장한다() {
     UUID userId = UUID.randomUUID();
     UUID petId = UUID.randomUUID();
-    when(petRepository.existsByIdAndUserId(petId, userId)).thenReturn(true);
+    mockPetAndPolicy(userId, petId);
+    when(placeService.searchNearby(any(), any(), anyInt()))
+        .thenReturn(List.of(samplePlace("p1", "장소A"), samplePlace("p2", "장소B")));
+    when(placeRagService.rankByReviewSimilarity(any(), any()))
+        .thenAnswer(inv -> inv.getArgument(0));
+    when(routeOptimizationService.optimizeOrder(any(), any(), any(), any(), any()))
+        .thenReturn(List.of("p1", "p2"));
     when(travelCourseRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
     when(coursePlaceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -177,7 +183,10 @@ class CourseServiceTest {
             "종로구",
             new BigDecimal("37.6"),
             new BigDecimal("126.9"),
-            List.of("p1", "p2"));
+            4,
+            (short) 25,
+            (short) 60,
+            "맑음");
 
     assertThat(result).isNotNull();
     assertThat(result.getTravelDate()).isEqualTo(LocalDate.now());
@@ -189,7 +198,14 @@ class CourseServiceTest {
   void 마지막_장소에_finalPlace_true가_설정된다() {
     UUID userId = UUID.randomUUID();
     UUID petId = UUID.randomUUID();
-    when(petRepository.existsByIdAndUserId(petId, userId)).thenReturn(true);
+    mockPetAndPolicy(userId, petId);
+    when(placeService.searchNearby(any(), any(), anyInt()))
+        .thenReturn(
+            List.of(samplePlace("p1", "장소A"), samplePlace("p2", "장소B"), samplePlace("p3", "장소C")));
+    when(placeRagService.rankByReviewSimilarity(any(), any()))
+        .thenAnswer(inv -> inv.getArgument(0));
+    when(routeOptimizationService.optimizeOrder(any(), any(), any(), any(), any()))
+        .thenReturn(List.of("p1", "p2", "p3"));
     when(travelCourseRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
     var saved = new ArrayList<CoursePlace>();
@@ -210,7 +226,10 @@ class CourseServiceTest {
         "종로구",
         new BigDecimal("37.6"),
         new BigDecimal("126.9"),
-        List.of("p1", "p2", "p3"));
+        5,
+        (short) 25,
+        (short) 60,
+        "맑음");
 
     assertThat(saved).hasSize(3);
     assertThat(saved.get(0).isFinalPlace()).isFalse();
@@ -235,15 +254,23 @@ class CourseServiceTest {
                     "종로구",
                     new BigDecimal("37.6"),
                     new BigDecimal("126.9"),
-                    List.of("p1")))
+                    4,
+                    null,
+                    null,
+                    null))
         .isInstanceOf(PetNotFoundException.class);
   }
 
   @Test
-  void 빈_장소목록으로_코스_저장시_예외발생한다() {
+  void 검색결과가_없으면_코스_저장시_예외발생한다() {
     UUID userId = UUID.randomUUID();
     UUID petId = UUID.randomUUID();
-    when(petRepository.existsByIdAndUserId(petId, userId)).thenReturn(true);
+    mockPetAndPolicy(userId, petId);
+    when(placeService.searchNearby(any(), any(), anyInt())).thenReturn(List.of());
+    when(placeRagService.rankByReviewSimilarity(any(), any()))
+        .thenAnswer(inv -> inv.getArgument(0));
+    when(routeOptimizationService.optimizeOrder(any(), any(), any(), any(), any()))
+        .thenReturn(List.of());
 
     assertThatThrownBy(
             () ->
@@ -257,8 +284,48 @@ class CourseServiceTest {
                     "종로구",
                     new BigDecimal("37.6"),
                     new BigDecimal("126.9"),
-                    List.of()))
+                    4,
+                    null,
+                    null,
+                    null))
         .isInstanceOf(NoPlacesFoundException.class);
+  }
+
+  @Test
+  void 코스를_완료한다() {
+    UUID userId = UUID.randomUUID();
+    UUID courseId = UUID.randomUUID();
+    TravelCourse course = sampleCourse(userId);
+    when(travelCourseRepository.findById(courseId)).thenReturn(Optional.of(course));
+
+    courseService.completeCourse(userId, courseId);
+
+    assertThat(course.isCompleted()).isTrue();
+  }
+
+  @Test
+  void 이미_완료된_코스_재완료시_멱등처리된다() {
+    UUID userId = UUID.randomUUID();
+    UUID courseId = UUID.randomUUID();
+    TravelCourse course = sampleCourse(userId);
+    course.complete();
+    when(travelCourseRepository.findById(courseId)).thenReturn(Optional.of(course));
+
+    courseService.completeCourse(userId, courseId);
+
+    assertThat(course.isCompleted()).isTrue();
+  }
+
+  @Test
+  void 타인_코스_완료시_예외발생한다() {
+    UUID ownerId = UUID.randomUUID();
+    UUID otherId = UUID.randomUUID();
+    UUID courseId = UUID.randomUUID();
+    TravelCourse course = sampleCourse(ownerId);
+    when(travelCourseRepository.findById(courseId)).thenReturn(Optional.of(course));
+
+    assertThatThrownBy(() -> courseService.completeCourse(otherId, courseId))
+        .isInstanceOf(CourseNotOwnerException.class);
   }
 
   @Test

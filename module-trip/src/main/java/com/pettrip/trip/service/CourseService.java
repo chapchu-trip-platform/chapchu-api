@@ -18,7 +18,10 @@ import com.pettrip.trip.model.TravelCourse;
 import com.pettrip.trip.repository.CoursePlaceRepository;
 import com.pettrip.trip.repository.TravelCourseRepository;
 import java.math.BigDecimal;
+import java.math.MathContext;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -30,6 +33,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class CourseService {
+
+  private static final int DEFAULT_RADIUS_METERS = 5000;
 
   private final PlaceService placeService;
   private final PlaceRepository placeRepository;
@@ -121,12 +126,50 @@ public class CourseService {
       String endLocation,
       BigDecimal endLat,
       BigDecimal endLng,
-      List<String> placeIds) {
+      int totalStopCount,
+      Short temperature,
+      Short humidity,
+      String weatherStatus) {
 
     if (!petRepository.existsByIdAndUserId(petId, userId)) {
       throw new PetNotFoundException();
     }
-    if (placeIds.isEmpty()) {
+    Pet pet = petRepository.findById(petId).orElseThrow(PetNotFoundException::new);
+
+    List<SearchPoint> searchPoints =
+        buildSearchPoints(startLat, startLng, endLat, endLng, totalStopCount);
+
+    Map<String, Place> placeMap = new LinkedHashMap<>();
+    for (SearchPoint point : searchPoints) {
+      List<Place> nearby =
+          placeService.searchNearby(point.lat(), point.lng(), DEFAULT_RADIUS_METERS);
+      for (Place place : nearby) {
+        placeMap.putIfAbsent(place.getExternalPlaceId(), place);
+      }
+    }
+
+    List<Place> mergedPlaces = new ArrayList<>(placeMap.values());
+
+    List<String> policyFilteredIds = filterByPetSize(mergedPlaces, pet.getSize());
+
+    String ragQuery = buildRagQuery(pet, weatherStatus, temperature);
+    List<String> ragRankedIds = placeRagService.rankByReviewSimilarity(policyFilteredIds, ragQuery);
+
+    Map<String, PlacePetPolicy> policyMap =
+        petPolicyRepository.findAllById(ragRankedIds).stream()
+            .collect(Collectors.toMap(PlacePetPolicy::getExternalPlaceId, Function.identity()));
+
+    List<PlaceInfo> placeInfos =
+        ragRankedIds.stream()
+            .map(placeMap::get)
+            .filter(Objects::nonNull)
+            .map(p -> toPlaceInfo(p, policyMap.get(p.getExternalPlaceId())))
+            .toList();
+
+    List<String> orderedIds =
+        routeOptimizationService.optimizeOrder(
+            placeInfos, toPetSizeLabel(pet.getSize()), pet.getAge(), weatherStatus, temperature);
+    if (orderedIds.isEmpty()) {
       throw new NoPlacesFoundException();
     }
 
@@ -135,14 +178,53 @@ public class CourseService {
             userId, startLocation, startLat, startLng, endLocation, endLat, endLng, travelDate);
     travelCourseRepository.save(course);
 
-    for (int i = 0; i < placeIds.size(); i++) {
-      boolean isLast = (i == placeIds.size() - 1);
-      String placeId = placeIds.get(i);
+    for (int i = 0; i < orderedIds.size(); i++) {
+      boolean isLast = (i == orderedIds.size() - 1);
+      String placeId = orderedIds.get(i);
       coursePlaceRepository.save(new CoursePlace(course, placeId, (short) (i + 1), isLast));
     }
 
     return course;
   }
+
+  private List<SearchPoint> buildSearchPoints(
+      BigDecimal startLat,
+      BigDecimal startLng,
+      BigDecimal endLat,
+      BigDecimal endLng,
+      int totalStopCount) {
+
+    int intermediateCount = totalStopCount - 2;
+    BigDecimal divisor = BigDecimal.valueOf(totalStopCount - 1);
+    BigDecimal latDelta = endLat.subtract(startLat);
+    BigDecimal lngDelta = endLng.subtract(startLng);
+
+    List<SearchPoint> searchPoints = new ArrayList<>();
+    searchPoints.add(new SearchPoint(startLat, startLng));
+    for (int i = 1; i <= intermediateCount; i++) {
+      BigDecimal ratio = BigDecimal.valueOf(i).divide(divisor, MathContext.DECIMAL64);
+      BigDecimal lat = startLat.add(latDelta.multiply(ratio));
+      BigDecimal lng = startLng.add(lngDelta.multiply(ratio));
+      searchPoints.add(new SearchPoint(lat, lng));
+    }
+    searchPoints.add(new SearchPoint(endLat, endLng));
+    return searchPoints;
+  }
+
+  @Transactional
+  public void completeCourse(UUID userId, UUID courseId) {
+    TravelCourse course =
+        travelCourseRepository.findById(courseId).orElseThrow(CourseNotFoundException::new);
+    if (!userId.equals(course.getUserId())) {
+      throw new CourseNotOwnerException();
+    }
+    if (course.isCompleted()) {
+      return;
+    }
+    course.complete();
+  }
+
+  private record SearchPoint(BigDecimal lat, BigDecimal lng) {}
 
   private List<String> filterByPetSize(List<Place> places, PetSize petSize) {
     List<String> placeIds = places.stream().map(Place::getExternalPlaceId).toList();

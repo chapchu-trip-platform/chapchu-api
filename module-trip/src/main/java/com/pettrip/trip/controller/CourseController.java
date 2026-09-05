@@ -39,7 +39,10 @@ public class CourseController {
             request.endLocation(),
             request.endLat(),
             request.endLng(),
-            request.placeIds());
+            request.totalStopCount(),
+            request.temperature(),
+            request.humidity(),
+            request.weatherStatus());
     TravelCourseDetail detail = courseService.getCourse(userId, course.getId());
     return CourseResponse.from(detail);
   }
@@ -47,5 +50,11 @@ public class CourseController {
   @GetMapping("/{courseId}")
   public CourseResponse getCourse(@CurrentUserId UUID userId, @PathVariable UUID courseId) {
     return CourseResponse.from(courseService.getCourse(userId, courseId));
+  }
+
+  @PostMapping("/{courseId}/complete")
+  @ResponseStatus(HttpStatus.OK)
+  public void completeCourse(@CurrentUserId UUID userId, @PathVariable UUID courseId) {
+    courseService.completeCourse(userId, courseId);
   }
 }
