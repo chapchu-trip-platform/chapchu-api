@@ -1149,7 +1149,7 @@ include::{snippets}/review-recommendation-delete/http-response.adoc[]
 `POST /courses`
 
 JWT 인증이 필요합니다. `petId`(본인 반려동물)가 필수이며, FE가 수집한 날씨 정보(temperature, humidity, weatherStatus)를 함께 전달합니다.
-KorPetTourService2로 주변 반려동물 동반 장소를 탐색하고, 반려동물 크기 하드 필터 → 리뷰 임베딩 RAG 랭킹 → AI 경로 최적화 순으로 코스를 생성합니다.
+출발지~도착지를 잇는 bounding box를 `intermediateStopCount + 2`개 구역으로 분할하고, 구역별로 KorPetTourService2 탐색 → 반려동물 크기 필터 → RAG 랭킹을 적용한 뒤, AI가 출발/도착 그룹에서 각 1개, 중간 그룹들에서 합계 최대 `intermediateStopCount`개를 선택해 방문 순서를 결정합니다. 장소가 없는 중간 구역은 건너뛰므로 응답의 `places` 개수는 `intermediateStopCount + 2`보다 적을 수 있습니다.
 응답에 각 장소의 위경도, 이미지, 반려동물 정책이 포함됩니다.
 
 [.request]

@@ -10,10 +10,13 @@ import com.pettrip.pet.model.Pet;
 import com.pettrip.pet.model.PetSize;
 import com.pettrip.pet.repository.PetRepository;
 import com.pettrip.pet.service.PetNotFoundException;
+import com.pettrip.place.model.AllowedPetSize;
 import com.pettrip.place.model.Place;
+import com.pettrip.place.model.PlacePetPolicy;
 import com.pettrip.place.repository.PlacePetPolicyRepository;
 import com.pettrip.place.repository.PlaceRepository;
 import com.pettrip.place.service.PlaceService;
+import com.pettrip.recommendation.service.PlaceInfo;
 import com.pettrip.recommendation.service.PlaceRagService;
 import com.pettrip.recommendation.service.RouteOptimizationService;
 import com.pettrip.trip.model.CoursePlace;
@@ -64,6 +67,10 @@ class CourseServiceTest {
         null);
   }
 
+  private Place samplePlace(String id, String name, BigDecimal lat, BigDecimal lng) {
+    return new Place(id, null, name, null, "서울시", lat, lng, null, null, null);
+  }
+
   private Pet samplePet(UUID userId) {
     return new Pet(userId, null, "초코", PetSize.SMALL, 3);
   }
@@ -87,7 +94,18 @@ class CourseServiceTest {
   private void mockPetAndPolicy(UUID userId, UUID petId) {
     when(petRepository.existsByIdAndUserId(petId, userId)).thenReturn(true);
     when(petRepository.findById(petId)).thenReturn(Optional.of(samplePet(userId)));
-    when(petPolicyRepository.findAllById(any())).thenReturn(List.of());
+    when(petPolicyRepository.findAllById(any()))
+        .thenAnswer(
+            inv -> {
+              Iterable<String> ids = inv.getArgument(0);
+              List<PlacePetPolicy> policies = new ArrayList<>();
+              for (String id : ids) {
+                policies.add(
+                    new PlacePetPolicy(
+                        samplePlace(id, "장소"), AllowedPetSize.ALL, null, null, null, null, null));
+              }
+              return policies;
+            });
   }
 
   @Test
@@ -164,11 +182,35 @@ class CourseServiceTest {
     UUID petId = UUID.randomUUID();
     mockPetAndPolicy(userId, petId);
     when(placeService.searchNearby(any(), any(), anyInt()))
-        .thenReturn(List.of(samplePlace("p1", "장소A"), samplePlace("p2", "장소B")));
+        .thenAnswer(
+            inv -> {
+              BigDecimal lat = inv.getArgument(0);
+              BigDecimal lng = inv.getArgument(1);
+              return List.of(samplePlace("p-" + lng.toPlainString(), "장소", lat, lng));
+            });
     when(placeRagService.rankByReviewSimilarity(any(), any()))
         .thenAnswer(inv -> inv.getArgument(0));
-    when(routeOptimizationService.optimizeOrder(any(), any(), any(), any(), any()))
-        .thenReturn(List.of("p1", "p2"));
+    when(routeOptimizationService.selectAndOrder(
+            any(), any(), any(), anyInt(), any(), any(), any(), any(), any(), any(), any(), any()))
+        .thenAnswer(
+            inv -> {
+              List<PlaceInfo> startGroup = inv.getArgument(0);
+              List<List<PlaceInfo>> middleGroups = inv.getArgument(1);
+              List<PlaceInfo> endGroup = inv.getArgument(2);
+              List<String> ids = new ArrayList<>();
+              if (!startGroup.isEmpty()) {
+                ids.add(startGroup.get(0).id());
+              }
+              for (List<PlaceInfo> mg : middleGroups) {
+                if (!mg.isEmpty()) {
+                  ids.add(mg.get(0).id());
+                }
+              }
+              if (!endGroup.isEmpty()) {
+                ids.add(endGroup.get(0).id());
+              }
+              return ids;
+            });
     when(travelCourseRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
     when(coursePlaceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -200,12 +242,35 @@ class CourseServiceTest {
     UUID petId = UUID.randomUUID();
     mockPetAndPolicy(userId, petId);
     when(placeService.searchNearby(any(), any(), anyInt()))
-        .thenReturn(
-            List.of(samplePlace("p1", "장소A"), samplePlace("p2", "장소B"), samplePlace("p3", "장소C")));
+        .thenAnswer(
+            inv -> {
+              BigDecimal lat = inv.getArgument(0);
+              BigDecimal lng = inv.getArgument(1);
+              return List.of(samplePlace("p-" + lng.toPlainString(), "장소", lat, lng));
+            });
     when(placeRagService.rankByReviewSimilarity(any(), any()))
         .thenAnswer(inv -> inv.getArgument(0));
-    when(routeOptimizationService.optimizeOrder(any(), any(), any(), any(), any()))
-        .thenReturn(List.of("p1", "p2", "p3"));
+    when(routeOptimizationService.selectAndOrder(
+            any(), any(), any(), anyInt(), any(), any(), any(), any(), any(), any(), any(), any()))
+        .thenAnswer(
+            inv -> {
+              List<PlaceInfo> startGroup = inv.getArgument(0);
+              List<List<PlaceInfo>> middleGroups = inv.getArgument(1);
+              List<PlaceInfo> endGroup = inv.getArgument(2);
+              List<String> ids = new ArrayList<>();
+              if (!startGroup.isEmpty()) {
+                ids.add(startGroup.get(0).id());
+              }
+              for (List<PlaceInfo> mg : middleGroups) {
+                if (!mg.isEmpty()) {
+                  ids.add(mg.get(0).id());
+                }
+              }
+              if (!endGroup.isEmpty()) {
+                ids.add(endGroup.get(0).id());
+              }
+              return ids;
+            });
     when(travelCourseRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
     var saved = new ArrayList<CoursePlace>();
@@ -226,7 +291,7 @@ class CourseServiceTest {
         "종로구",
         new BigDecimal("37.6"),
         new BigDecimal("126.9"),
-        5,
+        1,
         (short) 25,
         (short) 60,
         "맑음");
@@ -234,6 +299,60 @@ class CourseServiceTest {
     assertThat(saved).hasSize(3);
     assertThat(saved.get(0).isFinalPlace()).isFalse();
     assertThat(saved.get(2).isFinalPlace()).isTrue();
+  }
+
+  @Test
+  void 중간구역이_비어도_있는_장소만으로_코스를_저장한다() {
+    UUID userId = UUID.randomUUID();
+    UUID petId = UUID.randomUUID();
+    mockPetAndPolicy(userId, petId);
+    when(placeService.searchNearby(any(), any(), anyInt()))
+        .thenAnswer(
+            inv -> {
+              BigDecimal lat = inv.getArgument(0);
+              BigDecimal lng = inv.getArgument(1);
+              return List.of(samplePlace("p-" + lng.toPlainString(), "장소", lat, lng));
+            });
+    when(placeRagService.rankByReviewSimilarity(any(), any()))
+        .thenAnswer(inv -> inv.getArgument(0));
+    when(routeOptimizationService.selectAndOrder(
+            any(), any(), any(), anyInt(), any(), any(), any(), any(), any(), any(), any(), any()))
+        .thenAnswer(
+            inv -> {
+              List<PlaceInfo> startGroup = inv.getArgument(0);
+              List<PlaceInfo> endGroup = inv.getArgument(2);
+              return List.of(startGroup.get(0).id(), endGroup.get(0).id());
+            });
+    when(travelCourseRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    var saved = new ArrayList<CoursePlace>();
+    when(coursePlaceRepository.save(any(CoursePlace.class)))
+        .thenAnswer(
+            inv -> {
+              saved.add(inv.getArgument(0));
+              return inv.getArgument(0);
+            });
+
+    TravelCourse result =
+        courseService.createCourse(
+            userId,
+            petId,
+            LocalDate.now(),
+            "강남구",
+            new BigDecimal("37.5"),
+            new BigDecimal("127.0"),
+            "종로구",
+            new BigDecimal("37.6"),
+            new BigDecimal("126.9"),
+            4,
+            (short) 25,
+            (short) 60,
+            "맑음");
+
+    assertThat(result).isNotNull();
+    assertThat(saved).hasSize(2);
+    assertThat(saved.get(0).isFinalPlace()).isFalse();
+    assertThat(saved.get(1).isFinalPlace()).isTrue();
   }
 
   @Test
@@ -269,8 +388,6 @@ class CourseServiceTest {
     when(placeService.searchNearby(any(), any(), anyInt())).thenReturn(List.of());
     when(placeRagService.rankByReviewSimilarity(any(), any()))
         .thenAnswer(inv -> inv.getArgument(0));
-    when(routeOptimizationService.optimizeOrder(any(), any(), any(), any(), any()))
-        .thenReturn(List.of());
 
     assertThatThrownBy(
             () ->

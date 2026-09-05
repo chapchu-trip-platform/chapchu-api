@@ -123,7 +123,7 @@ class CourseControllerTest {
                     fieldWithPath("endLat").description("도착지 위도"),
                     fieldWithPath("endLng").description("도착지 경도"),
                     fieldWithPath("intermediateStopCount")
-                        .description("중간 장소 수 (0 = 출발지·도착지만, 최솟값 0)")
+                        .description("출발지·도착지를 제외한 중간 경유 장소 수 (최소 0)")
                         .type(JsonFieldType.NUMBER),
                     fieldWithPath("temperature").description("기온 (선택)").optional(),
                     fieldWithPath("humidity").description("습도 (선택)").optional(),

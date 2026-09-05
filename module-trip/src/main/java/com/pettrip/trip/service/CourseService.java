@@ -21,10 +21,11 @@ import java.math.BigDecimal;
 import java.math.MathContext;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -33,8 +34,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class CourseService {
-
-  private static final int DEFAULT_RADIUS_METERS = 5000;
 
   private final PlaceService placeService;
   private final PlaceRepository placeRepository;
@@ -136,42 +135,72 @@ public class CourseService {
     }
     Pet pet = petRepository.findById(petId).orElseThrow(PetNotFoundException::new);
 
-    List<SearchPoint> searchPoints =
-        buildSearchPoints(startLat, startLng, endLat, endLng, intermediateStopCount);
+    BigDecimal latDelta = endLat.subtract(startLat);
+    BigDecimal lngDelta = endLng.subtract(startLng);
+    int totalZones = intermediateStopCount + 2;
 
-    Map<String, Place> placeMap = new LinkedHashMap<>();
-    for (SearchPoint point : searchPoints) {
-      List<Place> nearby =
-          placeService.searchNearby(point.lat(), point.lng(), DEFAULT_RADIUS_METERS);
-      for (Place place : nearby) {
-        placeMap.putIfAbsent(place.getExternalPlaceId(), place);
+    Set<String> assigned = new HashSet<>();
+    List<Place> startRaw = new ArrayList<>();
+    List<List<Place>> middleRaws = new ArrayList<>();
+    List<Place> endRaw = new ArrayList<>();
+
+    for (int i = 0; i < totalZones; i++) {
+      BigDecimal ratio0 =
+          BigDecimal.valueOf(i).divide(BigDecimal.valueOf(totalZones), MathContext.DECIMAL64);
+      BigDecimal ratio1 =
+          BigDecimal.valueOf(i + 1).divide(BigDecimal.valueOf(totalZones), MathContext.DECIMAL64);
+
+      BigDecimal sliceStartLat = startLat.add(latDelta.multiply(ratio0));
+      BigDecimal sliceEndLat = startLat.add(latDelta.multiply(ratio1));
+      BigDecimal sliceStartLng = startLng.add(lngDelta.multiply(ratio0));
+      BigDecimal sliceEndLng = startLng.add(lngDelta.multiply(ratio1));
+
+      BigDecimal zoneMinLat = sliceStartLat.min(sliceEndLat);
+      BigDecimal zoneMaxLat = sliceStartLat.max(sliceEndLat);
+      BigDecimal zoneMinLng = sliceStartLng.min(sliceEndLng);
+      BigDecimal zoneMaxLng = sliceStartLng.max(sliceEndLng);
+
+      List<Place> zoneRaw = searchInZone(zoneMinLat, zoneMaxLat, zoneMinLng, zoneMaxLng);
+      List<Place> zoneGroup = assignGroup(zoneRaw, assigned);
+
+      if (i == 0) {
+        startRaw = zoneGroup;
+        continue;
       }
+      if (i == totalZones - 1) {
+        endRaw = zoneGroup;
+        continue;
+      }
+      middleRaws.add(zoneGroup);
     }
-
-    List<Place> mergedPlaces = new ArrayList<>(placeMap.values());
-
-    List<String> policyFilteredIds = filterByPetSize(mergedPlaces, pet.getSize());
 
     String ragQuery = buildRagQuery(pet, weatherStatus, temperature);
-    List<String> ragRankedIds = placeRagService.rankByReviewSimilarity(policyFilteredIds, ragQuery);
-
-    Map<String, PlacePetPolicy> policyMap =
-        petPolicyRepository.findAllById(ragRankedIds).stream()
-            .collect(Collectors.toMap(PlacePetPolicy::getExternalPlaceId, Function.identity()));
-
-    List<PlaceInfo> placeInfos =
-        ragRankedIds.stream()
-            .map(placeMap::get)
-            .filter(Objects::nonNull)
-            .map(p -> toPlaceInfo(p, policyMap.get(p.getExternalPlaceId())))
+    List<PlaceInfo> startInfos =
+        buildGroupInfos(startRaw, PlaceInfo.PlaceGroup.START, pet, ragQuery);
+    List<PlaceInfo> endInfos = buildGroupInfos(endRaw, PlaceInfo.PlaceGroup.END, pet, ragQuery);
+    List<List<PlaceInfo>> middleInfos =
+        middleRaws.stream()
+            .map(places -> buildGroupInfos(places, PlaceInfo.PlaceGroup.MIDDLE, pet, ragQuery))
             .toList();
 
-    List<String> orderedIds =
-        routeOptimizationService.optimizeOrder(
-            placeInfos, toPetSizeLabel(pet.getSize()), pet.getAge(), weatherStatus, temperature);
-    if (orderedIds.isEmpty()) {
+    if (startInfos.isEmpty() || endInfos.isEmpty()) {
       throw new NoPlacesFoundException();
     }
+
+    List<String> orderedIds =
+        routeOptimizationService.selectAndOrder(
+            startInfos,
+            middleInfos,
+            endInfos,
+            intermediateStopCount,
+            startLat,
+            startLng,
+            endLat,
+            endLng,
+            toPetSizeLabel(pet.getSize()),
+            pet.getAge(),
+            weatherStatus,
+            temperature);
 
     TravelCourse course =
         new TravelCourse(
@@ -187,27 +216,96 @@ public class CourseService {
     return course;
   }
 
-  private List<SearchPoint> buildSearchPoints(
-      BigDecimal startLat,
-      BigDecimal startLng,
-      BigDecimal endLat,
-      BigDecimal endLng,
-      int intermediateStopCount) {
+  private List<Place> searchInZone(
+      BigDecimal zoneMinLat, BigDecimal zoneMaxLat, BigDecimal zoneMinLng, BigDecimal zoneMaxLng) {
 
-    BigDecimal divisor = BigDecimal.valueOf(intermediateStopCount + 1);
-    BigDecimal latDelta = endLat.subtract(startLat);
-    BigDecimal lngDelta = endLng.subtract(startLng);
+    BigDecimal centerLat =
+        zoneMinLat.add(zoneMaxLat).divide(BigDecimal.valueOf(2), MathContext.DECIMAL64);
+    BigDecimal centerLng =
+        zoneMinLng.add(zoneMaxLng).divide(BigDecimal.valueOf(2), MathContext.DECIMAL64);
+    int radius =
+        (int)
+            Math.min(
+                haversineMeters(
+                    zoneMinLat.doubleValue(),
+                    zoneMinLng.doubleValue(),
+                    centerLat.doubleValue(),
+                    centerLng.doubleValue()),
+                20000);
+    radius = Math.max(radius, 1000);
 
-    List<SearchPoint> searchPoints = new ArrayList<>();
-    searchPoints.add(new SearchPoint(startLat, startLng));
-    for (int i = 1; i <= intermediateStopCount; i++) {
-      BigDecimal ratio = BigDecimal.valueOf(i).divide(divisor, MathContext.DECIMAL64);
-      BigDecimal lat = startLat.add(latDelta.multiply(ratio));
-      BigDecimal lng = startLng.add(lngDelta.multiply(ratio));
-      searchPoints.add(new SearchPoint(lat, lng));
+    List<Place> result =
+        filterByZone(
+            placeService.searchNearby(centerLat, centerLng, radius),
+            zoneMinLat,
+            zoneMaxLat,
+            zoneMinLng,
+            zoneMaxLng);
+    if (!result.isEmpty()) {
+      return result;
     }
-    searchPoints.add(new SearchPoint(endLat, endLng));
-    return searchPoints;
+
+    int expanded = (int) Math.min(radius * 1.5, 20000);
+    return filterByZone(
+        placeService.searchNearby(centerLat, centerLng, expanded),
+        zoneMinLat,
+        zoneMaxLat,
+        zoneMinLng,
+        zoneMaxLng);
+  }
+
+  private List<Place> filterByZone(
+      List<Place> places,
+      BigDecimal minLat,
+      BigDecimal maxLat,
+      BigDecimal minLng,
+      BigDecimal maxLng) {
+    return places.stream()
+        .filter(p -> p.getLatitude() != null && p.getLongitude() != null)
+        .filter(
+            p ->
+                p.getLatitude().compareTo(minLat) >= 0
+                    && p.getLatitude().compareTo(maxLat) <= 0
+                    && p.getLongitude().compareTo(minLng) >= 0
+                    && p.getLongitude().compareTo(maxLng) <= 0)
+        .toList();
+  }
+
+  private List<Place> assignGroup(List<Place> places, Set<String> assigned) {
+    List<Place> group = new ArrayList<>();
+    for (Place p : places) {
+      if (assigned.contains(p.getExternalPlaceId())) {
+        continue;
+      }
+      assigned.add(p.getExternalPlaceId());
+      group.add(p);
+    }
+    return group;
+  }
+
+  private List<PlaceInfo> buildGroupInfos(
+      List<Place> places, PlaceInfo.PlaceGroup group, Pet pet, String ragQuery) {
+    List<String> placeIds = places.stream().map(Place::getExternalPlaceId).toList();
+    Map<String, PlacePetPolicy> policyMap =
+        petPolicyRepository.findAllById(placeIds).stream()
+            .collect(Collectors.toMap(PlacePetPolicy::getExternalPlaceId, Function.identity()));
+    List<String> filtered = filterByPetSizeWithPolicy(places, pet.getSize(), policyMap);
+    List<String> ranked = placeRagService.rankByReviewSimilarity(filtered, ragQuery);
+    Map<String, Place> placeMap =
+        places.stream().collect(Collectors.toMap(Place::getExternalPlaceId, Function.identity()));
+    return ranked.stream()
+        .map(placeMap::get)
+        .filter(Objects::nonNull)
+        .map(p -> toPlaceInfo(p, policyMap.get(p.getExternalPlaceId()), group))
+        .toList();
+  }
+
+  private List<String> filterByPetSizeWithPolicy(
+      List<Place> places, PetSize petSize, Map<String, PlacePetPolicy> policyMap) {
+    return places.stream()
+        .map(Place::getExternalPlaceId)
+        .filter(id -> isPetAllowed(petSize, policyMap.get(id)))
+        .toList();
   }
 
   @Transactional
@@ -222,8 +320,6 @@ public class CourseService {
     }
     course.complete();
   }
-
-  private record SearchPoint(BigDecimal lat, BigDecimal lng) {}
 
   private List<String> filterByPetSize(List<Place> places, PetSize petSize) {
     List<String> placeIds = places.stream().map(Place::getExternalPlaceId).toList();
@@ -248,17 +344,20 @@ public class CourseService {
     };
   }
 
-  private PlaceInfo toPlaceInfo(Place p, PlacePetPolicy policy) {
-    String categoryLabel = toCategoryLabel(p.getContentTypeId());
-    String indoorOutdoor = toIndoorOutdoor(policy);
+  private PlaceInfo toPlaceInfo(Place p, PlacePetPolicy policy, PlaceInfo.PlaceGroup group) {
     return new PlaceInfo(
         p.getExternalPlaceId(),
         p.getPlaceName(),
         p.getAddress(),
         p.getLatitude(),
         p.getLongitude(),
-        categoryLabel,
-        indoorOutdoor);
+        toCategoryLabel(p.getContentTypeId()),
+        toIndoorOutdoor(policy),
+        group);
+  }
+
+  private PlaceInfo toPlaceInfo(Place p, PlacePetPolicy policy) {
+    return toPlaceInfo(p, policy, PlaceInfo.PlaceGroup.MIDDLE);
   }
 
   private RecommendedPlaceResult toRecommendedResult(Place p, PlacePetPolicy policy) {
