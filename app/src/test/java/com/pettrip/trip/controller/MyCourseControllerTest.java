@@ -10,11 +10,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.pettrip.config.SecurityConfig;
-import com.pettrip.trip.model.StartCourse;
 import com.pettrip.trip.model.TravelCourse;
 import com.pettrip.trip.service.CourseService;
+import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -44,8 +43,16 @@ class MyCourseControllerTest {
 
   @Test
   void 내_코스_목록을_조회한다() throws Exception {
-    StartCourse start = new StartCourse("강남구", LocalDateTime.now());
-    TravelCourse course = new TravelCourse(USER_ID, start, LocalDate.of(2026, 8, 30));
+    TravelCourse course =
+        new TravelCourse(
+            USER_ID,
+            "강남구",
+            new BigDecimal("37.5"),
+            new BigDecimal("127.0"),
+            "종로구",
+            new BigDecimal("37.6"),
+            new BigDecimal("126.9"),
+            LocalDate.of(2026, 8, 30));
     when(courseService.listMyCourses(any())).thenReturn(List.of(course));
 
     mockMvc

@@ -6,12 +6,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 import com.pettrip.trip.model.CourseWeatherRecord;
-import com.pettrip.trip.model.StartCourse;
 import com.pettrip.trip.model.TravelCourse;
 import com.pettrip.trip.repository.CourseWeatherRecordRepository;
 import com.pettrip.trip.repository.TravelCourseRepository;
+import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -33,8 +32,15 @@ class WeatherServiceTest {
   private static final UUID COURSE_ID = UUID.fromString("0198f3a0-5678-7000-8000-000000000002");
 
   private TravelCourse sampleCourse(UUID userId) {
-    StartCourse start = new StartCourse("강남구", LocalDateTime.of(2026, 8, 1, 10, 0));
-    return new TravelCourse(userId, start, LocalDate.of(2026, 8, 1));
+    return new TravelCourse(
+        userId,
+        "강남구",
+        new BigDecimal("37.5"),
+        new BigDecimal("127.0"),
+        "종로구",
+        new BigDecimal("37.6"),
+        new BigDecimal("126.9"),
+        LocalDate.of(2026, 8, 1));
   }
 
   private CourseWeatherRecord sampleRecord(UUID courseId) {

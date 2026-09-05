@@ -11,7 +11,6 @@ public interface TravelCourseRepository extends JpaRepository<TravelCourse, UUID
 
   @Query(
       "SELECT DISTINCT c FROM TravelCourse c"
-          + " LEFT JOIN FETCH c.startCourse"
           + " LEFT JOIN FETCH c.coursePlaces"
           + " WHERE c.userId = :userId"
           + " ORDER BY c.createdAt DESC")

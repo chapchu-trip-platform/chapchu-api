@@ -11,7 +11,11 @@ import java.util.List;
 import java.util.UUID;
 
 public record CourseResponse(
-    UUID courseId, LocalDate travelDate, String startLocation, List<CoursePlaceItem> places) {
+    UUID courseId,
+    LocalDate travelDate,
+    String startLocation,
+    String endLocation,
+    List<CoursePlaceItem> places) {
 
   public record CoursePlaceItem(
       UUID coursePlaceId,
@@ -45,7 +49,8 @@ public record CourseResponse(
     return new CourseResponse(
         course.getId(),
         course.getTravelDate(),
-        course.getStartCourse().getStartCourseLocation(),
+        course.getStartLocation(),
+        course.getEndLocation(),
         items);
   }
 

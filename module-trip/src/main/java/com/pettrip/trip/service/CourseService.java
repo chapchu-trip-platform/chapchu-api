@@ -14,13 +14,11 @@ import com.pettrip.recommendation.service.PlaceInfo;
 import com.pettrip.recommendation.service.PlaceRagService;
 import com.pettrip.recommendation.service.RouteOptimizationService;
 import com.pettrip.trip.model.CoursePlace;
-import com.pettrip.trip.model.StartCourse;
 import com.pettrip.trip.model.TravelCourse;
 import com.pettrip.trip.repository.CoursePlaceRepository;
 import com.pettrip.trip.repository.TravelCourseRepository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -61,15 +59,13 @@ public class CourseService {
     this.coursePlaceRepository = coursePlaceRepository;
   }
 
-  @Transactional
-  public TravelCourse createCourse(
+  @Transactional(readOnly = true)
+  public List<RecommendedPlaceResult> recommendPlaces(
       UUID userId,
       UUID petId,
       BigDecimal lat,
       BigDecimal lng,
       int radiusMeters,
-      LocalDate travelDate,
-      String startLocation,
       Short temperature,
       Short humidity,
       String weatherStatus) {
@@ -107,13 +103,41 @@ public class CourseService {
       throw new NoPlacesFoundException();
     }
 
-    StartCourse startCourse = new StartCourse(startLocation, LocalDateTime.now());
-    TravelCourse course = new TravelCourse(userId, startCourse, travelDate);
+    return orderedIds.stream()
+        .map(placeMap::get)
+        .filter(Objects::nonNull)
+        .map(p -> toRecommendedResult(p, policyMap.get(p.getExternalPlaceId())))
+        .toList();
+  }
+
+  @Transactional
+  public TravelCourse createCourse(
+      UUID userId,
+      UUID petId,
+      LocalDate travelDate,
+      String startLocation,
+      BigDecimal startLat,
+      BigDecimal startLng,
+      String endLocation,
+      BigDecimal endLat,
+      BigDecimal endLng,
+      List<String> placeIds) {
+
+    if (!petRepository.existsByIdAndUserId(petId, userId)) {
+      throw new PetNotFoundException();
+    }
+    if (placeIds.isEmpty()) {
+      throw new NoPlacesFoundException();
+    }
+
+    TravelCourse course =
+        new TravelCourse(
+            userId, startLocation, startLat, startLng, endLocation, endLat, endLng, travelDate);
     travelCourseRepository.save(course);
 
-    for (int i = 0; i < orderedIds.size(); i++) {
-      boolean isLast = (i == orderedIds.size() - 1);
-      String placeId = orderedIds.get(i);
+    for (int i = 0; i < placeIds.size(); i++) {
+      boolean isLast = (i == placeIds.size() - 1);
+      String placeId = placeIds.get(i);
       coursePlaceRepository.save(new CoursePlace(course, placeId, (short) (i + 1), isLast));
     }
 
@@ -145,10 +169,7 @@ public class CourseService {
 
   private PlaceInfo toPlaceInfo(Place p, PlacePetPolicy policy) {
     String categoryLabel = toCategoryLabel(p.getContentTypeId());
-    String indoorOutdoor =
-        policy != null && policy.getIndoorOutdoorType() != null
-            ? policy.getIndoorOutdoorType().name()
-            : "BOTH";
+    String indoorOutdoor = toIndoorOutdoor(policy);
     return new PlaceInfo(
         p.getExternalPlaceId(),
         p.getPlaceName(),
@@ -157,6 +178,16 @@ public class CourseService {
         p.getLongitude(),
         categoryLabel,
         indoorOutdoor);
+  }
+
+  private RecommendedPlaceResult toRecommendedResult(Place p, PlacePetPolicy policy) {
+    return new RecommendedPlaceResult(
+        p, policy, toCategoryLabel(p.getContentTypeId()), toIndoorOutdoor(policy));
+  }
+
+  private String toIndoorOutdoor(PlacePetPolicy policy) {
+    if (policy == null || policy.getIndoorOutdoorType() == null) return "BOTH";
+    return policy.getIndoorOutdoorType().name();
   }
 
   private String toCategoryLabel(Short contentTypeId) {
@@ -267,6 +298,9 @@ public class CourseService {
                 * Math.sin(dLng / 2);
     return r * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
+
+  public record RecommendedPlaceResult(
+      Place place, PlacePetPolicy policy, String categoryLabel, String indoorOutdoorType) {}
 
   public record TravelCourseDetail(
       TravelCourse course,

@@ -32,14 +32,14 @@ public class CourseController {
         courseService.createCourse(
             userId,
             request.petId(),
-            request.lat(),
-            request.lng(),
-            request.radiusMeters() > 0 ? request.radiusMeters() : 5000,
             request.travelDate(),
             request.startLocation(),
-            request.temperature(),
-            request.humidity(),
-            request.weatherStatus());
+            request.startLat(),
+            request.startLng(),
+            request.endLocation(),
+            request.endLat(),
+            request.endLng(),
+            request.placeIds());
     TravelCourseDetail detail = courseService.getCourse(userId, course.getId());
     return CourseResponse.from(detail);
   }
