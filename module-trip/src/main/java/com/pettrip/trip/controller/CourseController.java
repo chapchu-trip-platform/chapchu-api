@@ -39,7 +39,7 @@ public class CourseController {
             request.endLocation(),
             request.endLat(),
             request.endLng(),
-            request.totalStopCount(),
+            request.intermediateStopCount(),
             request.temperature(),
             request.humidity(),
             request.weatherStatus());
