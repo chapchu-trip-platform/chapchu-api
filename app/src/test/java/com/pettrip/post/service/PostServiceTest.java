@@ -114,6 +114,36 @@ class PostServiceTest {
   }
 
   @Test
+  void createPost는_photoId가_null이면_사진_검증을_건너뛴다() {
+    UUID userId = UUID.randomUUID();
+    PostResponse expected = samplePostResponse(userId);
+    stubReferenceCheck(true, false, true);
+    when(postRepository.save(any(Post.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    when(jdbcTemplate.query(any(String.class), any(SqlParameterSource.class), any(RowMapper.class)))
+        .thenReturn(List.of(expected));
+
+    PostResponse result =
+        postService.createPost(userId, UUID.randomUUID(), null, UUID.randomUUID(), "제목", "내용");
+
+    assertThat(result).isEqualTo(expected);
+  }
+
+  @Test
+  void createPost는_photoId가_null이면_photoId를_쿼리_파라미터에서_뺀다() {
+    UUID userId = UUID.randomUUID();
+    stubReferenceCheck(true, false, true);
+    when(postRepository.save(any(Post.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    when(jdbcTemplate.query(any(String.class), any(SqlParameterSource.class), any(RowMapper.class)))
+        .thenReturn(List.of(samplePostResponse(userId)));
+
+    postService.createPost(userId, UUID.randomUUID(), null, UUID.randomUUID(), "제목", "내용");
+
+    ArgumentCaptor<SqlParameterSource> captor = ArgumentCaptor.forClass(SqlParameterSource.class);
+    verify(jdbcTemplate).queryForObject(any(String.class), captor.capture(), any(RowMapper.class));
+    assertThat(captor.getValue().hasValue("photoId")).isFalse();
+  }
+
+  @Test
   void createPost는_남의_반려동물이면_예외를_던진다() {
     UUID userId = UUID.randomUUID();
     stubReferenceCheck(false, true, true);
