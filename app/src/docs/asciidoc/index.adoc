@@ -854,11 +854,13 @@ include::{snippets}/post-detail/response-fields.adoc[]
 
 `POST /posts`
 
-`petId`와 `courseId`는 필수다. `photoId`는 **선택**이라 생략하거나 `null`로 보내면
-사진 없는 게시글이 된다. 이 경우 응답의 `photoId`와 `photoUrl`이 `null`로 내려간다.
+`posts`는 자유게시판이다. 리뷰 게시판은 review 도메인에서 따로 가져온다.
 
-값을 보낸 참조는 **모두 요청한 사용자 본인의 것**이어야 한다. 없거나 남의 것이면 400이고,
-`fieldErrors`에 어느 필드인지 담긴다.
+그래서 `petId`, `photoId`, `courseId`가 **모두 선택**이다. 본문만 보내도 글이 등록된다.
+보내지 않은 참조는 응답에서 `null`로 내려가고, `photoId`를 생략하면 `photoUrl`도 `null`이다.
+
+값을 보낸 참조는 **요청한 사용자 본인의 것**이어야 한다. 없거나 남의 것이면 400이고,
+`fieldErrors`에 어느 필드인지 담긴다. 보내지 않은 참조는 검증하지 않는다.
 
 [.request]
 ==== 요청

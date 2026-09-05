@@ -1,6 +1,5 @@
 package com.pettrip.post.controller;
 
-import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
@@ -35,6 +34,7 @@ import org.springframework.boot.test.autoconfigure.restdocs.AutoConfigureRestDoc
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.restdocs.RestDocumentationExtension;
+import org.springframework.restdocs.payload.JsonFieldType;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -98,9 +98,9 @@ class PostControllerTest {
                 responseFields(
                     fieldWithPath("posts[]").description("게시글 목록"),
                     fieldWithPath("posts[].id").description("게시글 ID"),
-                    fieldWithPath("posts[].petId").description("동행한 반려견 ID"),
-                    fieldWithPath("posts[].photoId").description("대표 사진 ID"),
-                    fieldWithPath("posts[].courseId").description("여행 코스 ID"),
+                    fieldWithPath("posts[].petId").description("동행한 반려견 ID (null 가능)").optional(),
+                    fieldWithPath("posts[].photoId").description("대표 사진 ID (null 가능)").optional(),
+                    fieldWithPath("posts[].courseId").description("여행 코스 ID (null 가능)").optional(),
                     fieldWithPath("posts[].title").description("제목"),
                     fieldWithPath("posts[].content").description("내용"),
                     fieldWithPath("posts[].viewCount").description("조회수"),
@@ -144,9 +144,9 @@ class PostControllerTest {
                 pathParameters(parameterWithName("postId").description("게시글 ID")),
                 responseFields(
                     fieldWithPath("id").description("게시글 ID"),
-                    fieldWithPath("petId").description("동행한 반려견 ID"),
-                    fieldWithPath("photoId").description("대표 사진 ID"),
-                    fieldWithPath("courseId").description("여행 코스 ID"),
+                    fieldWithPath("petId").description("동행한 반려견 ID (null 가능)").optional(),
+                    fieldWithPath("photoId").description("대표 사진 ID (null 가능)").optional(),
+                    fieldWithPath("courseId").description("여행 코스 ID (null 가능)").optional(),
                     fieldWithPath("title").description("제목"),
                     fieldWithPath("content").description("내용"),
                     fieldWithPath("viewCount").description("조회수"),
@@ -184,16 +184,25 @@ class PostControllerTest {
             document(
                 "post-create",
                 requestFields(
-                    fieldWithPath("petId").description("동행한 반려견 ID"),
-                    fieldWithPath("photoId").description("대표 사진 ID (선택). 생략하면 사진 없는 글").optional(),
-                    fieldWithPath("courseId").description("여행 코스 ID"),
+                    fieldWithPath("petId")
+                        .description("동행한 반려견 ID (선택)")
+                        .type(JsonFieldType.STRING)
+                        .optional(),
+                    fieldWithPath("photoId")
+                        .description("대표 사진 ID (선택). 생략하면 사진 없는 글")
+                        .type(JsonFieldType.STRING)
+                        .optional(),
+                    fieldWithPath("courseId")
+                        .description("여행 코스 ID (선택)")
+                        .type(JsonFieldType.STRING)
+                        .optional(),
                     fieldWithPath("title").description("제목 (선택). 최대 100자").optional(),
                     fieldWithPath("content").description("내용 (선택)").optional()),
                 responseFields(
                     fieldWithPath("id").description("게시글 ID"),
-                    fieldWithPath("petId").description("동행한 반려견 ID"),
-                    fieldWithPath("photoId").description("대표 사진 ID"),
-                    fieldWithPath("courseId").description("여행 코스 ID"),
+                    fieldWithPath("petId").description("동행한 반려견 ID (null 가능)").optional(),
+                    fieldWithPath("photoId").description("대표 사진 ID (null 가능)").optional(),
+                    fieldWithPath("courseId").description("여행 코스 ID (null 가능)").optional(),
                     fieldWithPath("title").description("제목"),
                     fieldWithPath("content").description("내용"),
                     fieldWithPath("viewCount").description("조회수"),
@@ -257,17 +266,54 @@ class PostControllerTest {
   }
 
   @Test
-  void 게시글_작성_시_빠진_필수_필드를_전부_알려준다() throws Exception {
+  void 참조_없이_본문만으로_게시글을_작성할_수_있다() throws Exception {
+    when(postService.createPost(any(), isNull(), isNull(), isNull(), any(), any()))
+        .thenReturn(samplePostResponse());
+
     mockMvc
         .perform(
             post("/posts")
                 .contentType("application/json")
-                .content("{\"title\":\"제목만 보냄\"}")
+                .content("{\"title\":\"자유게시판 글\",\"content\":\"내용\"}")
                 .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
-        .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
-        .andExpect(jsonPath("$.fieldErrors.length()").value(2))
-        .andExpect(jsonPath("$.fieldErrors[*].field", containsInAnyOrder("petId", "courseId")));
+        .andExpect(status().isCreated());
+  }
+
+  @Test
+  void 반려동물_없이_게시글을_작성할_수_있다() throws Exception {
+    UUID courseId = UUID.randomUUID();
+    when(postService.createPost(any(), isNull(), isNull(), eq(courseId), any(), any()))
+        .thenReturn(samplePostResponse());
+
+    String body =
+        objectMapper.writeValueAsString(
+            new PostCreateRequest(null, null, courseId, "펫 없는 글", "내용"));
+
+    mockMvc
+        .perform(
+            post("/posts")
+                .contentType("application/json")
+                .content(body)
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isCreated());
+  }
+
+  @Test
+  void 여행_코스_없이_게시글을_작성할_수_있다() throws Exception {
+    UUID petId = UUID.randomUUID();
+    when(postService.createPost(any(), eq(petId), isNull(), isNull(), any(), any()))
+        .thenReturn(samplePostResponse());
+
+    String body =
+        objectMapper.writeValueAsString(new PostCreateRequest(petId, null, null, "코스 없는 글", "내용"));
+
+    mockMvc
+        .perform(
+            post("/posts")
+                .contentType("application/json")
+                .content(body)
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isCreated());
   }
 
   @Test
@@ -311,14 +357,17 @@ class PostControllerTest {
 
   @Test
   void 게시글_작성_시_검증_메시지가_한글로_나온다() throws Exception {
+    String body = "{\"title\":\"" + "가".repeat(101) + "\"}";
+
     mockMvc
         .perform(
             post("/posts")
                 .contentType("application/json")
-                .content("{\"title\":\"제목만 보냄\"}")
+                .content(body)
                 .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
         .andExpect(status().isBadRequest())
-        .andExpect(jsonPath("$.fieldErrors[0].message").value("필수 값입니다."));
+        .andExpect(jsonPath("$.fieldErrors[0].field").value("title"))
+        .andExpect(jsonPath("$.fieldErrors[0].message").value("0자 이상 100자 이하로 입력해 주세요."));
   }
 
   @Test
@@ -383,9 +432,9 @@ class PostControllerTest {
                     fieldWithPath("content").description("내용 (선택)").optional()),
                 responseFields(
                     fieldWithPath("id").description("게시글 ID"),
-                    fieldWithPath("petId").description("동행한 반려견 ID"),
-                    fieldWithPath("photoId").description("대표 사진 ID"),
-                    fieldWithPath("courseId").description("여행 코스 ID"),
+                    fieldWithPath("petId").description("동행한 반려견 ID (null 가능)").optional(),
+                    fieldWithPath("photoId").description("대표 사진 ID (null 가능)").optional(),
+                    fieldWithPath("courseId").description("여행 코스 ID (null 가능)").optional(),
                     fieldWithPath("title").description("제목"),
                     fieldWithPath("content").description("내용"),
                     fieldWithPath("viewCount").description("조회수"),
