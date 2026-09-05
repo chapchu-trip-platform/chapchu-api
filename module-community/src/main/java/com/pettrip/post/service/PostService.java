@@ -57,31 +57,15 @@ public class PostService {
    * <p>확인 없이 INSERT하면 FK 위반이 DataIntegrityViolationException으로 올라와 "입력 데이터가 올바르지 않습니다."라는 응답만 남는다.
    * 어느 값이 틀렸는지 알 수 없고, 남의 반려동물 ID를 붙여 글을 쓰는 것도 막지 못한다.
    */
-  private static final String REFERENCE_CHECK_SELECT =
-      """
-      SELECT EXISTS(SELECT 1 FROM pets
-                    WHERE pet_id = :petId AND user_id = :userId) AS pet_ok,
-             EXISTS(SELECT 1 FROM travel_courses
-                    WHERE course_id = :courseId AND user_id = :userId) AS course_ok,
-      """;
+  private static final String PET_EXISTS =
+      "EXISTS(SELECT 1 FROM pets WHERE pet_id = :petId AND user_id = :userId)";
 
-  private static final String REFERENCE_CHECK_SQL =
-      REFERENCE_CHECK_SELECT
-          + """
-             EXISTS(SELECT 1 FROM photos
-                    WHERE photo_id = :photoId AND user_id = :userId) AS photo_ok
-          """;
+  private static final String PHOTO_EXISTS =
+      "EXISTS(SELECT 1 FROM photos WHERE photo_id = :photoId AND user_id = :userId)";
+  private static final String COURSE_EXISTS =
+      "EXISTS(SELECT 1 FROM travel_courses WHERE course_id = :courseId AND user_id = :userId)";
 
-  /**
-   * 사진 없는 글은 photo 절을 아예 뺀다.
-   *
-   * <p>{@code :photoId}에 null을 넘기면 Postgres가 {@code photo_id = ?}의 파라미터 타입을 추론하지 못해 쿼리가 실패할 수 있다.
-   * 파라미터를 넘기지 않는 편이 안전하다.
-   */
-  private static final String REFERENCE_CHECK_SQL_WITHOUT_PHOTO =
-      REFERENCE_CHECK_SELECT + "       TRUE AS photo_ok";
-
-  /** {@link #REFERENCE_CHECK_SQL} 결과. */
+  /** 참조 확인 쿼리 결과. 보내지 않은 참조는 항상 true다. */
   public record ReferenceCheck(boolean petOk, boolean photoOk, boolean courseOk) {}
 
   private static final RowMapper<ReferenceCheck> REFERENCE_CHECK_ROW_MAPPER =
@@ -252,29 +236,53 @@ public class PostService {
   }
 
   private void verifyReferences(UUID userId, UUID petId, UUID photoId, UUID courseId) {
-    MapSqlParameterSource params =
-        new MapSqlParameterSource()
-            .addValue("userId", userId)
-            .addValue("petId", petId)
-            .addValue("courseId", courseId);
-    String sql = REFERENCE_CHECK_SQL_WITHOUT_PHOTO;
-    if (photoId != null) {
-      params.addValue("photoId", photoId);
-      sql = REFERENCE_CHECK_SQL;
+    if (petId == null && photoId == null && courseId == null) {
+      return;
     }
+    MapSqlParameterSource params = new MapSqlParameterSource().addValue("userId", userId);
+    addReference(params, "petId", petId);
+    addReference(params, "photoId", photoId);
+    addReference(params, "courseId", courseId);
+
+    String sql =
+        "SELECT "
+            + clause(petId, PET_EXISTS, "pet_ok")
+            + ", "
+            + clause(photoId, PHOTO_EXISTS, "photo_ok")
+            + ", "
+            + clause(courseId, COURSE_EXISTS, "course_ok");
     ReferenceCheck check = jdbcTemplate.queryForObject(sql, params, REFERENCE_CHECK_ROW_MAPPER);
     if (check == null) {
       throw new InvalidReferenceException("petId", "참조를 확인할 수 없습니다.");
     }
-    if (!check.petOk()) {
+    if (petId != null && !check.petOk()) {
       throw new InvalidReferenceException("petId", "존재하지 않거나 본인의 반려동물이 아닙니다.");
     }
     if (photoId != null && !check.photoOk()) {
       throw new InvalidReferenceException("photoId", "존재하지 않거나 본인의 사진이 아닙니다.");
     }
-    if (!check.courseOk()) {
+    if (courseId != null && !check.courseOk()) {
       throw new InvalidReferenceException("courseId", "존재하지 않거나 본인의 여행 코스가 아닙니다.");
     }
+  }
+
+  /**
+   * 보내지 않은 참조는 EXISTS 절 대신 {@code TRUE}를 넣는다.
+   *
+   * <p>null을 파라미터로 넘기면 Postgres가 {@code col = ?}의 타입을 추론하지 못해 쿼리가 실패할 수 있다. 절 자체를 빼는 편이 안전하다.
+   */
+  private static String clause(UUID id, String exists, String alias) {
+    if (id == null) {
+      return "TRUE AS " + alias;
+    }
+    return exists + " AS " + alias;
+  }
+
+  private static void addReference(MapSqlParameterSource params, String name, UUID id) {
+    if (id == null) {
+      return;
+    }
+    params.addValue(name, id);
   }
 
   private Post findPost(UUID postId) {

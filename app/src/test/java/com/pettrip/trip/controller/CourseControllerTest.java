@@ -98,7 +98,7 @@ class CourseControllerTest {
             "종로구",
             new BigDecimal("37.6"),
             new BigDecimal("126.9"),
-            4,
+            2,
             (short) 25,
             (short) 60,
             "맑음");

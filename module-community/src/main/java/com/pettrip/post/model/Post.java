@@ -23,14 +23,14 @@ public class Post {
   @Column(name = "user_id")
   private UUID userId;
 
-  @Column(name = "pet_id", nullable = false)
+  @Column(name = "pet_id")
   private UUID petId;
 
-  /** 사진 없는 게시글을 허용한다. 마이그레이션 V21 참고. */
+  /** 자유게시판이라 반려동물·사진·코스가 모두 선택이다. 마이그레이션 V22, V23 참고. */
   @Column(name = "photo_id")
   private UUID photoId;
 
-  @Column(name = "course_id", nullable = false)
+  @Column(name = "course_id")
   private UUID courseId;
 
   @Column(name = "title", length = 100)

@@ -10,7 +10,9 @@ import com.pettrip.pet.model.Pet;
 import com.pettrip.pet.model.PetSize;
 import com.pettrip.pet.repository.PetRepository;
 import com.pettrip.pet.service.PetNotFoundException;
+import com.pettrip.place.model.AllowedPetSize;
 import com.pettrip.place.model.Place;
+import com.pettrip.place.model.PlacePetPolicy;
 import com.pettrip.place.repository.PlacePetPolicyRepository;
 import com.pettrip.place.repository.PlaceRepository;
 import com.pettrip.place.service.PlaceService;
@@ -92,7 +94,18 @@ class CourseServiceTest {
   private void mockPetAndPolicy(UUID userId, UUID petId) {
     when(petRepository.existsByIdAndUserId(petId, userId)).thenReturn(true);
     when(petRepository.findById(petId)).thenReturn(Optional.of(samplePet(userId)));
-    when(petPolicyRepository.findAllById(any())).thenReturn(List.of());
+    when(petPolicyRepository.findAllById(any()))
+        .thenAnswer(
+            inv -> {
+              Iterable<String> ids = inv.getArgument(0);
+              List<PlacePetPolicy> policies = new ArrayList<>();
+              for (String id : ids) {
+                policies.add(
+                    new PlacePetPolicy(
+                        samplePlace(id, "장소"), AllowedPetSize.ALL, null, null, null, null, null));
+              }
+              return policies;
+            });
   }
 
   @Test
