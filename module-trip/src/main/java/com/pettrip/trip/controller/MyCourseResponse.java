@@ -15,7 +15,7 @@ public record MyCourseResponse(
     return new MyCourseResponse(
         course.getId(),
         course.getTravelDate(),
-        course.getStartCourse().getStartCourseLocation(),
+        course.getStartLocation(),
         course.isCompleted(),
         course.getCoursePlaces().size());
   }

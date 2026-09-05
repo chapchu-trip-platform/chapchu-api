@@ -14,13 +14,14 @@ import com.pettrip.recommendation.service.PlaceInfo;
 import com.pettrip.recommendation.service.PlaceRagService;
 import com.pettrip.recommendation.service.RouteOptimizationService;
 import com.pettrip.trip.model.CoursePlace;
-import com.pettrip.trip.model.StartCourse;
 import com.pettrip.trip.model.TravelCourse;
 import com.pettrip.trip.repository.CoursePlaceRepository;
 import com.pettrip.trip.repository.TravelCourseRepository;
 import java.math.BigDecimal;
+import java.math.MathContext;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -32,6 +33,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class CourseService {
+
+  private static final int DEFAULT_RADIUS_METERS = 5000;
 
   private final PlaceService placeService;
   private final PlaceRepository placeRepository;
@@ -61,15 +64,13 @@ public class CourseService {
     this.coursePlaceRepository = coursePlaceRepository;
   }
 
-  @Transactional
-  public TravelCourse createCourse(
+  @Transactional(readOnly = true)
+  public List<RecommendedPlaceResult> recommendPlaces(
       UUID userId,
       UUID petId,
       BigDecimal lat,
       BigDecimal lng,
       int radiusMeters,
-      LocalDate travelDate,
-      String startLocation,
       Short temperature,
       Short humidity,
       String weatherStatus) {
@@ -107,8 +108,74 @@ public class CourseService {
       throw new NoPlacesFoundException();
     }
 
-    StartCourse startCourse = new StartCourse(startLocation, LocalDateTime.now());
-    TravelCourse course = new TravelCourse(userId, startCourse, travelDate);
+    return orderedIds.stream()
+        .map(placeMap::get)
+        .filter(Objects::nonNull)
+        .map(p -> toRecommendedResult(p, policyMap.get(p.getExternalPlaceId())))
+        .toList();
+  }
+
+  @Transactional
+  public TravelCourse createCourse(
+      UUID userId,
+      UUID petId,
+      LocalDate travelDate,
+      String startLocation,
+      BigDecimal startLat,
+      BigDecimal startLng,
+      String endLocation,
+      BigDecimal endLat,
+      BigDecimal endLng,
+      int totalStopCount,
+      Short temperature,
+      Short humidity,
+      String weatherStatus) {
+
+    if (!petRepository.existsByIdAndUserId(petId, userId)) {
+      throw new PetNotFoundException();
+    }
+    Pet pet = petRepository.findById(petId).orElseThrow(PetNotFoundException::new);
+
+    List<SearchPoint> searchPoints =
+        buildSearchPoints(startLat, startLng, endLat, endLng, totalStopCount);
+
+    Map<String, Place> placeMap = new LinkedHashMap<>();
+    for (SearchPoint point : searchPoints) {
+      List<Place> nearby =
+          placeService.searchNearby(point.lat(), point.lng(), DEFAULT_RADIUS_METERS);
+      for (Place place : nearby) {
+        placeMap.putIfAbsent(place.getExternalPlaceId(), place);
+      }
+    }
+
+    List<Place> mergedPlaces = new ArrayList<>(placeMap.values());
+
+    List<String> policyFilteredIds = filterByPetSize(mergedPlaces, pet.getSize());
+
+    String ragQuery = buildRagQuery(pet, weatherStatus, temperature);
+    List<String> ragRankedIds = placeRagService.rankByReviewSimilarity(policyFilteredIds, ragQuery);
+
+    Map<String, PlacePetPolicy> policyMap =
+        petPolicyRepository.findAllById(ragRankedIds).stream()
+            .collect(Collectors.toMap(PlacePetPolicy::getExternalPlaceId, Function.identity()));
+
+    List<PlaceInfo> placeInfos =
+        ragRankedIds.stream()
+            .map(placeMap::get)
+            .filter(Objects::nonNull)
+            .map(p -> toPlaceInfo(p, policyMap.get(p.getExternalPlaceId())))
+            .toList();
+
+    List<String> orderedIds =
+        routeOptimizationService.optimizeOrder(
+            placeInfos, toPetSizeLabel(pet.getSize()), pet.getAge(), weatherStatus, temperature);
+    if (orderedIds.isEmpty()) {
+      throw new NoPlacesFoundException();
+    }
+
+    TravelCourse course =
+        new TravelCourse(
+            userId, startLocation, startLat, startLng, endLocation, endLat, endLng, travelDate);
     travelCourseRepository.save(course);
 
     for (int i = 0; i < orderedIds.size(); i++) {
@@ -119,6 +186,45 @@ public class CourseService {
 
     return course;
   }
+
+  private List<SearchPoint> buildSearchPoints(
+      BigDecimal startLat,
+      BigDecimal startLng,
+      BigDecimal endLat,
+      BigDecimal endLng,
+      int totalStopCount) {
+
+    int intermediateCount = totalStopCount - 2;
+    BigDecimal divisor = BigDecimal.valueOf(totalStopCount - 1);
+    BigDecimal latDelta = endLat.subtract(startLat);
+    BigDecimal lngDelta = endLng.subtract(startLng);
+
+    List<SearchPoint> searchPoints = new ArrayList<>();
+    searchPoints.add(new SearchPoint(startLat, startLng));
+    for (int i = 1; i <= intermediateCount; i++) {
+      BigDecimal ratio = BigDecimal.valueOf(i).divide(divisor, MathContext.DECIMAL64);
+      BigDecimal lat = startLat.add(latDelta.multiply(ratio));
+      BigDecimal lng = startLng.add(lngDelta.multiply(ratio));
+      searchPoints.add(new SearchPoint(lat, lng));
+    }
+    searchPoints.add(new SearchPoint(endLat, endLng));
+    return searchPoints;
+  }
+
+  @Transactional
+  public void completeCourse(UUID userId, UUID courseId) {
+    TravelCourse course =
+        travelCourseRepository.findById(courseId).orElseThrow(CourseNotFoundException::new);
+    if (!userId.equals(course.getUserId())) {
+      throw new CourseNotOwnerException();
+    }
+    if (course.isCompleted()) {
+      return;
+    }
+    course.complete();
+  }
+
+  private record SearchPoint(BigDecimal lat, BigDecimal lng) {}
 
   private List<String> filterByPetSize(List<Place> places, PetSize petSize) {
     List<String> placeIds = places.stream().map(Place::getExternalPlaceId).toList();
@@ -145,10 +251,7 @@ public class CourseService {
 
   private PlaceInfo toPlaceInfo(Place p, PlacePetPolicy policy) {
     String categoryLabel = toCategoryLabel(p.getContentTypeId());
-    String indoorOutdoor =
-        policy != null && policy.getIndoorOutdoorType() != null
-            ? policy.getIndoorOutdoorType().name()
-            : "BOTH";
+    String indoorOutdoor = toIndoorOutdoor(policy);
     return new PlaceInfo(
         p.getExternalPlaceId(),
         p.getPlaceName(),
@@ -157,6 +260,16 @@ public class CourseService {
         p.getLongitude(),
         categoryLabel,
         indoorOutdoor);
+  }
+
+  private RecommendedPlaceResult toRecommendedResult(Place p, PlacePetPolicy policy) {
+    return new RecommendedPlaceResult(
+        p, policy, toCategoryLabel(p.getContentTypeId()), toIndoorOutdoor(policy));
+  }
+
+  private String toIndoorOutdoor(PlacePetPolicy policy) {
+    if (policy == null || policy.getIndoorOutdoorType() == null) return "BOTH";
+    return policy.getIndoorOutdoorType().name();
   }
 
   private String toCategoryLabel(Short contentTypeId) {
@@ -267,6 +380,9 @@ public class CourseService {
                 * Math.sin(dLng / 2);
     return r * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
+
+  public record RecommendedPlaceResult(
+      Place place, PlacePetPolicy policy, String categoryLabel, String indoorOutdoorType) {}
 
   public record TravelCourseDetail(
       TravelCourse course,

@@ -6,11 +6,10 @@ import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
-import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToMany;
-import jakarta.persistence.OneToOne;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -24,9 +23,26 @@ public class TravelCourse extends BaseEntity {
   @Column(name = "user_id")
   private UUID userId;
 
-  @OneToOne(cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-  @JoinColumn(name = "start_course_id", nullable = false)
-  private StartCourse startCourse;
+  @Column(name = "start_location", length = 255)
+  private String startLocation;
+
+  @Column(name = "start_lat", precision = 10, scale = 7)
+  private BigDecimal startLat;
+
+  @Column(name = "start_lng", precision = 10, scale = 7)
+  private BigDecimal startLng;
+
+  @Column(name = "end_location", length = 255)
+  private String endLocation;
+
+  @Column(name = "end_lat", precision = 10, scale = 7)
+  private BigDecimal endLat;
+
+  @Column(name = "end_lng", precision = 10, scale = 7)
+  private BigDecimal endLng;
+
+  @Column(name = "total_distance_m")
+  private Integer totalDistanceM;
 
   @Column(name = "travel_date")
   private LocalDate travelDate;
@@ -40,9 +56,22 @@ public class TravelCourse extends BaseEntity {
 
   protected TravelCourse() {}
 
-  public TravelCourse(UUID userId, StartCourse startCourse, LocalDate travelDate) {
+  public TravelCourse(
+      UUID userId,
+      String startLocation,
+      BigDecimal startLat,
+      BigDecimal startLng,
+      String endLocation,
+      BigDecimal endLat,
+      BigDecimal endLng,
+      LocalDate travelDate) {
     this.userId = userId;
-    this.startCourse = startCourse;
+    this.startLocation = startLocation;
+    this.startLat = startLat;
+    this.startLng = startLng;
+    this.endLocation = endLocation;
+    this.endLat = endLat;
+    this.endLng = endLng;
     this.travelDate = travelDate;
   }
 
@@ -50,8 +79,32 @@ public class TravelCourse extends BaseEntity {
     return userId;
   }
 
-  public StartCourse getStartCourse() {
-    return startCourse;
+  public String getStartLocation() {
+    return startLocation;
+  }
+
+  public BigDecimal getStartLat() {
+    return startLat;
+  }
+
+  public BigDecimal getStartLng() {
+    return startLng;
+  }
+
+  public String getEndLocation() {
+    return endLocation;
+  }
+
+  public BigDecimal getEndLat() {
+    return endLat;
+  }
+
+  public BigDecimal getEndLng() {
+    return endLng;
+  }
+
+  public Integer getTotalDistanceM() {
+    return totalDistanceM;
   }
 
   public LocalDate getTravelDate() {

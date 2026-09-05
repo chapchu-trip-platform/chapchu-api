@@ -32,11 +32,14 @@ public class CourseController {
         courseService.createCourse(
             userId,
             request.petId(),
-            request.lat(),
-            request.lng(),
-            request.radiusMeters() > 0 ? request.radiusMeters() : 5000,
             request.travelDate(),
             request.startLocation(),
+            request.startLat(),
+            request.startLng(),
+            request.endLocation(),
+            request.endLat(),
+            request.endLng(),
+            request.totalStopCount(),
             request.temperature(),
             request.humidity(),
             request.weatherStatus());
@@ -47,5 +50,11 @@ public class CourseController {
   @GetMapping("/{courseId}")
   public CourseResponse getCourse(@CurrentUserId UUID userId, @PathVariable UUID courseId) {
     return CourseResponse.from(courseService.getCourse(userId, courseId));
+  }
+
+  @PostMapping("/{courseId}/complete")
+  @ResponseStatus(HttpStatus.OK)
+  public void completeCourse(@CurrentUserId UUID userId, @PathVariable UUID courseId) {
+    courseService.completeCourse(userId, courseId);
   }
 }

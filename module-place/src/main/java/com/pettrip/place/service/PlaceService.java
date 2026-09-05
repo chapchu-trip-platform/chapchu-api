@@ -8,11 +8,15 @@ import com.pettrip.place.repository.PlacePetPolicyRepository;
 import com.pettrip.place.repository.PlaceRepository;
 import java.math.BigDecimal;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class PlaceService {
+
+  private static final Logger log = LoggerFactory.getLogger(PlaceService.class);
 
   private final PlaceRepository placeRepository;
   private final PlacePetPolicyRepository petPolicyRepository;
@@ -36,11 +40,21 @@ public class PlaceService {
   public List<Place> searchNearby(BigDecimal lat, BigDecimal lng, int radiusMeters) {
     try {
       List<TourApiClient.NearbyItem> items = tourApiClient.fetchNearby(lat, lng, radiusMeters);
-      return items.stream()
-          .map(this::syncPlace)
-          .filter(place -> petPolicyRepository.existsById(place.getExternalPlaceId()))
-          .toList();
+      log.info(
+          "TourAPI fetchNearby 결과 {}건 (lat={}, lng={}, radius={})",
+          items.size(),
+          lat,
+          lng,
+          radiusMeters);
+      List<Place> result =
+          items.stream()
+              .map(this::syncPlace)
+              .filter(place -> petPolicyRepository.existsById(place.getExternalPlaceId()))
+              .toList();
+      log.info("펫 정책 필터 통과 {}건 / 전체 {}건", result.size(), items.size());
+      return result;
     } catch (Exception e) {
+      log.error("searchNearby 실패 {}: {}", e.getClass().getSimpleName(), e.getMessage(), e);
       return List.of();
     }
   }
@@ -86,7 +100,10 @@ public class PlaceService {
   private void syncPetPolicy(Place place, String contentId) {
     if (petPolicyRepository.existsById(contentId)) return;
     TourApiClient.PetDetailItem detail = tourApiClient.fetchPetDetail(contentId);
-    if (detail == null) return;
+    if (detail == null) {
+      log.warn("detailPetTour2 응답 없음 contentId={} -> 펫 정책 미저장(필터에서 제외됨)", contentId);
+      return;
+    }
 
     petPolicyRepository.save(
         new PlacePetPolicy(

@@ -18,13 +18,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pettrip.config.SecurityConfig;
 import com.pettrip.place.model.Place;
 import com.pettrip.trip.model.CoursePlace;
-import com.pettrip.trip.model.StartCourse;
 import com.pettrip.trip.model.TravelCourse;
 import com.pettrip.trip.service.CourseService;
 import com.pettrip.trip.service.CourseService.TravelCourseDetail;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -55,8 +53,16 @@ class CourseControllerTest {
   @MockitoBean private JwtDecoder jwtDecoder;
 
   private TravelCourseDetail sampleDetail() {
-    StartCourse start = new StartCourse("강남구", LocalDateTime.now());
-    TravelCourse course = new TravelCourse(USER_ID, start, LocalDate.of(2026, 8, 30));
+    TravelCourse course =
+        new TravelCourse(
+            USER_ID,
+            "강남구",
+            new BigDecimal("37.5"),
+            new BigDecimal("127.0"),
+            "종로구",
+            new BigDecimal("37.6"),
+            new BigDecimal("126.9"),
+            LocalDate.of(2026, 8, 30));
     Place place =
         new Place(
             "ext-001",
@@ -74,24 +80,28 @@ class CourseControllerTest {
   }
 
   @Test
-  void 코스를_생성한다() throws Exception {
+  void 코스를_저장한다() throws Exception {
     TravelCourseDetail detail = sampleDetail();
     when(courseService.createCourse(
-            any(), any(), any(), any(), anyInt(), any(), any(), any(), any(), any()))
+            any(), any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), any(), any(),
+            any()))
         .thenReturn(detail.course());
     when(courseService.getCourse(any(), any())).thenReturn(detail);
 
     CreateCourseRequest request =
         new CreateCourseRequest(
             UUID.randomUUID(),
-            new BigDecimal("37.5"),
-            new BigDecimal("127.0"),
-            5000,
             LocalDate.of(2026, 8, 30),
             "강남구",
-            null,
-            null,
-            null);
+            new BigDecimal("37.5"),
+            new BigDecimal("127.0"),
+            "종로구",
+            new BigDecimal("37.6"),
+            new BigDecimal("126.9"),
+            4,
+            (short) 25,
+            (short) 60,
+            "맑음");
 
     mockMvc
         .perform(
@@ -105,20 +115,24 @@ class CourseControllerTest {
                 "course-create",
                 requestFields(
                     fieldWithPath("petId").description("반려동물 ID (필수)"),
-                    fieldWithPath("lat").description("위도"),
-                    fieldWithPath("lng").description("경도"),
-                    fieldWithPath("radiusMeters")
-                        .description("검색 반경(미터). 0이면 기본값 5000m 적용")
-                        .type(JsonFieldType.NUMBER),
                     fieldWithPath("travelDate").description("여행 날짜"),
-                    fieldWithPath("startLocation").description("출발 위치"),
-                    fieldWithPath("temperature").description("기온(℃) — FE 제공, 선택").optional(),
-                    fieldWithPath("humidity").description("습도(%) — FE 제공, 선택").optional(),
-                    fieldWithPath("weatherStatus").description("날씨 상태 — FE 제공, 선택").optional()),
+                    fieldWithPath("startLocation").description("출발지 이름"),
+                    fieldWithPath("startLat").description("출발지 위도"),
+                    fieldWithPath("startLng").description("출발지 경도"),
+                    fieldWithPath("endLocation").description("도착지 이름"),
+                    fieldWithPath("endLat").description("도착지 위도"),
+                    fieldWithPath("endLng").description("도착지 경도"),
+                    fieldWithPath("totalStopCount")
+                        .description("출발지+도착지 포함 총 장소 수 (최소 2)")
+                        .type(JsonFieldType.NUMBER),
+                    fieldWithPath("temperature").description("기온 (선택)").optional(),
+                    fieldWithPath("humidity").description("습도 (선택)").optional(),
+                    fieldWithPath("weatherStatus").description("날씨 상태 (선택)").optional()),
                 responseFields(
                     fieldWithPath("courseId").description("코스 ID"),
                     fieldWithPath("travelDate").description("여행 날짜"),
-                    fieldWithPath("startLocation").description("출발 위치"),
+                    fieldWithPath("startLocation").description("출발지 이름"),
+                    fieldWithPath("endLocation").description("도착지 이름"),
                     fieldWithPath("places").description("방문 장소 목록").type(JsonFieldType.ARRAY),
                     fieldWithPath("places[].coursePlaceId").description("코스 장소 ID"),
                     fieldWithPath("places[].externalPlaceId").description("장소 외부 ID"),
@@ -151,7 +165,8 @@ class CourseControllerTest {
                 responseFields(
                     fieldWithPath("courseId").description("코스 ID"),
                     fieldWithPath("travelDate").description("여행 날짜"),
-                    fieldWithPath("startLocation").description("출발 위치"),
+                    fieldWithPath("startLocation").description("출발지 이름"),
+                    fieldWithPath("endLocation").description("도착지 이름"),
                     fieldWithPath("places").description("방문 장소 목록").type(JsonFieldType.ARRAY),
                     fieldWithPath("places[].coursePlaceId").description("코스 장소 ID"),
                     fieldWithPath("places[].externalPlaceId").description("장소 외부 ID"),
@@ -164,5 +179,19 @@ class CourseControllerTest {
                         .type(JsonFieldType.NUMBER),
                     fieldWithPath("places[].finalPlace").description("마지막 방문 장소 여부"),
                     fieldWithPath("places[].petPolicy").description("반려동물 정책").optional())));
+  }
+
+  @Test
+  void 코스를_완료한다() throws Exception {
+    UUID courseId = UUID.randomUUID();
+    mockMvc
+        .perform(
+            post("/courses/{courseId}/complete", courseId)
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isOk())
+        .andDo(
+            document(
+                "course-complete",
+                pathParameters(parameterWithName("courseId").description("완료할 코스 ID"))));
   }
 }
