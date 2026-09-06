@@ -54,12 +54,8 @@ public class PlaceService {
           lat,
           lng,
           radiusMeters);
-      List<Place> result =
-          items.stream()
-              .map(this::syncPlace)
-              .filter(place -> petPolicyRepository.existsById(place.getExternalPlaceId()))
-              .toList();
-      log.info("펫 정책 필터 통과 {}건 / 전체 {}건", result.size(), items.size());
+      List<Place> result = items.stream().map(this::syncPlace).toList();
+      log.info("장소 동기화 완료 {}건 / 전체 {}건", result.size(), items.size());
       return result;
     } catch (Exception e) {
       log.error("searchNearby 실패 {}: {}", e.getClass().getSimpleName(), e.getMessage(), e);

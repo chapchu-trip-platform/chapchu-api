@@ -334,7 +334,7 @@ public class CourseService {
   }
 
   private boolean isPetAllowed(PetSize petSize, PlacePetPolicy policy) {
-    if (policy == null) return false;
+    if (policy == null) return true;
     AllowedPetSize allowed = policy.getAllowedPetSize();
     if (allowed == null || allowed == AllowedPetSize.ALL) return true;
     return switch (petSize) {
