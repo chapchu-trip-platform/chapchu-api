@@ -98,10 +98,16 @@ public class TourApiClient {
     }
 
     try {
-      Map<String, Object> response = (Map<String, Object>) body.get("response");
-      Map<String, Object> responseBody = (Map<String, Object>) response.get("body");
-      Map<String, Object> items = (Map<String, Object>) responseBody.get("items");
-      Object item = items.get("item");
+      if (!(body.get("response") instanceof Map<?, ?> response)) {
+        return Collections.emptyList();
+      }
+      if (!(((Map<String, Object>) response).get("body") instanceof Map<?, ?> responseBody)) {
+        return Collections.emptyList();
+      }
+      if (!(((Map<String, Object>) responseBody).get("items") instanceof Map<?, ?> items)) {
+        return Collections.emptyList();
+      }
+      Object item = ((Map<String, Object>) items).get("item");
       if (item instanceof List<?> list) {
         return (List<Map<String, Object>>) list;
       }

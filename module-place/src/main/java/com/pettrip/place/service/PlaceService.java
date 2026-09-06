@@ -99,10 +99,10 @@ public class PlaceService {
         null,
         null,
         contentTypeId);
-    placeRepository.save(place);
+    Place saved = placeRepository.save(place);
 
-    syncPetPolicy(place, item.contentId());
-    return place;
+    syncPetPolicy(saved, item.contentId());
+    return saved;
   }
 
   private void syncPetPolicy(Place place, String contentId) {
