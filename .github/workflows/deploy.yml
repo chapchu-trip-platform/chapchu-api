@@ -60,11 +60,14 @@ jobs:
           CHAPCHU_API_CLIENT_SECRET: ${{ secrets.CHAPCHU_API_CLIENT_SECRET }}
           TOUR_API_KEY: ${{ secrets.TOUR_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          S3_BUCKET_NAME: ${{ secrets.S3_BUCKET_NAME }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          envs: DB_PASSWORD,CHAPCHU_API_CLIENT_SECRET,TOUR_API_KEY,OPENAI_API_KEY
+          envs: DB_PASSWORD,CHAPCHU_API_CLIENT_SECRET,TOUR_API_KEY,OPENAI_API_KEY,AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,S3_BUCKET_NAME
           script: |
             export KUBECONFIG=/home/ubuntu/.kube/config
             kubectl create secret generic postgres-secret \
@@ -75,6 +78,9 @@ jobs:
               --from-literal=CHAPCHU_API_CLIENT_SECRET="$CHAPCHU_API_CLIENT_SECRET" \
               --from-literal=TOUR_API_KEY="$TOUR_API_KEY" \
               --from-literal=OPENAI_API_KEY="$OPENAI_API_KEY" \
+              --from-literal=AWS_ACCESS_KEY_ID="$AWS_ACCESS_KEY_ID" \
+              --from-literal=AWS_SECRET_ACCESS_KEY="$AWS_SECRET_ACCESS_KEY" \
+              --from-literal=S3_BUCKET_NAME="$S3_BUCKET_NAME" \
               -n chapchu --dry-run=client -o yaml | kubectl apply -f -
             kubectl apply -f ~/k8s/k8s/chapchu-api-configmap.yaml
 
