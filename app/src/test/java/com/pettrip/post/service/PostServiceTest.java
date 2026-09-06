@@ -3,6 +3,7 @@ package com.pettrip.post.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -22,6 +23,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.jdbc.core.RowMapper;
@@ -99,7 +101,8 @@ class PostServiceTest {
     UUID courseId = UUID.randomUUID();
     PostResponse expected = samplePostResponse(userId);
     stubReferenceCheck(true, true, true);
-    when(postRepository.save(any(Post.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    when(postRepository.saveAndFlush(any(Post.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
     when(jdbcTemplate.query(any(String.class), any(SqlParameterSource.class), any(RowMapper.class)))
         .thenReturn(List.of(expected));
 
@@ -119,7 +122,8 @@ class PostServiceTest {
     UUID userId = UUID.randomUUID();
     PostResponse expected = samplePostResponse(userId);
     stubReferenceCheck(true, false, true);
-    when(postRepository.save(any(Post.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    when(postRepository.saveAndFlush(any(Post.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
     when(jdbcTemplate.query(any(String.class), any(SqlParameterSource.class), any(RowMapper.class)))
         .thenReturn(List.of(expected));
 
@@ -133,7 +137,8 @@ class PostServiceTest {
   void createPost는_photoId가_null이면_photoId를_쿼리_파라미터에서_뺀다() {
     UUID userId = UUID.randomUUID();
     stubReferenceCheck(true, false, true);
-    when(postRepository.save(any(Post.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    when(postRepository.saveAndFlush(any(Post.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
     when(jdbcTemplate.query(any(String.class), any(SqlParameterSource.class), any(RowMapper.class)))
         .thenReturn(List.of(samplePostResponse(userId)));
 
@@ -149,7 +154,8 @@ class PostServiceTest {
     UUID userId = UUID.randomUUID();
     PostResponse expected = samplePostResponse(userId);
     stubReferenceCheck(false, true, false);
-    when(postRepository.save(any(Post.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    when(postRepository.saveAndFlush(any(Post.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
     when(jdbcTemplate.query(any(String.class), any(SqlParameterSource.class), any(RowMapper.class)))
         .thenReturn(List.of(expected));
 
@@ -162,7 +168,8 @@ class PostServiceTest {
   @Test
   void createPost는_참조가_모두_null이면_확인_쿼리를_돌리지_않는다() {
     UUID userId = UUID.randomUUID();
-    when(postRepository.save(any(Post.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    when(postRepository.saveAndFlush(any(Post.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
     when(jdbcTemplate.query(any(String.class), any(SqlParameterSource.class), any(RowMapper.class)))
         .thenReturn(List.of(samplePostResponse(userId)));
 
@@ -177,7 +184,8 @@ class PostServiceTest {
     UUID userId = UUID.randomUUID();
     UUID courseId = UUID.randomUUID();
     stubReferenceCheck(false, false, true);
-    when(postRepository.save(any(Post.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    when(postRepository.saveAndFlush(any(Post.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
     when(jdbcTemplate.query(any(String.class), any(SqlParameterSource.class), any(RowMapper.class)))
         .thenReturn(List.of(samplePostResponse(userId)));
 
@@ -187,6 +195,42 @@ class PostServiceTest {
     verify(jdbcTemplate).queryForObject(any(String.class), captor.capture(), any(RowMapper.class));
     assertThat(captor.getValue().hasValue("petId")).isFalse();
     assertThat(captor.getValue().hasValue("courseId")).isTrue();
+  }
+
+  @Test
+  void createPost는_저장을_flush한_뒤_되읽는다() {
+    UUID userId = UUID.randomUUID();
+    when(postRepository.saveAndFlush(any(Post.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+    when(jdbcTemplate.query(any(String.class), any(SqlParameterSource.class), any(RowMapper.class)))
+        .thenReturn(List.of(samplePostResponse(userId)));
+
+    postService.createPost(userId, null, null, null, "제목", "내용");
+
+    InOrder inOrder = inOrder(postRepository, jdbcTemplate);
+    inOrder.verify(postRepository).saveAndFlush(any(Post.class));
+    inOrder
+        .verify(jdbcTemplate)
+        .query(any(String.class), any(SqlParameterSource.class), any(RowMapper.class));
+  }
+
+  @Test
+  void updatePost는_저장을_flush한_뒤_되읽는다() {
+    UUID userId = UUID.randomUUID();
+    UUID postId = UUID.randomUUID();
+    Post post =
+        new Post(userId, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "제목", "내용");
+    when(postRepository.findById(postId)).thenReturn(Optional.of(post));
+    when(jdbcTemplate.query(any(String.class), any(SqlParameterSource.class), any(RowMapper.class)))
+        .thenReturn(List.of(samplePostResponse(userId)));
+
+    postService.updatePost(userId, postId, "새 제목", "새 내용");
+
+    InOrder inOrder = inOrder(postRepository, jdbcTemplate);
+    inOrder.verify(postRepository).saveAndFlush(post);
+    inOrder
+        .verify(jdbcTemplate)
+        .query(any(String.class), any(SqlParameterSource.class), any(RowMapper.class));
   }
 
   @Test
