@@ -22,7 +22,7 @@ public class PlaceRagService {
   private static final String RANK_SQL =
       "SELECT r.place_id"
           + " FROM reviews r"
-          + " JOIN review_embeddings re ON re.review_id = r.id"
+          + " JOIN review_embeddings re ON re.review_id = r.review_id"
           + " WHERE r.place_id = ANY(?)"
           + " GROUP BY r.place_id"
           + " ORDER BY MIN(re.embedding <=> ?::vector) ASC, AVG(r.rating) DESC";
