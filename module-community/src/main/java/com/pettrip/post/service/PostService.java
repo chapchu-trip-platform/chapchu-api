@@ -124,19 +124,28 @@ public class PostService {
     return fetchEnrichedPost(userId, postId);
   }
 
+  /**
+   * 저장 후 {@code saveAndFlush}로 INSERT를 강제한다.
+   *
+   * <p>{@link #fetchEnrichedPost}는 닉네임·사진 URL을 붙이려고 JdbcTemplate 원시 SQL로 되읽는데, 이 쿼리는 Hibernate 영속성
+   * 컨텍스트를 보지 않는다. {@code Post}는 PK를 애플리케이션이 직접 만들어서(@GeneratedValue 없음) {@code save()}가 INSERT를 커밋
+   * 시점까지 미루므로, flush하지 않으면 방금 만든 글을 DB에서 찾지 못해 404가 난다.
+   */
   @Transactional
   public PostResponse createPost(
       UUID userId, UUID petId, UUID photoId, UUID courseId, String title, String content) {
     verifyReferences(userId, petId, photoId, courseId);
-    Post post = postRepository.save(new Post(userId, petId, photoId, courseId, title, content));
+    Post post =
+        postRepository.saveAndFlush(new Post(userId, petId, photoId, courseId, title, content));
     return fetchEnrichedPost(userId, post.getId());
   }
 
   @Transactional
+  /** {@link #createPost}와 같은 이유로 flush한다. 여기서는 404 대신 수정 전 내용이 응답으로 나가는 형태로 드러난다. */
   public PostResponse updatePost(UUID userId, UUID postId, String title, String content) {
     Post post = getOwnedPost(userId, postId);
     post.update(title, content);
-    postRepository.save(post);
+    postRepository.saveAndFlush(post);
     return fetchEnrichedPost(userId, postId);
   }
 
