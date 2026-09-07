@@ -67,6 +67,10 @@ app:
   s3:
     bucket: ${S3_BUCKET_NAME:placeholder}
 
+  # 프로필 사진 미설정 유저에게 내려줄 기본 이미지 URL. 실제 기본 이미지로 교체 시 env로 주입.
+  profile:
+    default-image-url: ${DEFAULT_PROFILE_IMAGE_URL:https://chapchu-photos.s3.ap-northeast-2.amazonaws.com/defaults/profile.png}
+
   # TOUR_API_KEY는 아직 배포 환경에 주입돼 있지 않다. 기본값을 비워 두어 키가 없어도 기동은 되게 한다.
   # DB에서 읽는 GET /places/{placeId}는 정상 동작하고, TourAPI를 호출하는 GET /places/nearby 만
   # 실패한다. 키가 준비되면 k8s Secret에 TOUR_API_KEY를 추가하면 된다 (이슈 #50 참고).

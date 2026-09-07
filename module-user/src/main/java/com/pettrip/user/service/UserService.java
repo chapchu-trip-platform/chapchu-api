@@ -1,5 +1,8 @@
 package com.pettrip.user.service;
 
+import com.pettrip.photo.model.Photo;
+import com.pettrip.photo.repository.PhotoRepository;
+import com.pettrip.photo.service.PhotoService;
 import com.pettrip.user.model.AccountStatus;
 import com.pettrip.user.model.Region;
 import com.pettrip.user.model.Theme;
@@ -12,6 +15,7 @@ import com.pettrip.user.repository.UserRepository;
 import java.util.HashSet;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -21,20 +25,50 @@ public class UserService {
   private final RegionRepository regionRepository;
   private final ThemeRepository themeRepository;
   private final TransportMethodRepository transportMethodRepository;
+  private final PhotoRepository photoRepository;
+  private final PhotoService photoService;
+  private final String defaultProfileImageUrl;
 
   public UserService(
       UserRepository userRepository,
       RegionRepository regionRepository,
       ThemeRepository themeRepository,
-      TransportMethodRepository transportMethodRepository) {
+      TransportMethodRepository transportMethodRepository,
+      PhotoRepository photoRepository,
+      PhotoService photoService,
+      @Value("${app.profile.default-image-url}") String defaultProfileImageUrl) {
     this.userRepository = userRepository;
     this.regionRepository = regionRepository;
     this.themeRepository = themeRepository;
     this.transportMethodRepository = transportMethodRepository;
+    this.photoRepository = photoRepository;
+    this.photoService = photoService;
+    this.defaultProfileImageUrl = defaultProfileImageUrl;
   }
 
-  public User getMe(UUID userId) {
-    return findUser(userId);
+  public MeDetail getMe(UUID userId) {
+    return assemble(findUser(userId));
+  }
+
+  public MeDetail updateProfilePhoto(UUID userId, UUID photoId) {
+    User user = findUser(userId);
+    if (photoId != null) {
+      photoService.getOwnedPhoto(userId, photoId);
+    }
+    user.updateProfilePhoto(photoId);
+    return assemble(userRepository.save(user));
+  }
+
+  private MeDetail assemble(User user) {
+    if (user.getProfilePhotoId() == null) {
+      return new MeDetail(user, new ProfilePhotoView(null, defaultProfileImageUrl));
+    }
+    Photo photo = photoRepository.findById(user.getProfilePhotoId()).orElse(null);
+    if (photo == null) {
+      return new MeDetail(user, new ProfilePhotoView(null, defaultProfileImageUrl));
+    }
+    String url = photoService.issueDownloadUrl(photo.getPhotoUrl()).toString();
+    return new MeDetail(user, new ProfilePhotoView(photo.getId(), url));
   }
 
   /** docs/decisions/027 참고: 닉네임은 유저 간 중복될 수 없다. */
@@ -42,11 +76,11 @@ public class UserService {
     return !userRepository.existsByNickname(nickname);
   }
 
-  public User updateMe(UUID userId, String nickname, AccountStatus accountStatus) {
+  public MeDetail updateMe(UUID userId, String nickname, AccountStatus accountStatus) {
     User user = findUser(userId);
     validateNicknameNotTaken(user, nickname);
     user.update(nickname, accountStatus);
-    return userRepository.save(user);
+    return assemble(userRepository.save(user));
   }
 
   /** 본인이 이미 쓰던 닉네임을 그대로 보낸 경우는 중복으로 보지 않는다. */

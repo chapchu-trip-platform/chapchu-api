@@ -1,7 +1,6 @@
 package com.pettrip.user.controller;
 
 import com.pettrip.common.service.CurrentUserId;
-import com.pettrip.user.model.User;
 import com.pettrip.user.service.UserService;
 import jakarta.validation.Valid;
 import java.util.UUID;
@@ -23,19 +22,24 @@ public class UserController {
 
   @GetMapping
   public UserResponse getMe(@CurrentUserId UUID userId) {
-    return UserResponse.from(userService.getMe(userId));
+    return UserResponse.of(userService.getMe(userId));
   }
 
   @PatchMapping("/nickname")
   public UserResponse changeNickname(
       @CurrentUserId UUID userId, @RequestBody @Valid NicknameChangeRequest request) {
-    User user = userService.updateMe(userId, request.nickname(), null);
-    return UserResponse.from(user);
+    return UserResponse.of(userService.updateMe(userId, request.nickname(), null));
   }
 
   @PatchMapping
   public UserResponse updateMe(@CurrentUserId UUID userId, @RequestBody UserUpdateRequest request) {
-    User user = userService.updateMe(userId, request.nickname(), request.accountStatus());
-    return UserResponse.from(user);
+    return UserResponse.of(
+        userService.updateMe(userId, request.nickname(), request.accountStatus()));
+  }
+
+  @PatchMapping("/photo")
+  public UserResponse updateProfilePhoto(
+      @CurrentUserId UUID userId, @RequestBody ProfilePhotoUpdateRequest request) {
+    return UserResponse.of(userService.updateProfilePhoto(userId, request.photoId()));
   }
 }
