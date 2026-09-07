@@ -49,14 +49,15 @@ class PhotoControllerTest {
 
   @Test
   void 사진_업로드_URL을_발급한다() throws Exception {
-    String photoKey = "visit/user-1/uuid-초코.jpg";
-    when(photoService.buildPhotoKey(any(), eq(PhotoType.VISIT), eq("초코.jpg"))).thenReturn(photoKey);
+    String photoKey = "review/user-1/uuid-초코.jpg";
+    when(photoService.buildPhotoKey(any(), eq(PhotoType.REVIEW), eq("초코.jpg")))
+        .thenReturn(photoKey);
     when(photoService.issueUploadUrl(photoKey))
         .thenReturn(
             URI.create("https://bucket.s3.ap-northeast-2.amazonaws.com/" + photoKey).toURL());
 
     String body =
-        objectMapper.writeValueAsString(new PhotoUploadUrlRequest(PhotoType.VISIT, "초코.jpg"));
+        objectMapper.writeValueAsString(new PhotoUploadUrlRequest(PhotoType.REVIEW, "초코.jpg"));
 
     mockMvc
         .perform(
@@ -69,7 +70,7 @@ class PhotoControllerTest {
             document(
                 "photo-upload-url",
                 requestFields(
-                    fieldWithPath("type").description("사진 용도 (VISIT, POST, ALBUM, PROFILE)"),
+                    fieldWithPath("type").description("사진 용도 (PROFILE, POST, REVIEW)"),
                     fieldWithPath("fileName").description("업로드할 원본 파일명")),
                 responseFields(
                     fieldWithPath("uploadUrl").description("S3 Presigned PUT URL (10분 유효)"),
@@ -79,7 +80,7 @@ class PhotoControllerTest {
   @Test
   void 사진을_저장한다() throws Exception {
     UUID coursePlaceId = UUID.randomUUID();
-    String photoKey = "visit/user-1/uuid-초코.jpg";
+    String photoKey = "review/user-1/uuid-초코.jpg";
     LocalDate takenAt = LocalDate.of(2026, 7, 1);
     Photo photo = new Photo(UUID.randomUUID(), coursePlaceId, photoKey, takenAt);
     when(photoService.savePhoto(any(), eq(coursePlaceId), eq(photoKey), eq(takenAt)))
@@ -115,7 +116,7 @@ class PhotoControllerTest {
   @Test
   void 사진_조회_URL을_발급한다() throws Exception {
     UUID photoId = UUID.randomUUID();
-    String photoKey = "visit/user-1/uuid-초코.jpg";
+    String photoKey = "review/user-1/uuid-초코.jpg";
     Photo photo = new Photo(USER_ID, UUID.randomUUID(), photoKey, LocalDate.of(2026, 7, 1));
     when(photoService.getOwnedPhoto(any(), eq(photoId))).thenReturn(photo);
     when(photoService.issueDownloadUrl(photoKey))

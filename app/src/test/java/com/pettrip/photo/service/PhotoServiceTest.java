@@ -40,9 +40,9 @@ class PhotoServiceTest {
   void buildPhotoKey는_기능_유저ID_파일명을_포함한_경로를_생성한다() {
     UUID userId = UUID.randomUUID();
 
-    String key = photoService.buildPhotoKey(userId, PhotoType.VISIT, "초코.jpg");
+    String key = photoService.buildPhotoKey(userId, PhotoType.REVIEW, "초코.jpg");
 
-    assertThat(key).startsWith("visit/" + userId + "/").endsWith("-초코.jpg");
+    assertThat(key).startsWith("review/" + userId + "/").endsWith("-초코.jpg");
   }
 
   @Test
@@ -50,7 +50,8 @@ class PhotoServiceTest {
     UUID userId = UUID.randomUUID();
 
     assertThat(photoService.buildPhotoKey(userId, PhotoType.POST, "a.jpg")).startsWith("post/");
-    assertThat(photoService.buildPhotoKey(userId, PhotoType.ALBUM, "a.jpg")).startsWith("album/");
+    assertThat(photoService.buildPhotoKey(userId, PhotoType.PROFILE, "a.jpg"))
+        .startsWith("profile/");
   }
 
   @Test
