@@ -17,6 +17,6 @@ public class PlaceReviewController {
 
   @GetMapping("/places/{placeId}/reviews")
   public List<ReviewResponse> listPlaceReviews(@PathVariable String placeId) {
-    return reviewService.listPlaceReviews(placeId).stream().map(ReviewResponse::from).toList();
+    return reviewService.listPlaceReviews(placeId).stream().map(ReviewResponse::of).toList();
   }
 }

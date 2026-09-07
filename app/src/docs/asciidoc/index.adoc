@@ -1091,6 +1091,11 @@ include::{snippets}/comment-delete/http-response.adoc[]
 JWT 인증이 필요합니다. `petId`는 본인 반려동물이어야 하며, 타인의 반려동물 ID를 사용하면 403이 반환됩니다.
 코스 여행 중 작성하는 경우 `coursePlaceId`를 함께 전달하면 해당 방문 장소와 연결됩니다.
 
+사진을 첨부하려면 먼저 `POST /photos/upload-url`(type=`REVIEW`) → S3 업로드 → `POST /photos`로 사진을 만들어
+얻은 `photoId`들을 `photoIds`에 순서대로 담아 보냅니다(리뷰 1개에 여러 장, 최대 10장). 본인 소유가 아닌
+사진 ID면 `404 NOT_FOUND`. 응답·조회 시 각 사진의 다운로드 URL(presigned GET, 10분)이 `photos[]`로 내려갑니다.
+코스엔 리뷰가 여러 개 달리므로 코스당 사진이 여러 장 쌓이며, 앨범·추천장소는 이 리뷰 사진을 가져다 씁니다.
+
 [.request]
 ==== 요청
 

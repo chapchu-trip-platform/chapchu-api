@@ -9,43 +9,74 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.pettrip.pet.repository.PetRepository;
+import com.pettrip.photo.model.Photo;
+import com.pettrip.photo.repository.PhotoRepository;
+import com.pettrip.photo.service.PhotoNotFoundException;
+import com.pettrip.photo.service.PhotoService;
 import com.pettrip.review.controller.ReviewCreateRequest;
 import com.pettrip.review.model.Review;
+import com.pettrip.review.model.ReviewPhoto;
+import com.pettrip.review.repository.ReviewPhotoRepository;
 import com.pettrip.review.repository.ReviewRecommendationRepository;
 import com.pettrip.review.repository.ReviewRepository;
+import java.net.URI;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class ReviewServiceTest {
 
   @Mock private ReviewRepository reviewRepository;
   @Mock private ReviewRecommendationRepository reviewRecommendationRepository;
   @Mock private ReviewEmbeddingService reviewEmbeddingService;
   @Mock private PetRepository petRepository;
+  @Mock private ReviewPhotoRepository reviewPhotoRepository;
+  @Mock private PhotoRepository photoRepository;
+  @Mock private PhotoService photoService;
 
   @InjectMocks private ReviewService reviewService;
+
+  @BeforeEach
+  void setUp() {
+    when(reviewPhotoRepository.findByReviewIdInOrderByPhotoOrderAsc(any())).thenReturn(List.of());
+    when(photoRepository.findAllById(any())).thenReturn(List.of());
+  }
+
+  private ReviewCreateRequest request(
+      String placeId,
+      UUID petId,
+      short rating,
+      String contents,
+      String weather,
+      UUID coursePlaceId) {
+    return new ReviewCreateRequest(placeId, petId, rating, contents, weather, coursePlaceId, null);
+  }
 
   @Test
   void 리뷰_생성시_리뷰와_임베딩이_저장된다() {
     UUID userId = UUID.randomUUID();
     UUID petId = UUID.randomUUID();
-    ReviewCreateRequest request =
-        new ReviewCreateRequest("place-1", petId, (short) 4, "좋았어요", "SUNNY", null);
+    ReviewCreateRequest request = request("place-1", petId, (short) 4, "좋았어요", "SUNNY", null);
     Review saved = new Review("place-1", userId, petId, (short) 4, "좋았어요", "SUNNY");
     when(petRepository.existsByIdAndUserId(petId, userId)).thenReturn(true);
     when(reviewRepository.save(any(Review.class))).thenReturn(saved);
 
-    Review result = reviewService.createReview(userId, request);
+    ReviewDetail result = reviewService.createReview(userId, request);
 
-    assertThat(result.getPlaceId()).isEqualTo("place-1");
-    assertThat(result.getWeather()).isEqualTo("SUNNY");
+    assertThat(result.review().getPlaceId()).isEqualTo("place-1");
+    assertThat(result.review().getWeather()).isEqualTo("SUNNY");
+    assertThat(result.photos()).isEmpty();
     verify(reviewEmbeddingService).generateAndSave(saved);
   }
 
@@ -55,30 +86,79 @@ class ReviewServiceTest {
     UUID petId = UUID.randomUUID();
     UUID coursePlaceId = UUID.randomUUID();
     ReviewCreateRequest request =
-        new ReviewCreateRequest("place-1", petId, (short) 5, "코스 최고!", "SUNNY", coursePlaceId);
+        request("place-1", petId, (short) 5, "코스 최고!", "SUNNY", coursePlaceId);
     Review saved = new Review("place-1", userId, petId, (short) 5, "코스 최고!", "SUNNY");
     saved.setCoursePlaceId(coursePlaceId);
     when(petRepository.existsByIdAndUserId(petId, userId)).thenReturn(true);
     when(reviewRepository.save(any(Review.class))).thenReturn(saved);
 
-    Review result = reviewService.createReview(userId, request);
+    ReviewDetail result = reviewService.createReview(userId, request);
 
-    assertThat(result.getCoursePlaceId()).isEqualTo(coursePlaceId);
+    assertThat(result.review().getCoursePlaceId()).isEqualTo(coursePlaceId);
+  }
+
+  @Test
+  void 사진과_함께_리뷰_생성시_순서대로_저장되고_응답에_실린다() throws Exception {
+    UUID userId = UUID.randomUUID();
+    UUID petId = UUID.randomUUID();
+    UUID photo1 = UUID.randomUUID();
+    UUID photo2 = UUID.randomUUID();
+    ReviewCreateRequest request =
+        new ReviewCreateRequest(
+            "place-1", petId, (short) 5, "사진 많음", "SUNNY", null, List.of(photo1, photo2));
+    Review saved = new Review("place-1", userId, petId, (short) 5, "사진 많음", "SUNNY");
+    when(petRepository.existsByIdAndUserId(petId, userId)).thenReturn(true);
+    when(photoService.getOwnedPhoto(any(), any()))
+        .thenReturn(new Photo(userId, null, "review/u/a.jpg", null));
+    when(reviewRepository.save(any(Review.class))).thenReturn(saved);
+
+    Photo p1 = new Photo(userId, null, "review/u/1.jpg", LocalDate.of(2026, 7, 1));
+    Photo p2 = new Photo(userId, null, "review/u/2.jpg", null);
+    when(reviewPhotoRepository.findByReviewIdInOrderByPhotoOrderAsc(any()))
+        .thenReturn(
+            List.of(
+                new ReviewPhoto(saved.getId(), p1.getId(), (short) 0),
+                new ReviewPhoto(saved.getId(), p2.getId(), (short) 1)));
+    when(photoRepository.findAllById(any())).thenReturn(List.of(p1, p2));
+    when(photoService.issueDownloadUrl(any())).thenReturn(URI.create("https://bucket/x").toURL());
+
+    ReviewDetail result = reviewService.createReview(userId, request);
+
+    verify(reviewPhotoRepository, times(2)).save(any(ReviewPhoto.class));
+    assertThat(result.photos()).hasSize(2);
+    assertThat(result.photos().get(0).photoId()).isEqualTo(p1.getId());
+  }
+
+  @Test
+  void 타인_사진_첨부시_예외발생하고_리뷰는_저장되지_않는다() {
+    UUID userId = UUID.randomUUID();
+    UUID petId = UUID.randomUUID();
+    UUID foreignPhoto = UUID.randomUUID();
+    ReviewCreateRequest request =
+        new ReviewCreateRequest(
+            "place-1", petId, (short) 4, "좋음", "SUNNY", null, List.of(foreignPhoto));
+    when(petRepository.existsByIdAndUserId(petId, userId)).thenReturn(true);
+    when(photoService.getOwnedPhoto(userId, foreignPhoto)).thenThrow(new PhotoNotFoundException());
+
+    assertThatThrownBy(() -> reviewService.createReview(userId, request))
+        .isInstanceOf(PhotoNotFoundException.class);
+
+    verify(reviewRepository, never()).save(any());
+    verify(reviewPhotoRepository, never()).save(any());
   }
 
   @Test
   void 날씨없이_리뷰_생성시_정상_저장된다() {
     UUID userId = UUID.randomUUID();
     UUID petId = UUID.randomUUID();
-    ReviewCreateRequest request =
-        new ReviewCreateRequest("place-2", petId, (short) 3, "그냥 그랬어요", null, null);
+    ReviewCreateRequest request = request("place-2", petId, (short) 3, "그냥 그랬어요", null, null);
     Review saved = new Review("place-2", userId, petId, (short) 3, "그냥 그랬어요", null);
     when(petRepository.existsByIdAndUserId(petId, userId)).thenReturn(true);
     when(reviewRepository.save(any(Review.class))).thenReturn(saved);
 
-    Review result = reviewService.createReview(userId, request);
+    ReviewDetail result = reviewService.createReview(userId, request);
 
-    assertThat(result.getWeather()).isNull();
+    assertThat(result.review().getWeather()).isNull();
     verify(reviewEmbeddingService).generateAndSave(saved);
   }
 
@@ -86,8 +166,7 @@ class ReviewServiceTest {
   void 타인_반려동물로_리뷰_생성시_예외발생한다() {
     UUID userId = UUID.randomUUID();
     UUID otherPetId = UUID.randomUUID();
-    ReviewCreateRequest request =
-        new ReviewCreateRequest("place-1", otherPetId, (short) 4, "좋았어요", null, null);
+    ReviewCreateRequest request = request("place-1", otherPetId, (short) 4, "좋았어요", null, null);
     when(petRepository.existsByIdAndUserId(otherPetId, userId)).thenReturn(false);
 
     assertThatThrownBy(() -> reviewService.createReview(userId, request))
@@ -132,10 +211,11 @@ class ReviewServiceTest {
             new Review(placeId, UUID.randomUUID(), UUID.randomUUID(), (short) 3, "리뷰2", null));
     when(reviewRepository.findByPlaceIdOrderByCreatedAtDesc(placeId)).thenReturn(expected);
 
-    List<Review> result = reviewService.listPlaceReviews(placeId);
+    List<ReviewDetail> result = reviewService.listPlaceReviews(placeId);
 
     assertThat(result).hasSize(2);
-    assertThat(result.get(0).getContents()).isEqualTo("리뷰1");
+    assertThat(result.get(0).review().getContents()).isEqualTo("리뷰1");
+    assertThat(result.get(0).photos()).isEmpty();
   }
 
   @Test

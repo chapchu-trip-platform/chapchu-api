@@ -20,6 +20,6 @@ public class MyReviewController {
 
   @GetMapping
   public List<ReviewResponse> listMyReviews(@CurrentUserId UUID userId) {
-    return reviewService.listMyReviews(userId).stream().map(ReviewResponse::from).toList();
+    return reviewService.listMyReviews(userId).stream().map(ReviewResponse::of).toList();
   }
 }

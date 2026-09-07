@@ -27,7 +27,7 @@ public class ReviewController {
   @ResponseStatus(HttpStatus.CREATED)
   public ReviewResponse create(
       @CurrentUserId UUID userId, @RequestBody @Valid ReviewCreateRequest request) {
-    return ReviewResponse.from(reviewService.createReview(userId, request));
+    return ReviewResponse.of(reviewService.createReview(userId, request));
   }
 
   @DeleteMapping("/{reviewId}")

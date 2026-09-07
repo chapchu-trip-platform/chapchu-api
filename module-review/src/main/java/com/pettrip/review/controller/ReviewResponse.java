@@ -1,7 +1,10 @@
 package com.pettrip.review.controller;
 
 import com.pettrip.review.model.Review;
+import com.pettrip.review.service.ReviewDetail;
+import com.pettrip.review.service.ReviewPhotoView;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 public record ReviewResponse(
@@ -13,9 +16,11 @@ public record ReviewResponse(
     String weather,
     int recommendationCount,
     LocalDateTime createdAt,
-    UUID coursePlaceId) {
+    UUID coursePlaceId,
+    List<ReviewPhotoView> photos) {
 
-  public static ReviewResponse from(Review review) {
+  public static ReviewResponse of(ReviewDetail detail) {
+    Review review = detail.review();
     return new ReviewResponse(
         review.getId(),
         review.getPlaceId(),
@@ -25,6 +30,7 @@ public record ReviewResponse(
         review.getWeather(),
         review.getRecommendationCount(),
         review.getCreatedAt(),
-        review.getCoursePlaceId());
+        review.getCoursePlaceId(),
+        detail.photos());
   }
 }
