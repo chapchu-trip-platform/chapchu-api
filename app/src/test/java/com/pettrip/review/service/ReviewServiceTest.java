@@ -252,4 +252,35 @@ class ReviewServiceTest {
     verify(reviewRecommendationRepository, times(1)).deleteByReviewIdAndUserId(reviewId, userId);
     verify(reviewRepository).save(review);
   }
+
+  @Test
+  void getMyAlbum은_내_리뷰_사진을_최신리뷰_사진순으로_펼쳐서_반환한다() throws Exception {
+    UUID userId = UUID.randomUUID();
+    Review r1 = new Review("place-A", userId, UUID.randomUUID(), (short) 5, "리뷰1", "SUNNY");
+    Photo p1 = new Photo(userId, null, "review/u/1.jpg", java.time.LocalDate.of(2026, 7, 1));
+    Photo p2 = new Photo(userId, null, "review/u/2.jpg", null);
+    when(reviewRepository.findByUserIdOrderByCreatedAtDesc(userId)).thenReturn(List.of(r1));
+    when(reviewPhotoRepository.findByReviewIdInOrderByPhotoOrderAsc(any()))
+        .thenReturn(
+            List.of(
+                new ReviewPhoto(r1.getId(), p1.getId(), (short) 0),
+                new ReviewPhoto(r1.getId(), p2.getId(), (short) 1)));
+    when(photoRepository.findAllById(any())).thenReturn(List.of(p1, p2));
+    when(photoService.issueDownloadUrl(any())).thenReturn(URI.create("https://bucket/x").toURL());
+
+    List<AlbumItem> album = reviewService.getMyAlbum(userId);
+
+    assertThat(album).hasSize(2);
+    assertThat(album.get(0).photoId()).isEqualTo(p1.getId());
+    assertThat(album.get(0).reviewId()).isEqualTo(r1.getId());
+    assertThat(album.get(0).placeId()).isEqualTo("place-A");
+  }
+
+  @Test
+  void getMyAlbum은_리뷰가_없으면_빈_리스트를_반환한다() {
+    UUID userId = UUID.randomUUID();
+    when(reviewRepository.findByUserIdOrderByCreatedAtDesc(userId)).thenReturn(List.of());
+
+    assertThat(reviewService.getMyAlbum(userId)).isEmpty();
+  }
 }

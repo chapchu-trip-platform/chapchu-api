@@ -99,6 +99,43 @@ public class ReviewService {
     return assemble(reviewRepository.findByUserIdOrderByCreatedAtDesc(userId));
   }
 
+  /** 내 앨범: 내가 쓴 리뷰들의 사진을 최신 리뷰 → 사진 순서로 펼쳐서 반환. */
+  public List<AlbumItem> getMyAlbum(UUID userId) {
+    List<Review> reviews = reviewRepository.findByUserIdOrderByCreatedAtDesc(userId);
+    if (reviews.isEmpty()) {
+      return List.of();
+    }
+    List<UUID> reviewIds = reviews.stream().map(Review::getId).toList();
+    List<ReviewPhoto> links = reviewPhotoRepository.findByReviewIdInOrderByPhotoOrderAsc(reviewIds);
+    Map<UUID, List<ReviewPhoto>> linksByReview =
+        links.stream()
+            .collect(
+                Collectors.groupingBy(
+                    ReviewPhoto::getReviewId, LinkedHashMap::new, Collectors.toList()));
+    List<UUID> photoIds = links.stream().map(ReviewPhoto::getPhotoId).distinct().toList();
+    Map<UUID, Photo> photoMap =
+        photoRepository.findAllById(photoIds).stream()
+            .collect(Collectors.toMap(Photo::getId, Function.identity()));
+
+    List<AlbumItem> items = new ArrayList<>();
+    for (Review review : reviews) {
+      for (ReviewPhoto link : linksByReview.getOrDefault(review.getId(), List.of())) {
+        Photo photo = photoMap.get(link.getPhotoId());
+        if (photo == null) {
+          continue;
+        }
+        items.add(
+            new AlbumItem(
+                photo.getId(),
+                photoService.issueDownloadUrl(photo.getPhotoUrl()).toString(),
+                photo.getTakenAt(),
+                review.getId(),
+                review.getPlaceId()));
+      }
+    }
+    return items;
+  }
+
   public List<ReviewDetail> listPlaceReviews(String placeId) {
     return assemble(reviewRepository.findByPlaceIdOrderByCreatedAtDesc(placeId));
   }
