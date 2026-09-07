@@ -1,6 +1,7 @@
 package com.pettrip.place.service;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -8,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.DefaultUriBuilderFactory;
@@ -17,6 +19,12 @@ import org.springframework.web.util.DefaultUriBuilderFactory.EncodingMode;
 public class TourApiClient {
 
   private static final Logger log = LoggerFactory.getLogger(TourApiClient.class);
+
+  // TourAPI(data.go.kr 오픈API 게이트웨이)가 느려지거나 무응답이면 무한 대기하지 않도록 제한한다.
+  // 정상 응답은 보통 1초 이내. 타임아웃 시 예외가 PlaceService.searchNearby의 try-catch로 잡혀
+  // 빈 목록으로 폴백되므로, 100초 매달려 524가 나는 대신 빠르게 실패한다.
+  private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(3);
+  private static final Duration READ_TIMEOUT = Duration.ofSeconds(5);
 
   private final RestClient restClient;
   private final String serviceKey;
@@ -29,7 +37,12 @@ public class TourApiClient {
     // 기본 인코딩 모드는 이 '%'를 '%25'로 이중 인코딩해 인증을 깨뜨린다.
     DefaultUriBuilderFactory uriFactory = new DefaultUriBuilderFactory(baseUrl);
     uriFactory.setEncodingMode(EncodingMode.VALUES_ONLY);
-    this.restClient = builder.uriBuilderFactory(uriFactory).build();
+
+    SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+    requestFactory.setConnectTimeout(CONNECT_TIMEOUT);
+    requestFactory.setReadTimeout(READ_TIMEOUT);
+
+    this.restClient = builder.uriBuilderFactory(uriFactory).requestFactory(requestFactory).build();
     this.serviceKey = serviceKey.strip();
   }
 
