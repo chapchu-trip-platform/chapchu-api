@@ -1231,7 +1231,26 @@ include::{snippets}/weather-record-list/response-fields.adoc[]
 
 == 앨범 API
 
-NOTE: 현재 준비 중입니다.
+앨범은 별도 저장 없이 **내가 쓴 리뷰들의 사진을 모아 보여주는** 파생 조회입니다(리뷰 사진 = `review_photos`).
+
+=== 내 앨범 조회
+
+`GET /users/me/album`
+
+JWT 인증이 필요합니다. 내 리뷰 사진을 **최신 리뷰 → 리뷰 내 사진 순서**로 펼쳐서 반환합니다.
+각 항목에 `reviewId`·`placeId`가 있어 사진에서 원 리뷰·장소로 되짚을 수 있습니다.
+`downloadUrl`은 presigned GET URL(10분)입니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/album-list/http-request.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/album-list/http-response.adoc[]
+include::{snippets}/album-list/response-fields.adoc[]
 
 == 추천 API
 
