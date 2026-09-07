@@ -17,7 +17,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pettrip.config.SecurityConfig;
 import com.pettrip.user.model.AccountStatus;
 import com.pettrip.user.model.User;
+import com.pettrip.user.service.MeDetail;
 import com.pettrip.user.service.NicknameAlreadyInUseException;
+import com.pettrip.user.service.ProfilePhotoView;
 import com.pettrip.user.service.UserService;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -27,6 +29,8 @@ import org.springframework.boot.test.autoconfigure.restdocs.AutoConfigureRestDoc
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.restdocs.RestDocumentationExtension;
+import org.springframework.restdocs.payload.FieldDescriptor;
+import org.springframework.restdocs.payload.JsonFieldType;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -38,6 +42,7 @@ import org.springframework.test.web.servlet.MockMvc;
 class UserControllerTest {
 
   private static final UUID USER_ID = UUID.fromString("0198f3a0-1234-7000-8000-000000000001");
+  private static final UUID PHOTO_ID = UUID.fromString("0198f3a0-9999-7000-8000-000000000009");
 
   @Autowired private MockMvc mockMvc;
   @Autowired private ObjectMapper objectMapper;
@@ -45,31 +50,46 @@ class UserControllerTest {
   @MockitoBean private UserService userService;
   @MockitoBean private JwtDecoder jwtDecoder;
 
+  private MeDetail meWithPhoto(User user) {
+    return new MeDetail(
+        user,
+        new ProfilePhotoView(
+            PHOTO_ID, "https://bucket.s3.ap-northeast-2.amazonaws.com/profile/u/1.jpg?sig=x"));
+  }
+
+  private FieldDescriptor[] userResponseFields() {
+    return new FieldDescriptor[] {
+      fieldWithPath("id").description("유저 ID"),
+      fieldWithPath("email").description("이메일"),
+      fieldWithPath("nickname").description("닉네임").optional(),
+      fieldWithPath("role").description("권한"),
+      fieldWithPath("accountStatus").description("계정 상태"),
+      fieldWithPath("createdAt").description("생성일시"),
+      fieldWithPath("updatedAt").description("수정일시"),
+      fieldWithPath("profilePhoto").description("프로필 사진 (미설정 시 기본 이미지)"),
+      fieldWithPath("profilePhoto.photoId")
+          .description("사진 ID (기본 이미지면 null)")
+          .type(JsonFieldType.STRING)
+          .optional(),
+      fieldWithPath("profilePhoto.downloadUrl").description("사진 URL (presigned GET 또는 기본 이미지)")
+    };
+  }
+
   @Test
   void 내_정보를_조회한다() throws Exception {
     User user = new User("test@example.com", "google-1");
-    when(userService.getMe(any())).thenReturn(user);
+    when(userService.getMe(any())).thenReturn(meWithPhoto(user));
 
     mockMvc
         .perform(get("/users/me").with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
         .andExpect(status().isOk())
-        .andDo(
-            document(
-                "user-get-me",
-                responseFields(
-                    fieldWithPath("id").description("유저 ID"),
-                    fieldWithPath("email").description("이메일"),
-                    fieldWithPath("nickname").description("닉네임"),
-                    fieldWithPath("role").description("권한"),
-                    fieldWithPath("accountStatus").description("계정 상태"),
-                    fieldWithPath("createdAt").description("생성일시"),
-                    fieldWithPath("updatedAt").description("수정일시"))));
+        .andDo(document("user-get-me", responseFields(userResponseFields())));
   }
 
   @Test
   void 닉네임을_변경한다() throws Exception {
     User user = new User("test@example.com", "google-1");
-    when(userService.updateMe(any(), eq("초코사랑"), eq(null))).thenReturn(user);
+    when(userService.updateMe(any(), eq("초코사랑"), eq(null))).thenReturn(meWithPhoto(user));
 
     String body = objectMapper.writeValueAsString(new NicknameChangeRequest("초코사랑"));
 
@@ -84,20 +104,14 @@ class UserControllerTest {
             document(
                 "user-change-nickname",
                 requestFields(fieldWithPath("nickname").description("변경할 닉네임")),
-                responseFields(
-                    fieldWithPath("id").description("유저 ID"),
-                    fieldWithPath("email").description("이메일"),
-                    fieldWithPath("nickname").description("닉네임"),
-                    fieldWithPath("role").description("권한"),
-                    fieldWithPath("accountStatus").description("계정 상태"),
-                    fieldWithPath("createdAt").description("생성일시"),
-                    fieldWithPath("updatedAt").description("수정일시"))));
+                responseFields(userResponseFields())));
   }
 
   @Test
   void 내_정보를_수정한다() throws Exception {
     User user = new User("test@example.com", "google-1");
-    when(userService.updateMe(any(), eq("새닉네임"), eq(AccountStatus.ACTIVE))).thenReturn(user);
+    when(userService.updateMe(any(), eq("새닉네임"), eq(AccountStatus.ACTIVE)))
+        .thenReturn(meWithPhoto(user));
 
     String body =
         objectMapper.writeValueAsString(new UserUpdateRequest("새닉네임", AccountStatus.ACTIVE));
@@ -115,14 +129,33 @@ class UserControllerTest {
                 requestFields(
                     fieldWithPath("nickname").description("변경할 닉네임 (선택)"),
                     fieldWithPath("accountStatus").description("계정 상태 (선택, 예: WITHDRAWN=탈퇴)")),
-                responseFields(
-                    fieldWithPath("id").description("유저 ID"),
-                    fieldWithPath("email").description("이메일"),
-                    fieldWithPath("nickname").description("닉네임"),
-                    fieldWithPath("role").description("권한"),
-                    fieldWithPath("accountStatus").description("계정 상태"),
-                    fieldWithPath("createdAt").description("생성일시"),
-                    fieldWithPath("updatedAt").description("수정일시"))));
+                responseFields(userResponseFields())));
+  }
+
+  @Test
+  void 프로필_사진을_설정한다() throws Exception {
+    User user = new User("test@example.com", "google-1");
+    when(userService.updateProfilePhoto(any(), eq(PHOTO_ID))).thenReturn(meWithPhoto(user));
+
+    String body = objectMapper.writeValueAsString(new ProfilePhotoUpdateRequest(PHOTO_ID));
+
+    mockMvc
+        .perform(
+            patch("/users/me/photo")
+                .contentType("application/json")
+                .content(body)
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.profilePhoto.photoId").value(PHOTO_ID.toString()))
+        .andDo(
+            document(
+                "user-update-photo",
+                requestFields(
+                    fieldWithPath("photoId")
+                        .description("설정할 사진 ID (upload-url type=PROFILE로 발급). null이면 기본 이미지로 되돌림")
+                        .type(JsonFieldType.STRING)
+                        .optional()),
+                responseFields(userResponseFields())));
   }
 
   @Test
