@@ -11,7 +11,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.pettrip.config.SecurityConfig;
 import com.pettrip.review.model.Review;
+import com.pettrip.review.service.ReviewDetail;
+import com.pettrip.review.service.ReviewPhotoView;
 import com.pettrip.review.service.ReviewService;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -40,11 +43,17 @@ class PlaceReviewControllerTest {
   @Test
   void 장소별_리뷰_목록을_조회한다() throws Exception {
     String placeId = "place-abc";
+    UUID photoId = UUID.randomUUID();
+    Review review =
+        new Review(placeId, UUID.randomUUID(), UUID.randomUUID(), (short) 4, "좋았어요", "SUNNY");
     when(reviewService.listPlaceReviews(placeId))
         .thenReturn(
             List.of(
-                new Review(
-                    placeId, UUID.randomUUID(), UUID.randomUUID(), (short) 4, "좋았어요", "SUNNY")));
+                new ReviewDetail(
+                    review,
+                    List.of(
+                        new ReviewPhotoView(
+                            photoId, "https://bucket/review/u/1.jpg", LocalDate.of(2026, 7, 1))))));
 
     mockMvc
         .perform(get("/places/{placeId}/reviews", placeId))
@@ -67,6 +76,14 @@ class PlaceReviewControllerTest {
                     fieldWithPath("[].createdAt").description("작성일시"),
                     fieldWithPath("[].coursePlaceId")
                         .description("코스 방문 장소 ID. 코스 외 단독 리뷰면 null")
+                        .type(JsonFieldType.STRING)
+                        .optional(),
+                    fieldWithPath("[].photos").description("첨부 사진 목록"),
+                    fieldWithPath("[].photos[].photoId").description("사진 ID"),
+                    fieldWithPath("[].photos[].downloadUrl")
+                        .description("presigned GET URL (10분 유효)"),
+                    fieldWithPath("[].photos[].takenAt")
+                        .description("촬영일")
                         .type(JsonFieldType.STRING)
                         .optional())));
   }

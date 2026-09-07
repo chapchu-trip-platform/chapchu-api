@@ -18,7 +18,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pettrip.config.SecurityConfig;
 import com.pettrip.review.model.Review;
+import com.pettrip.review.service.ReviewDetail;
+import com.pettrip.review.service.ReviewPhotoView;
 import com.pettrip.review.service.ReviewService;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,12 +53,21 @@ class ReviewControllerTest {
   @Test
   void 리뷰를_작성한다() throws Exception {
     UUID petId = UUID.randomUUID();
+    UUID photoId = UUID.randomUUID();
     ReviewCreateRequest request =
         new ReviewCreateRequest(
-            "place-abc", petId, (short) 4, "강아지랑 산책하기 딱 좋은 곳이에요", "SUNNY", null);
+            "place-abc", petId, (short) 4, "강아지랑 산책하기 딱 좋은 곳이에요", "SUNNY", null, List.of(photoId));
     Review review =
         new Review("place-abc", USER_ID, petId, (short) 4, "강아지랑 산책하기 딱 좋은 곳이에요", "SUNNY");
-    when(reviewService.createReview(any(), any())).thenReturn(review);
+    ReviewDetail detail =
+        new ReviewDetail(
+            review,
+            List.of(
+                new ReviewPhotoView(
+                    photoId,
+                    "https://bucket.s3.ap-northeast-2.amazonaws.com/review/u/1.jpg",
+                    LocalDate.of(2026, 7, 1))));
+    when(reviewService.createReview(any(), any())).thenReturn(detail);
 
     mockMvc
         .perform(
@@ -78,6 +91,10 @@ class ReviewControllerTest {
                     fieldWithPath("coursePlaceId")
                         .description("코스 방문 장소 ID. 코스 여행 중 작성 시 연결. 생략 가능")
                         .type(JsonFieldType.STRING)
+                        .optional(),
+                    fieldWithPath("photoIds")
+                        .description(
+                            "첨부 사진 ID 목록 (upload-url type=REVIEW → POST /photos로 발급). 최대 10, 생략 가능")
                         .optional()),
                 responseFields(
                     fieldWithPath("id").description("리뷰 ID"),
@@ -93,6 +110,13 @@ class ReviewControllerTest {
                     fieldWithPath("createdAt").description("작성일시"),
                     fieldWithPath("coursePlaceId")
                         .description("코스 방문 장소 ID. 코스 외 단독 리뷰면 null")
+                        .type(JsonFieldType.STRING)
+                        .optional(),
+                    fieldWithPath("photos").description("첨부 사진 목록"),
+                    fieldWithPath("photos[].photoId").description("사진 ID"),
+                    fieldWithPath("photos[].downloadUrl").description("presigned GET URL (10분 유효)"),
+                    fieldWithPath("photos[].takenAt")
+                        .description("촬영일")
                         .type(JsonFieldType.STRING)
                         .optional())));
   }

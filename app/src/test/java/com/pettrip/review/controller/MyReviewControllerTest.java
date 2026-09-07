@@ -11,7 +11,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.pettrip.config.SecurityConfig;
 import com.pettrip.review.model.Review;
+import com.pettrip.review.service.ReviewDetail;
+import com.pettrip.review.service.ReviewPhotoView;
 import com.pettrip.review.service.ReviewService;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -44,7 +47,13 @@ class MyReviewControllerTest {
     Review review =
         new Review(
             "place-1", UUID.randomUUID(), UUID.randomUUID(), (short) 5, "정말 좋은 곳이었어요", "SUNNY");
-    when(reviewService.listMyReviews(any())).thenReturn(List.of(review));
+    ReviewDetail detail =
+        new ReviewDetail(
+            review,
+            List.of(
+                new ReviewPhotoView(
+                    UUID.randomUUID(), "https://bucket/review/u/1.jpg", LocalDate.of(2026, 7, 1))));
+    when(reviewService.listMyReviews(any())).thenReturn(List.of(detail));
 
     mockMvc
         .perform(get("/users/me/reviews").with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
@@ -65,6 +74,14 @@ class MyReviewControllerTest {
                     fieldWithPath("[].createdAt").description("작성일시"),
                     fieldWithPath("[].coursePlaceId")
                         .description("코스 방문 장소 ID. 코스 외 단독 리뷰면 null")
+                        .type(JsonFieldType.STRING)
+                        .optional(),
+                    fieldWithPath("[].photos").description("첨부 사진 목록"),
+                    fieldWithPath("[].photos[].photoId").description("사진 ID"),
+                    fieldWithPath("[].photos[].downloadUrl")
+                        .description("presigned GET URL (10분 유효)"),
+                    fieldWithPath("[].photos[].takenAt")
+                        .description("촬영일")
                         .type(JsonFieldType.STRING)
                         .optional())));
   }
