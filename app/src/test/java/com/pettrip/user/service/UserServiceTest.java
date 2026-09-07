@@ -29,11 +29,15 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class UserServiceTest {
 
-  private static final String DEFAULT_IMG = "https://cdn.example.com/default-profile.png";
+  private static final String DEFAULT_KEY = "defaults/profile.svg";
+  private static final String DEFAULT_URL = "https://bucket/defaults/profile.svg?sig=d";
 
   @Mock private UserRepository userRepository;
   @Mock private RegionRepository regionRepository;
@@ -45,7 +49,7 @@ class UserServiceTest {
   private UserService userService;
 
   @BeforeEach
-  void setUp() {
+  void setUp() throws Exception {
     userService =
         new UserService(
             userRepository,
@@ -54,7 +58,8 @@ class UserServiceTest {
             transportMethodRepository,
             photoRepository,
             photoService,
-            DEFAULT_IMG);
+            DEFAULT_KEY);
+    when(photoService.issueDownloadUrl(DEFAULT_KEY)).thenReturn(URI.create(DEFAULT_URL).toURL());
   }
 
   @Test
@@ -66,15 +71,16 @@ class UserServiceTest {
   }
 
   @Test
-  void getMe는_프사가_없으면_기본이미지_URL을_내려준다() {
+  void getMe는_프사가_없으면_기본이미지_presigned_URL을_내려준다() throws Exception {
     UUID userId = UUID.randomUUID();
     User user = new User("test@example.com", "google-1");
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(photoService.issueDownloadUrl(DEFAULT_KEY)).thenReturn(URI.create(DEFAULT_URL).toURL());
 
     MeDetail result = userService.getMe(userId);
 
     assertThat(result.profilePhoto().photoId()).isNull();
-    assertThat(result.profilePhoto().downloadUrl()).isEqualTo(DEFAULT_IMG);
+    assertThat(result.profilePhoto().downloadUrl()).isEqualTo(DEFAULT_URL);
   }
 
   @Test
@@ -127,17 +133,18 @@ class UserServiceTest {
   }
 
   @Test
-  void updateProfilePhoto는_null이면_프사를_지우고_기본이미지로_되돌린다() {
+  void updateProfilePhoto는_null이면_프사를_지우고_기본이미지로_되돌린다() throws Exception {
     UUID userId = UUID.randomUUID();
     User user = new User("test@example.com", "google-1");
     user.updateProfilePhoto(UUID.randomUUID());
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(photoService.issueDownloadUrl(DEFAULT_KEY)).thenReturn(URI.create(DEFAULT_URL).toURL());
 
     MeDetail result = userService.updateProfilePhoto(userId, null);
 
     assertThat(user.getProfilePhotoId()).isNull();
-    assertThat(result.profilePhoto().downloadUrl()).isEqualTo(DEFAULT_IMG);
+    assertThat(result.profilePhoto().downloadUrl()).isEqualTo(DEFAULT_URL);
   }
 
   @Test

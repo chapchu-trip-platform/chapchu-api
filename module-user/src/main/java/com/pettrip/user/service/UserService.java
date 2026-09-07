@@ -27,7 +27,7 @@ public class UserService {
   private final TransportMethodRepository transportMethodRepository;
   private final PhotoRepository photoRepository;
   private final PhotoService photoService;
-  private final String defaultProfileImageUrl;
+  private final String defaultProfileImageKey;
 
   public UserService(
       UserRepository userRepository,
@@ -36,14 +36,14 @@ public class UserService {
       TransportMethodRepository transportMethodRepository,
       PhotoRepository photoRepository,
       PhotoService photoService,
-      @Value("${app.profile.default-image-url}") String defaultProfileImageUrl) {
+      @Value("${app.profile.default-image-key}") String defaultProfileImageKey) {
     this.userRepository = userRepository;
     this.regionRepository = regionRepository;
     this.themeRepository = themeRepository;
     this.transportMethodRepository = transportMethodRepository;
     this.photoRepository = photoRepository;
     this.photoService = photoService;
-    this.defaultProfileImageUrl = defaultProfileImageUrl;
+    this.defaultProfileImageKey = defaultProfileImageKey;
   }
 
   public MeDetail getMe(UUID userId) {
@@ -61,14 +61,19 @@ public class UserService {
 
   private MeDetail assemble(User user) {
     if (user.getProfilePhotoId() == null) {
-      return new MeDetail(user, new ProfilePhotoView(null, defaultProfileImageUrl));
+      return new MeDetail(user, defaultProfilePhoto());
     }
     Photo photo = photoRepository.findById(user.getProfilePhotoId()).orElse(null);
     if (photo == null) {
-      return new MeDetail(user, new ProfilePhotoView(null, defaultProfileImageUrl));
+      return new MeDetail(user, defaultProfilePhoto());
     }
     String url = photoService.issueDownloadUrl(photo.getPhotoUrl()).toString();
     return new MeDetail(user, new ProfilePhotoView(photo.getId(), url));
+  }
+
+  private ProfilePhotoView defaultProfilePhoto() {
+    return new ProfilePhotoView(
+        null, photoService.issueDownloadUrl(defaultProfileImageKey).toString());
   }
 
   /** docs/decisions/027 참고: 닉네임은 유저 간 중복될 수 없다. */

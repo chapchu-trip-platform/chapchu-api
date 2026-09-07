@@ -370,6 +370,29 @@ include::{snippets}/user-change-nickname/request-fields.adoc[]
 include::{snippets}/user-change-nickname/http-response.adoc[]
 include::{snippets}/user-change-nickname/response-fields.adoc[]
 
+=== 프로필 사진 설정
+
+`PATCH /users/me/photo`
+
+프로필 사진을 설정합니다. `photoId`는 `POST /photos/upload-url`(type=`PROFILE`) → S3 업로드 → `POST /photos`로
+발급받은 사진 ID입니다. 본인 소유가 아닌 사진이면 `404 NOT_FOUND`. `photoId`를 `null`로 보내면 프사를 지우고
+기본 이미지로 되돌립니다.
+
+NOTE: 모든 `/users/me` 응답의 `profilePhoto.downloadUrl`은 항상 값이 있습니다. 프사가 있으면 그 사진의,
+없으면 서버 기본 이미지의 presigned GET URL(10분)이 내려갑니다. (버킷이 비공개라 기본 이미지도 서명해서 제공)
+
+[.request]
+==== 요청
+
+include::{snippets}/user-update-photo/http-request.adoc[]
+include::{snippets}/user-update-photo/request-fields.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/user-update-photo/http-response.adoc[]
+include::{snippets}/user-update-photo/response-fields.adoc[]
+
 === 선호 사항 선택지 조회
 
 `GET /preferences/options`
