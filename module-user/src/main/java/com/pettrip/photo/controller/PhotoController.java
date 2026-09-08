@@ -2,9 +2,11 @@ package com.pettrip.photo.controller;
 
 import com.pettrip.common.service.CurrentUserId;
 import com.pettrip.photo.model.Photo;
+import com.pettrip.photo.service.PhotoSaveCommand;
 import com.pettrip.photo.service.PhotoService;
 import jakarta.validation.Valid;
 import java.net.URL;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,21 +29,26 @@ public class PhotoController {
 
   @PostMapping("/upload-url")
   @ResponseStatus(HttpStatus.CREATED)
-  public PhotoUploadUrlResponse issueUploadUrl(
+  public List<PhotoUploadUrlResponse> issueUploadUrls(
       @CurrentUserId UUID userId, @RequestBody @Valid PhotoUploadUrlRequest request) {
-    String photoKey = photoService.buildPhotoKey(userId, request.type(), request.fileName());
+    return request.files().stream().map(file -> toUploadUrl(userId, file)).toList();
+  }
+
+  private PhotoUploadUrlResponse toUploadUrl(UUID userId, PhotoUploadUrlRequest.FileRequest file) {
+    String photoKey = photoService.buildPhotoKey(userId, file.type(), file.fileName());
     URL uploadUrl = photoService.issueUploadUrl(photoKey);
-    return new PhotoUploadUrlResponse(uploadUrl.toString(), photoKey);
+    return new PhotoUploadUrlResponse(uploadUrl.toString(), photoKey, file.fileName());
   }
 
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  public PhotoResponse createPhoto(
+  public List<PhotoResponse> createPhotos(
       @CurrentUserId UUID userId, @RequestBody @Valid PhotoCreateRequest request) {
-    Photo photo =
-        photoService.savePhoto(
-            userId, request.coursePlaceId(), request.photoKey(), request.takenAt());
-    return PhotoResponse.from(photo);
+    List<PhotoSaveCommand> commands =
+        request.photos().stream()
+            .map(p -> new PhotoSaveCommand(p.coursePlaceId(), p.photoKey(), p.takenAt()))
+            .toList();
+    return photoService.savePhotos(userId, commands).stream().map(PhotoResponse::from).toList();
   }
 
   @GetMapping("/{photoId}")
