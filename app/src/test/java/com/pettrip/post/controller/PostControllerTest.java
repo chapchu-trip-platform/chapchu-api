@@ -54,6 +54,17 @@ class PostControllerTest {
   @MockitoBean private PostService postService;
   @MockitoBean private JwtDecoder jwtDecoder;
 
+  private PostSummaryResponse sampleSummary() {
+    return new PostSummaryResponse(
+        UUID.randomUUID(),
+        "첫 여행",
+        "멍멍이아빠",
+        3,
+        1,
+        new PostResponse.PhotoView(UUID.randomUUID(), "post/user-1/x-강아지.jpg"),
+        LocalDateTime.of(2024, 1, 15, 10, 30, 0));
+  }
+
   private PostResponse samplePostResponse() {
     return new PostResponse(
         UUID.randomUUID(),
@@ -75,7 +86,7 @@ class PostControllerTest {
 
   @Test
   void 게시글_목록을_조회한다() throws Exception {
-    PostListResponse listResponse = new PostListResponse(List.of(samplePostResponse()), null);
+    PostListResponse listResponse = new PostListResponse(List.of(sampleSummary()), null);
     when(postService.listPosts(any(), any(), any(), anyInt())).thenReturn(listResponse);
 
     mockMvc
@@ -98,25 +109,19 @@ class PostControllerTest {
                             "이전 페이지 마지막 항목의 커서. 형식: {createdAt}~{postId} (예: 2024-01-15T10:30:00~uuid). 첫 페이지 생략"),
                     parameterWithName("size").optional().description("페이지 크기 (기본값: 20)")),
                 responseFields(
-                    fieldWithPath("posts[]").description("게시글 목록"),
+                    fieldWithPath("posts[]").description("게시글 목록 (카드용 요약)"),
                     fieldWithPath("posts[].id").description("게시글 ID"),
-                    fieldWithPath("posts[].petId").description("동행한 반려견 ID (null 가능)").optional(),
-                    fieldWithPath("posts[].photoId").description("대표 사진 ID (null 가능)").optional(),
-                    fieldWithPath("posts[].courseId").description("여행 코스 ID (null 가능)").optional(),
                     fieldWithPath("posts[].title").description("제목"),
-                    fieldWithPath("posts[].content").description("내용"),
-                    fieldWithPath("posts[].viewCount").description("조회수"),
+                    fieldWithPath("posts[].nickname").description("작성자 닉네임"),
                     fieldWithPath("posts[].recommendationCount").description("추천 수"),
                     fieldWithPath("posts[].commentCount").description("댓글 수"),
-                    fieldWithPath("posts[].recommended")
-                        .description("요청한 사용자가 추천했는지. 추천 취소 버튼 노출 판단용"),
-                    fieldWithPath("posts[].bookmarked").description("요청한 사용자가 북마크했는지"),
-                    fieldWithPath("posts[].nickname").description("작성자 닉네임"),
-                    fieldWithPath("posts[].photoUrl").description("대표 사진 URL (null 가능)").optional(),
-                    fieldWithPath("posts[].photos[]").description("첨부 사진 목록").optional(),
-                    fieldWithPath("posts[].photos[].photoId").description("사진 ID"),
-                    fieldWithPath("posts[].photos[].photoKey")
-                        .description("S3 경로. FE는 GET /photos/{photoId}로 다운로드 URL 발급"),
+                    fieldWithPath("posts[].thumbnail")
+                        .description("대표 사진(첫 장). 사진 없는 글이면 null")
+                        .optional(),
+                    fieldWithPath("posts[].thumbnail.photoId").description("사진 ID").optional(),
+                    fieldWithPath("posts[].thumbnail.photoKey")
+                        .description("S3 경로. FE는 GET /photos/{photoId}로 다운로드 URL 발급")
+                        .optional(),
                     fieldWithPath("posts[].createdAt").description("작성일시"),
                     fieldWithPath("nextCursor")
                         .description("다음 페이지 커서 (마지막 페이지면 null)")
@@ -125,7 +130,7 @@ class PostControllerTest {
 
   @Test
   void 게시글_목록을_추천순으로_조회한다() throws Exception {
-    PostListResponse listResponse = new PostListResponse(List.of(samplePostResponse()), null);
+    PostListResponse listResponse = new PostListResponse(List.of(sampleSummary()), null);
     when(postService.listPosts(any(), eq("popular"), any(), anyInt())).thenReturn(listResponse);
 
     mockMvc

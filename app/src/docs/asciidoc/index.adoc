@@ -726,6 +726,9 @@ include::{snippets}/place-nearby/response-fields.adoc[]
 
 `GET /posts?sort={sort}&cursor={cursor}&size={size}`
 
+목록은 카드용 **요약**(제목·닉네임·대표사진·추천수·댓글수·작성일)만 내려갑니다. 본문·참조·사진 전체는 상세 `GET /posts/{id}`에서 가져옵니다.
+`thumbnail`은 대표 사진(첫 장)이며 사진 없는 글이면 null입니다. 비공개 버킷이라 FE는 `thumbnail.photoId`로 `GET /photos/{photoId}`를 호출해 다운로드 URL을 발급받습니다.
+
 cursor 값은 이전 응답의 `nextCursor` 필드를 그대로 전달합니다. 첫 페이지는 생략합니다. `nextCursor`가 null이면 마지막 페이지입니다.
 
 [.request]
