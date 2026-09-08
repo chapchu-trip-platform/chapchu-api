@@ -5,6 +5,7 @@ import com.pettrip.common.service.InvalidReferenceException;
 import com.pettrip.post.controller.PostCreateRequest;
 import com.pettrip.post.controller.PostListResponse;
 import com.pettrip.post.controller.PostResponse;
+import com.pettrip.post.controller.PostSummaryResponse;
 import com.pettrip.post.model.Post;
 import com.pettrip.post.model.PostBookmark;
 import com.pettrip.post.model.PostRecommendation;
@@ -125,6 +126,25 @@ public class PostService {
               rs.getString("photo_url"),
               List.of(),
               rs.getTimestamp("created_at").toLocalDateTime());
+
+  private static final RowMapper<PostSummaryResponse> POST_SUMMARY_ROW_MAPPER =
+      (rs, rowNum) ->
+          new PostSummaryResponse(
+              rs.getObject("post_id", UUID.class),
+              rs.getString("title"),
+              rs.getString("nickname"),
+              rs.getInt("recommendation_count"),
+              rs.getInt("comment_count"),
+              thumbnailOf(rs.getObject("photo_id", UUID.class), rs.getString("photo_url")),
+              rs.getTimestamp("created_at").toLocalDateTime());
+
+  /** 대표 사진(첫 장). photo_id가 없으면 사진 없는 글이라 null. */
+  private static PostResponse.PhotoView thumbnailOf(UUID photoId, String photoKey) {
+    if (photoId == null) {
+      return null;
+    }
+    return new PostResponse.PhotoView(photoId, photoKey);
+  }
 
   private final PostRepository postRepository;
   private final PostRecommendationRepository postRecommendationRepository;
@@ -304,26 +324,25 @@ public class PostService {
     MapSqlParameterSource params =
         new MapSqlParameterSource().addValue("userId", userId).addValue("size", size);
     if (cursor == null) {
-      List<PostResponse> posts = jdbcTemplate.query(LATEST_SQL, params, POST_ROW_MAPPER);
-      return toListResponse(enrichWithPhotos(posts), size);
+      return toListResponse(jdbcTemplate.query(LATEST_SQL, params, POST_SUMMARY_ROW_MAPPER), size);
     }
     String[] parts = cursor.split("~", 2);
     params.addValue(
         "cursorAt",
         Timestamp.valueOf(LocalDateTime.parse(parts[0], DateTimeFormatter.ISO_LOCAL_DATE_TIME)));
     params.addValue("cursorId", UUID.fromString(parts[1]));
-    List<PostResponse> posts = jdbcTemplate.query(LATEST_CURSOR_SQL, params, POST_ROW_MAPPER);
-    return toListResponse(enrichWithPhotos(posts), size);
+    return toListResponse(
+        jdbcTemplate.query(LATEST_CURSOR_SQL, params, POST_SUMMARY_ROW_MAPPER), size);
   }
 
   private PostListResponse queryPopular(UUID userId, int size) {
     MapSqlParameterSource params =
         new MapSqlParameterSource().addValue("userId", userId).addValue("size", size);
-    List<PostResponse> posts = jdbcTemplate.query(POPULAR_SQL, params, POST_ROW_MAPPER);
-    return new PostListResponse(enrichWithPhotos(posts), null);
+    return new PostListResponse(
+        jdbcTemplate.query(POPULAR_SQL, params, POST_SUMMARY_ROW_MAPPER), null);
   }
 
-  /** 글 목록에 각 글의 사진 전체를 배치로 붙인다. post_photos → photos 순서대로. */
+  /** 상세 조회에 각 글의 사진 전체를 배치로 붙인다. post_photos → photos 순서대로. */
   private List<PostResponse> enrichWithPhotos(List<PostResponse> posts) {
     if (posts.isEmpty()) {
       return posts;
@@ -343,11 +362,11 @@ public class PostService {
         .toList();
   }
 
-  private PostListResponse toListResponse(List<PostResponse> posts, int size) {
+  private PostListResponse toListResponse(List<PostSummaryResponse> posts, int size) {
     if (posts.size() < size) {
       return new PostListResponse(posts, null);
     }
-    PostResponse last = posts.get(posts.size() - 1);
+    PostSummaryResponse last = posts.get(posts.size() - 1);
     String nextCursor =
         last.createdAt().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME) + "~" + last.id();
     return new PostListResponse(posts, nextCursor);
