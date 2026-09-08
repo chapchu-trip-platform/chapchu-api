@@ -183,8 +183,30 @@ public class CourseService {
             .map(places -> buildGroupInfos(places, PlaceInfo.PlaceGroup.MIDDLE, pet, ragQuery))
             .toList();
 
-    if (startInfos.isEmpty() || endInfos.isEmpty()) {
-      throw new NoPlacesFoundException();
+    boolean anyFound =
+        !startInfos.isEmpty()
+            || !endInfos.isEmpty()
+            || middleInfos.stream().anyMatch(group -> !group.isEmpty());
+
+    // 전 구역(bbox)이 모두 비었을 때만 출발지·도착지 중심 반경(원)으로 최후 재검색.
+    // 일부만 비면 찾은 장소들로 코스를 만든다(스탑 수는 FE가 개수로 판단).
+    if (!anyFound) {
+      int radius = endpointRadius(startLat, startLng, endLat, endLng, totalZones);
+      startInfos =
+          buildGroupInfos(
+              assignGroup(searchAroundPoint(startLat, startLng, radius), assigned),
+              PlaceInfo.PlaceGroup.START,
+              pet,
+              ragQuery);
+      endInfos =
+          buildGroupInfos(
+              assignGroup(searchAroundPoint(endLat, endLng, radius), assigned),
+              PlaceInfo.PlaceGroup.END,
+              pet,
+              ragQuery);
+      if (startInfos.isEmpty() && endInfos.isEmpty()) {
+        throw new NoPlacesFoundException();
+      }
     }
 
     List<String> orderedIds =
@@ -201,6 +223,9 @@ public class CourseService {
             pet.getAge(),
             weatherStatus,
             temperature);
+    if (orderedIds.isEmpty()) {
+      throw new NoPlacesFoundException();
+    }
 
     TravelCourse course =
         new TravelCourse(
@@ -214,6 +239,33 @@ public class CourseService {
     }
 
     return course;
+  }
+
+  /** 지점 주변을 반경(원)으로 검색한다. bbox 필터를 쓰지 않아 사방의 장소를 잡는다. 비면 한 번 넓혀 재시도. */
+  private List<Place> searchAroundPoint(BigDecimal lat, BigDecimal lng, int radius) {
+    List<Place> result = placeService.searchNearby(lat, lng, radius);
+    if (!result.isEmpty()) {
+      return result;
+    }
+    int expanded = (int) Math.min(radius * 2.0, 20000);
+    return placeService.searchNearby(lat, lng, expanded);
+  }
+
+  /** 출발/도착 반경 = 전체 거리를 구역 수로 나눈 값(최소 1.5km, 상한 20km). */
+  private int endpointRadius(
+      BigDecimal startLat,
+      BigDecimal startLng,
+      BigDecimal endLat,
+      BigDecimal endLng,
+      int totalZones) {
+    double segment =
+        haversineMeters(
+            startLat.doubleValue(),
+            startLng.doubleValue(),
+            endLat.doubleValue(),
+            endLng.doubleValue());
+    int perZone = (int) (segment / totalZones);
+    return Math.min(Math.max(perZone, 1500), 20000);
   }
 
   private List<Place> searchInZone(
