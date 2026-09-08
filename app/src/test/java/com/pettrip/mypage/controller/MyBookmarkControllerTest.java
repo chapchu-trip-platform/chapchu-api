@@ -53,6 +53,7 @@ class MyBookmarkControllerTest {
             false,
             "닉네임",
             null,
+            List.of(),
             LocalDateTime.now());
     when(myBookmarkService.listMyBookmarks(USER_ID)).thenReturn(List.of(response));
 
