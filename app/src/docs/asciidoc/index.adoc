@@ -127,15 +127,10 @@ const redirect = encodeURIComponent(window.location.origin + '/auth/callback');
 window.location.href = `https://api.chapchu.site/auth/login?redirect=${redirect}`;
 ----
 
-include::{snippets}/auth-login/http-request.adoc[]
-
 [.response]
 ==== 응답
 
 로그인 완료 후 `{redirect}` 경로로 리다이렉트합니다.
-
-include::{snippets}/auth-login/http-response.adoc[]
-include::{snippets}/auth-login/response-headers.adoc[]
 
 * *기존 유저*: `{redirect}#access_token={JWT}`
 * *신규 유저*: `{redirect}?registration_token={token}`
@@ -152,29 +147,8 @@ NOTE: access_token은 URL fragment(`#`)로 전달됩니다. 서버 로그에 남
 * *기존 유저*: `code`·`state`를 검증하고 access_token을 발급해 `{redirect}#access_token={JWT}`로 리다이렉트합니다.
 * *신규 유저*: `registration_token`을 담아 `{redirect}?registration_token={token}`로 리다이렉트합니다.
 
-[.request]
-==== 요청 (기존 유저)
-
-include::{snippets}/auth-callback-success/http-request.adoc[]
-include::{snippets}/auth-callback-success/query-parameters.adoc[]
-
-[.response]
-==== 응답 (기존 유저)
-
-include::{snippets}/auth-callback-success/http-response.adoc[]
-include::{snippets}/auth-callback-success/response-headers.adoc[]
-
-[.request]
-==== 요청 (신규 유저)
-
-include::{snippets}/auth-callback-onboarding/http-request.adoc[]
-include::{snippets}/auth-callback-onboarding/query-parameters.adoc[]
-
-[.response]
-==== 응답 (신규 유저)
-
-include::{snippets}/auth-callback-onboarding/http-response.adoc[]
-include::{snippets}/auth-callback-onboarding/response-headers.adoc[]
+쿼리 파라미터: `code`, `state`(기존 유저 흐름), `registration_token`(신규 유저 흐름).
+`code`가 비었거나 `state`가 쿠키와 불일치하면 `400 Bad Request`.
 
 === 통합 회원가입
 
@@ -226,18 +200,12 @@ include::{snippets}/auth-signup/response-fields.adoc[]
 
 refresh_token 쿠키가 자동으로 포함되므로 FE는 별도 헤더 없이 호출합니다.
 반드시 `credentials: 'include'` (fetch) 또는 `withCredentials: true` (axios) 설정이 필요합니다.
-
-[.request]
-==== 요청
-
-include::{snippets}/auth-refresh/http-request.adoc[]
-include::{snippets}/auth-refresh/request-cookies.adoc[]
+요청은 `refresh_token` HttpOnly 쿠키만 필요하고 본문은 없습니다.
 
 [.response]
 ==== 응답 (성공)
 
-include::{snippets}/auth-refresh/http-response.adoc[]
-include::{snippets}/auth-refresh/response-fields.adoc[]
+`200 OK` — 새 access_token을 발급합니다. (refresh_token 회전)
 
 [.response]
 ==== 응답 (쿠키 없음)
@@ -467,18 +435,6 @@ include::{snippets}/user-preferences-update/http-response.adoc[]
 include::{snippets}/user-preferences-update/response-fields.adoc[]
 
 NOTE: 회원가입 시점의 최초 등록은 `POST /auth/signup`이 함께 처리합니다.
-
-[.request]
-==== 요청
-
-include::{snippets}/user-preferences-update/http-request.adoc[]
-include::{snippets}/user-preferences-update/request-fields.adoc[]
-
-[.response]
-==== 응답
-
-include::{snippets}/user-preferences-update/http-response.adoc[]
-include::{snippets}/user-preferences-update/response-fields.adoc[]
 
 === 작성한 게시글 조회
 
@@ -727,7 +683,9 @@ NOTE: 장소 데이터는 TourAPI에서 가져와 채웁니다 (`docs/decisions/
 
 === 장소 조회
 
-`GET /places/{placeId}`
+`GET /places/{externalPlaceId}`
+
+`externalPlaceId`는 한국관광공사 TourAPI의 `contentId`입니다.
 
 [.request]
 ==== 요청
