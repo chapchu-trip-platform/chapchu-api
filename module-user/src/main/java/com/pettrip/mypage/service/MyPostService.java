@@ -44,6 +44,7 @@ public class MyPostService {
               rs.getBoolean("bookmarked"),
               rs.getString("nickname"),
               rs.getString("photo_url"),
+              List.of(),
               rs.getTimestamp("created_at").toLocalDateTime());
 
   private final NamedParameterJdbcTemplate jdbcTemplate;

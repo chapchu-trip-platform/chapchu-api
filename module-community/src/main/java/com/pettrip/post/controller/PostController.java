@@ -42,15 +42,15 @@ public class PostController {
 
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  public PostResponse createPost(
+  public void createPost(
       @CurrentUserId UUID userId, @RequestBody @Valid PostCreateRequest request) {
-    return postService.createPost(
+    postService.createPost(
         userId,
         request.petId(),
-        request.photoId(),
         request.courseId(),
         request.title(),
-        request.content());
+        request.content(),
+        request.photos());
   }
 
   @PatchMapping("/{postId}")

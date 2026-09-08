@@ -3,7 +3,7 @@ package com.pettrip.post.controller;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.document;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
@@ -24,6 +24,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pettrip.common.service.InvalidReferenceException;
 import com.pettrip.config.SecurityConfig;
 import com.pettrip.post.service.PostService;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -68,6 +69,7 @@ class PostControllerTest {
         false,
         "멍멍이아빠",
         "https://example.com/photo.jpg",
+        List.of(new PostResponse.PhotoView(UUID.randomUUID(), "post/user-1/x-강아지.jpg")),
         LocalDateTime.of(2024, 1, 15, 10, 30, 0));
   }
 
@@ -111,6 +113,10 @@ class PostControllerTest {
                     fieldWithPath("posts[].bookmarked").description("요청한 사용자가 북마크했는지"),
                     fieldWithPath("posts[].nickname").description("작성자 닉네임"),
                     fieldWithPath("posts[].photoUrl").description("대표 사진 URL (null 가능)").optional(),
+                    fieldWithPath("posts[].photos[]").description("첨부 사진 목록").optional(),
+                    fieldWithPath("posts[].photos[].photoId").description("사진 ID"),
+                    fieldWithPath("posts[].photos[].photoKey")
+                        .description("S3 경로. FE는 GET /photos/{photoId}로 다운로드 URL 발급"),
                     fieldWithPath("posts[].createdAt").description("작성일시"),
                     fieldWithPath("nextCursor")
                         .description("다음 페이지 커서 (마지막 페이지면 null)")
@@ -156,22 +162,28 @@ class PostControllerTest {
                     fieldWithPath("bookmarked").description("요청한 사용자가 북마크했는지"),
                     fieldWithPath("nickname").description("작성자 닉네임"),
                     fieldWithPath("photoUrl").description("대표 사진 URL (null 가능)").optional(),
+                    fieldWithPath("photos[]").description("첨부 사진 목록").optional(),
+                    fieldWithPath("photos[].photoId").description("사진 ID"),
+                    fieldWithPath("photos[].photoKey")
+                        .description("S3 경로. FE는 GET /photos/{photoId}로 다운로드 URL 발급"),
                     fieldWithPath("createdAt").description("작성일시"))));
   }
 
   @Test
   void 게시글을_작성한다() throws Exception {
     UUID petId = UUID.randomUUID();
-    UUID photoId = UUID.randomUUID();
     UUID courseId = UUID.randomUUID();
-    PostResponse response = samplePostResponse();
-    when(postService.createPost(
-            any(), eq(petId), eq(photoId), eq(courseId), eq("첫 여행"), eq("즐거웠어요")))
-        .thenReturn(response);
 
     String body =
         objectMapper.writeValueAsString(
-            new PostCreateRequest(petId, photoId, courseId, "첫 여행", "즐거웠어요"));
+            new PostCreateRequest(
+                petId,
+                courseId,
+                "첫 여행",
+                "즐거웠어요",
+                List.of(
+                    new PostCreateRequest.PhotoEntry(
+                        "post/" + USER_ID + "/x-강아지.jpg", LocalDate.of(2024, 1, 15)))));
 
     mockMvc
         .perform(
@@ -188,31 +200,15 @@ class PostControllerTest {
                         .description("동행한 반려견 ID (선택)")
                         .type(JsonFieldType.STRING)
                         .optional(),
-                    fieldWithPath("photoId")
-                        .description("대표 사진 ID (선택). 생략하면 사진 없는 글")
-                        .type(JsonFieldType.STRING)
-                        .optional(),
                     fieldWithPath("courseId")
                         .description("여행 코스 ID (선택)")
                         .type(JsonFieldType.STRING)
                         .optional(),
                     fieldWithPath("title").description("제목 (선택). 최대 100자").optional(),
-                    fieldWithPath("content").description("내용 (선택)").optional()),
-                responseFields(
-                    fieldWithPath("id").description("게시글 ID"),
-                    fieldWithPath("petId").description("동행한 반려견 ID (null 가능)").optional(),
-                    fieldWithPath("photoId").description("대표 사진 ID (null 가능)").optional(),
-                    fieldWithPath("courseId").description("여행 코스 ID (null 가능)").optional(),
-                    fieldWithPath("title").description("제목"),
-                    fieldWithPath("content").description("내용"),
-                    fieldWithPath("viewCount").description("조회수"),
-                    fieldWithPath("recommendationCount").description("추천 수"),
-                    fieldWithPath("commentCount").description("댓글 수"),
-                    fieldWithPath("recommended").description("요청한 사용자가 추천했는지. 추천 취소 버튼 노출 판단용"),
-                    fieldWithPath("bookmarked").description("요청한 사용자가 북마크했는지"),
-                    fieldWithPath("nickname").description("작성자 닉네임"),
-                    fieldWithPath("photoUrl").description("대표 사진 URL (null 가능)").optional(),
-                    fieldWithPath("createdAt").description("작성일시"))));
+                    fieldWithPath("content").description("내용 (선택)").optional(),
+                    fieldWithPath("photos[]").description("첨부 사진 목록 (선택). 최대 10장").optional(),
+                    fieldWithPath("photos[].photoKey").description("upload-url로 발급받은 S3 경로"),
+                    fieldWithPath("photos[].takenAt").description("촬영일 (선택)").optional())));
   }
 
   @Test
@@ -220,7 +216,7 @@ class PostControllerTest {
     String body =
         objectMapper.writeValueAsString(
             new PostCreateRequest(
-                UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "가".repeat(101), "즐거웠어요"));
+                UUID.randomUUID(), UUID.randomUUID(), "가".repeat(101), "즐거웠어요", null));
 
     mockMvc
         .perform(
@@ -233,15 +229,9 @@ class PostControllerTest {
 
   @Test
   void 게시글_작성_시_제목과_내용은_생략할_수_있다() throws Exception {
-    UUID petId = UUID.randomUUID();
-    UUID photoId = UUID.randomUUID();
-    UUID courseId = UUID.randomUUID();
-    when(postService.createPost(any(), eq(petId), eq(photoId), eq(courseId), isNull(), isNull()))
-        .thenReturn(samplePostResponse());
-
     String body =
         objectMapper.writeValueAsString(
-            new PostCreateRequest(petId, photoId, courseId, null, null));
+            new PostCreateRequest(UUID.randomUUID(), UUID.randomUUID(), null, null, null));
 
     mockMvc
         .perform(
@@ -253,23 +243,7 @@ class PostControllerTest {
   }
 
   @Test
-  void 게시글_수정_시_제목이_100자를_넘으면_400() throws Exception {
-    String body = objectMapper.writeValueAsString(new PostUpdateRequest("가".repeat(101), null));
-
-    mockMvc
-        .perform(
-            patch("/posts/{postId}", UUID.randomUUID())
-                .contentType("application/json")
-                .content(body)
-                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
-        .andExpect(status().isBadRequest());
-  }
-
-  @Test
   void 참조_없이_본문만으로_게시글을_작성할_수_있다() throws Exception {
-    when(postService.createPost(any(), isNull(), isNull(), isNull(), any(), any()))
-        .thenReturn(samplePostResponse());
-
     mockMvc
         .perform(
             post("/posts")
@@ -280,71 +254,10 @@ class PostControllerTest {
   }
 
   @Test
-  void 반려동물_없이_게시글을_작성할_수_있다() throws Exception {
-    UUID courseId = UUID.randomUUID();
-    when(postService.createPost(any(), isNull(), isNull(), eq(courseId), any(), any()))
-        .thenReturn(samplePostResponse());
-
-    String body =
-        objectMapper.writeValueAsString(
-            new PostCreateRequest(null, null, courseId, "펫 없는 글", "내용"));
-
-    mockMvc
-        .perform(
-            post("/posts")
-                .contentType("application/json")
-                .content(body)
-                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
-        .andExpect(status().isCreated());
-  }
-
-  @Test
-  void 여행_코스_없이_게시글을_작성할_수_있다() throws Exception {
-    UUID petId = UUID.randomUUID();
-    when(postService.createPost(any(), eq(petId), isNull(), isNull(), any(), any()))
-        .thenReturn(samplePostResponse());
-
-    String body =
-        objectMapper.writeValueAsString(new PostCreateRequest(petId, null, null, "코스 없는 글", "내용"));
-
-    mockMvc
-        .perform(
-            post("/posts")
-                .contentType("application/json")
-                .content(body)
-                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
-        .andExpect(status().isCreated());
-  }
-
-  @Test
   void 사진_없이_게시글을_작성할_수_있다() throws Exception {
-    UUID petId = UUID.randomUUID();
-    UUID courseId = UUID.randomUUID();
-    when(postService.createPost(any(), eq(petId), isNull(), eq(courseId), any(), any()))
-        .thenReturn(samplePostResponse());
-
     String body =
         objectMapper.writeValueAsString(
-            new PostCreateRequest(petId, null, courseId, "사진 없는 글", "내용"));
-
-    mockMvc
-        .perform(
-            post("/posts")
-                .contentType("application/json")
-                .content(body)
-                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
-        .andExpect(status().isCreated());
-  }
-
-  @Test
-  void 게시글_작성_시_photoId_키를_생략해도_작성된다() throws Exception {
-    UUID petId = UUID.randomUUID();
-    UUID courseId = UUID.randomUUID();
-    when(postService.createPost(any(), eq(petId), isNull(), eq(courseId), any(), any()))
-        .thenReturn(samplePostResponse());
-
-    String body =
-        "{\"petId\":\"" + petId + "\",\"courseId\":\"" + courseId + "\",\"title\":\"제목\"}";
+            new PostCreateRequest(UUID.randomUUID(), UUID.randomUUID(), "사진 없는 글", "내용", null));
 
     mockMvc
         .perform(
@@ -373,7 +286,7 @@ class PostControllerTest {
   @Test
   void 게시글_작성_시_UUID_형식이_틀리면_어느_필드인지_알려준다() throws Exception {
     String id = UUID.randomUUID().toString();
-    String body = "{\"petId\":\"1\",\"photoId\":\"" + id + "\",\"courseId\":\"" + id + "\"}";
+    String body = "{\"petId\":\"1\",\"courseId\":\"" + id + "\"}";
 
     mockMvc
         .perform(
@@ -390,10 +303,11 @@ class PostControllerTest {
   @Test
   void 게시글_작성_시_참조가_잘못되면_어느_필드인지_알려준다() throws Exception {
     UUID id = UUID.randomUUID();
-    when(postService.createPost(any(), any(), any(), any(), any(), any()))
-        .thenThrow(new InvalidReferenceException("photoId", "존재하지 않거나 접근할 수 없는 사진입니다."));
+    doThrow(new InvalidReferenceException("petId", "존재하지 않거나 본인의 반려동물이 아닙니다."))
+        .when(postService)
+        .createPost(any(), any(), any(), any(), any(), any());
 
-    String body = objectMapper.writeValueAsString(new PostCreateRequest(id, id, id, "제목", "내용"));
+    String body = objectMapper.writeValueAsString(new PostCreateRequest(id, id, "제목", "내용", null));
 
     mockMvc
         .perform(
@@ -403,8 +317,21 @@ class PostControllerTest {
                 .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("INVALID_REQUEST"))
-        .andExpect(jsonPath("$.fieldErrors[0].field").value("photoId"))
-        .andExpect(jsonPath("$.fieldErrors[0].message").value("존재하지 않거나 접근할 수 없는 사진입니다."));
+        .andExpect(jsonPath("$.fieldErrors[0].field").value("petId"))
+        .andExpect(jsonPath("$.fieldErrors[0].message").value("존재하지 않거나 본인의 반려동물이 아닙니다."));
+  }
+
+  @Test
+  void 게시글_수정_시_제목이_100자를_넘으면_400() throws Exception {
+    String body = objectMapper.writeValueAsString(new PostUpdateRequest("가".repeat(101), null));
+
+    mockMvc
+        .perform(
+            patch("/posts/{postId}", UUID.randomUUID())
+                .contentType("application/json")
+                .content(body)
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isBadRequest());
   }
 
   @Test
@@ -444,6 +371,10 @@ class PostControllerTest {
                     fieldWithPath("bookmarked").description("요청한 사용자가 북마크했는지"),
                     fieldWithPath("nickname").description("작성자 닉네임"),
                     fieldWithPath("photoUrl").description("대표 사진 URL (null 가능)").optional(),
+                    fieldWithPath("photos[]").description("첨부 사진 목록").optional(),
+                    fieldWithPath("photos[].photoId").description("사진 ID"),
+                    fieldWithPath("photos[].photoKey")
+                        .description("S3 경로. FE는 GET /photos/{photoId}로 다운로드 URL 발급"),
                     fieldWithPath("createdAt").description("작성일시"))));
   }
 

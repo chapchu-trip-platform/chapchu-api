@@ -1,6 +1,8 @@
 package com.pettrip.post.service;
 
+import com.github.f4b6a3.uuid.UuidCreator;
 import com.pettrip.common.service.InvalidReferenceException;
+import com.pettrip.post.controller.PostCreateRequest;
 import com.pettrip.post.controller.PostListResponse;
 import com.pettrip.post.controller.PostResponse;
 import com.pettrip.post.model.Post;
@@ -11,10 +13,16 @@ import com.pettrip.post.repository.PostBookmarkRepository;
 import com.pettrip.post.repository.PostRecommendationRepository;
 import com.pettrip.post.repository.PostReportRepository;
 import com.pettrip.post.repository.PostRepository;
+import java.sql.Date;
 import java.sql.Timestamp;
+import java.sql.Types;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -51,6 +59,27 @@ public class PostService {
           + "ORDER BY p.recommendation_count DESC, p.created_at DESC, p.post_id DESC LIMIT :size";
   private static final String DETAIL_SQL = ENRICHED_SELECT + "WHERE p.post_id = :postId";
 
+  private static final String PHOTOS_BY_POST_SQL =
+      """
+      SELECT pp.post_id, pp.photo_id, ph.photo_url
+      FROM post_photos pp
+      JOIN photos ph ON ph.photo_id = pp.photo_id
+      WHERE pp.post_id IN (:postIds)
+      ORDER BY pp.post_id, pp.photo_order
+      """;
+
+  private static final String INSERT_PHOTO_SQL =
+      """
+      INSERT INTO photos (photo_id, user_id, course_place_id, photo_url, taken_at, created_at)
+      VALUES (:photoId, :userId, NULL, :photoUrl, :takenAt, now())
+      """;
+
+  private static final String INSERT_POST_PHOTO_SQL =
+      """
+      INSERT INTO post_photos (post_id, photo_id, photo_order)
+      VALUES (:postId, :photoId, :photoOrder)
+      """;
+
   /**
    * 글이 가리키는 반려동물·사진·코스가 실제로 있고 작성자 것인지 한 번에 확인한다.
    *
@@ -60,18 +89,23 @@ public class PostService {
   private static final String PET_EXISTS =
       "EXISTS(SELECT 1 FROM pets WHERE pet_id = :petId AND user_id = :userId)";
 
-  private static final String PHOTO_EXISTS =
-      "EXISTS(SELECT 1 FROM photos WHERE photo_id = :photoId AND user_id = :userId)";
   private static final String COURSE_EXISTS =
       "EXISTS(SELECT 1 FROM travel_courses WHERE course_id = :courseId AND user_id = :userId)";
 
-  /** 참조 확인 쿼리 결과. 보내지 않은 참조는 항상 true다. */
-  public record ReferenceCheck(boolean petOk, boolean photoOk, boolean courseOk) {}
+  /** 참조 확인 쿼리 결과. 보내지 않은 참조는 항상 true다. 사진은 photoKey 경로로 별도 검증한다. */
+  public record ReferenceCheck(boolean petOk, boolean courseOk) {}
 
   private static final RowMapper<ReferenceCheck> REFERENCE_CHECK_ROW_MAPPER =
+      (rs, rowNum) -> new ReferenceCheck(rs.getBoolean("pet_ok"), rs.getBoolean("course_ok"));
+
+  private record PostPhotoRow(UUID postId, UUID photoId, String photoKey) {}
+
+  private static final RowMapper<PostPhotoRow> POST_PHOTO_ROW_MAPPER =
       (rs, rowNum) ->
-          new ReferenceCheck(
-              rs.getBoolean("pet_ok"), rs.getBoolean("photo_ok"), rs.getBoolean("course_ok"));
+          new PostPhotoRow(
+              rs.getObject("post_id", UUID.class),
+              rs.getObject("photo_id", UUID.class),
+              rs.getString("photo_url"));
 
   private static final RowMapper<PostResponse> POST_ROW_MAPPER =
       (rs, rowNum) ->
@@ -89,6 +123,7 @@ public class PostService {
               rs.getBoolean("bookmarked"),
               rs.getString("nickname"),
               rs.getString("photo_url"),
+              List.of(),
               rs.getTimestamp("created_at").toLocalDateTime());
 
   private final PostRepository postRepository;
@@ -125,19 +160,81 @@ public class PostService {
   }
 
   /**
-   * 저장 후 {@code saveAndFlush}로 INSERT를 강제한다.
+   * 글을 저장한다. 응답은 없다(FE는 생성 후 목록으로 이동).
    *
-   * <p>{@link #fetchEnrichedPost}는 닉네임·사진 URL을 붙이려고 JdbcTemplate 원시 SQL로 되읽는데, 이 쿼리는 Hibernate 영속성
-   * 컨텍스트를 보지 않는다. {@code Post}는 PK를 애플리케이션이 직접 만들어서(@GeneratedValue 없음) {@code save()}가 INSERT를 커밋
-   * 시점까지 미루므로, flush하지 않으면 방금 만든 글을 DB에서 찾지 못해 404가 난다.
+   * <p>{@code saveAndFlush}로 INSERT를 강제하는 이유: 뒤이어 {@link #linkPostPhotos}가 JdbcTemplate 원시 SQL로
+   * post_photos에 post_id FK를 넣는데, {@code Post}는 PK를 애플리케이션이 직접 만들어(@GeneratedValue 없음) {@code
+   * save()}가 INSERT를 커밋 시점까지 미룬다. flush하지 않으면 아직 없는 글을 참조해 FK 위반이 난다.
    */
   @Transactional
-  public PostResponse createPost(
-      UUID userId, UUID petId, UUID photoId, UUID courseId, String title, String content) {
-    verifyReferences(userId, petId, photoId, courseId);
+  public void createPost(
+      UUID userId,
+      UUID petId,
+      UUID courseId,
+      String title,
+      String content,
+      List<PostCreateRequest.PhotoEntry> photos) {
+    verifyReferences(userId, petId, courseId);
+    List<PostCreateRequest.PhotoEntry> entries = photos;
+    if (entries == null) {
+      entries = List.of();
+    }
+    List<UUID> photoIds = createPhotos(userId, entries);
     Post post =
-        postRepository.saveAndFlush(new Post(userId, petId, photoId, courseId, title, content));
-    return fetchEnrichedPost(userId, post.getId());
+        postRepository.saveAndFlush(
+            new Post(userId, petId, firstOrNull(photoIds), courseId, title, content));
+    linkPostPhotos(post.getId(), photoIds);
+  }
+
+  /** photoKey들로 photos row를 만들고 생성된 photoId를 순서대로 돌려준다. */
+  private List<UUID> createPhotos(UUID userId, List<PostCreateRequest.PhotoEntry> entries) {
+    List<UUID> photoIds = new ArrayList<>();
+    for (PostCreateRequest.PhotoEntry entry : entries) {
+      verifyPhotoKeyOwnership(userId, entry.photoKey());
+      UUID photoId = UuidCreator.getTimeOrderedEpoch();
+      MapSqlParameterSource params =
+          new MapSqlParameterSource()
+              .addValue("photoId", photoId)
+              .addValue("userId", userId)
+              .addValue("photoUrl", entry.photoKey())
+              .addValue("takenAt", toSqlDate(entry.takenAt()), Types.DATE);
+      jdbcTemplate.update(INSERT_PHOTO_SQL, params);
+      photoIds.add(photoId);
+    }
+    return photoIds;
+  }
+
+  private void linkPostPhotos(UUID postId, List<UUID> photoIds) {
+    for (int order = 0; order < photoIds.size(); order++) {
+      MapSqlParameterSource params =
+          new MapSqlParameterSource()
+              .addValue("postId", postId)
+              .addValue("photoId", photoIds.get(order))
+              .addValue("photoOrder", order);
+      jdbcTemplate.update(INSERT_POST_PHOTO_SQL, params);
+    }
+  }
+
+  /** photoKey는 {@code {type}/{userId}/...} 형식이라 두 번째 경로 조각이 본인 userId여야 한다. */
+  private void verifyPhotoKeyOwnership(UUID userId, String photoKey) {
+    String[] parts = photoKey.split("/");
+    if (parts.length < 3 || !parts[1].equals(userId.toString())) {
+      throw new InvalidReferenceException("photoKey", "본인의 사진 업로드 경로가 아닙니다.");
+    }
+  }
+
+  private static UUID firstOrNull(List<UUID> photoIds) {
+    if (photoIds.isEmpty()) {
+      return null;
+    }
+    return photoIds.get(0);
+  }
+
+  private static Date toSqlDate(LocalDate takenAt) {
+    if (takenAt == null) {
+      return null;
+    }
+    return Date.valueOf(takenAt);
   }
 
   @Transactional
@@ -208,7 +305,7 @@ public class PostService {
         new MapSqlParameterSource().addValue("userId", userId).addValue("size", size);
     if (cursor == null) {
       List<PostResponse> posts = jdbcTemplate.query(LATEST_SQL, params, POST_ROW_MAPPER);
-      return toListResponse(posts, size);
+      return toListResponse(enrichWithPhotos(posts), size);
     }
     String[] parts = cursor.split("~", 2);
     params.addValue(
@@ -216,14 +313,34 @@ public class PostService {
         Timestamp.valueOf(LocalDateTime.parse(parts[0], DateTimeFormatter.ISO_LOCAL_DATE_TIME)));
     params.addValue("cursorId", UUID.fromString(parts[1]));
     List<PostResponse> posts = jdbcTemplate.query(LATEST_CURSOR_SQL, params, POST_ROW_MAPPER);
-    return toListResponse(posts, size);
+    return toListResponse(enrichWithPhotos(posts), size);
   }
 
   private PostListResponse queryPopular(UUID userId, int size) {
     MapSqlParameterSource params =
         new MapSqlParameterSource().addValue("userId", userId).addValue("size", size);
     List<PostResponse> posts = jdbcTemplate.query(POPULAR_SQL, params, POST_ROW_MAPPER);
-    return new PostListResponse(posts, null);
+    return new PostListResponse(enrichWithPhotos(posts), null);
+  }
+
+  /** 글 목록에 각 글의 사진 전체를 배치로 붙인다. post_photos → photos 순서대로. */
+  private List<PostResponse> enrichWithPhotos(List<PostResponse> posts) {
+    if (posts.isEmpty()) {
+      return posts;
+    }
+    List<UUID> postIds = posts.stream().map(PostResponse::id).toList();
+    MapSqlParameterSource params = new MapSqlParameterSource().addValue("postIds", postIds);
+    List<PostPhotoRow> rows = jdbcTemplate.query(PHOTOS_BY_POST_SQL, params, POST_PHOTO_ROW_MAPPER);
+
+    Map<UUID, List<PostResponse.PhotoView>> byPost = new LinkedHashMap<>();
+    for (PostPhotoRow row : rows) {
+      byPost
+          .computeIfAbsent(row.postId(), key -> new ArrayList<>())
+          .add(new PostResponse.PhotoView(row.photoId(), row.photoKey()));
+    }
+    return posts.stream()
+        .map(post -> post.withPhotos(byPost.getOrDefault(post.id(), List.of())))
+        .toList();
   }
 
   private PostListResponse toListResponse(List<PostResponse> posts, int size) {
@@ -239,25 +356,24 @@ public class PostService {
   private PostResponse fetchEnrichedPost(UUID userId, UUID postId) {
     MapSqlParameterSource params =
         new MapSqlParameterSource().addValue("userId", userId).addValue("postId", postId);
-    return jdbcTemplate.query(DETAIL_SQL, params, POST_ROW_MAPPER).stream()
-        .findFirst()
-        .orElseThrow(PostNotFoundException::new);
+    PostResponse post =
+        jdbcTemplate.query(DETAIL_SQL, params, POST_ROW_MAPPER).stream()
+            .findFirst()
+            .orElseThrow(PostNotFoundException::new);
+    return enrichWithPhotos(List.of(post)).get(0);
   }
 
-  private void verifyReferences(UUID userId, UUID petId, UUID photoId, UUID courseId) {
-    if (petId == null && photoId == null && courseId == null) {
+  private void verifyReferences(UUID userId, UUID petId, UUID courseId) {
+    if (petId == null && courseId == null) {
       return;
     }
     MapSqlParameterSource params = new MapSqlParameterSource().addValue("userId", userId);
     addReference(params, "petId", petId);
-    addReference(params, "photoId", photoId);
     addReference(params, "courseId", courseId);
 
     String sql =
         "SELECT "
             + clause(petId, PET_EXISTS, "pet_ok")
-            + ", "
-            + clause(photoId, PHOTO_EXISTS, "photo_ok")
             + ", "
             + clause(courseId, COURSE_EXISTS, "course_ok");
     ReferenceCheck check = jdbcTemplate.queryForObject(sql, params, REFERENCE_CHECK_ROW_MAPPER);
@@ -266,9 +382,6 @@ public class PostService {
     }
     if (petId != null && !check.petOk()) {
       throw new InvalidReferenceException("petId", "존재하지 않거나 본인의 반려동물이 아닙니다.");
-    }
-    if (photoId != null && !check.photoOk()) {
-      throw new InvalidReferenceException("photoId", "존재하지 않거나 본인의 사진이 아닙니다.");
     }
     if (courseId != null && !check.courseOk()) {
       throw new InvalidReferenceException("courseId", "존재하지 않거나 본인의 여행 코스가 아닙니다.");
