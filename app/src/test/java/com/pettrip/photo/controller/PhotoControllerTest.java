@@ -21,6 +21,7 @@ import com.pettrip.photo.model.PhotoType;
 import com.pettrip.photo.service.PhotoService;
 import java.net.URI;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -48,7 +49,7 @@ class PhotoControllerTest {
   @MockitoBean private JwtDecoder jwtDecoder;
 
   @Test
-  void 사진_업로드_URL을_발급한다() throws Exception {
+  void 사진_업로드_URL을_여러장_발급한다() throws Exception {
     String photoKey = "review/user-1/uuid-초코.jpg";
     when(photoService.buildPhotoKey(any(), eq(PhotoType.REVIEW), eq("초코.jpg")))
         .thenReturn(photoKey);
@@ -57,7 +58,9 @@ class PhotoControllerTest {
             URI.create("https://bucket.s3.ap-northeast-2.amazonaws.com/" + photoKey).toURL());
 
     String body =
-        objectMapper.writeValueAsString(new PhotoUploadUrlRequest(PhotoType.REVIEW, "초코.jpg"));
+        objectMapper.writeValueAsString(
+            new PhotoUploadUrlRequest(
+                List.of(new PhotoUploadUrlRequest.FileRequest(PhotoType.REVIEW, "초코.jpg"))));
 
     mockMvc
         .perform(
@@ -70,24 +73,26 @@ class PhotoControllerTest {
             document(
                 "photo-upload-url",
                 requestFields(
-                    fieldWithPath("type").description("사진 용도 (PROFILE, POST, REVIEW)"),
-                    fieldWithPath("fileName").description("업로드할 원본 파일명")),
+                    fieldWithPath("files[].type").description("사진 용도 (PROFILE, POST, REVIEW)"),
+                    fieldWithPath("files[].fileName").description("업로드할 원본 파일명")),
                 responseFields(
-                    fieldWithPath("uploadUrl").description("S3 Presigned PUT URL (10분 유효)"),
-                    fieldWithPath("photoKey").description("사진 저장 시 참조할 S3 경로"))));
+                    fieldWithPath("[].uploadUrl").description("S3 Presigned PUT URL (10분 유효)"),
+                    fieldWithPath("[].photoKey").description("사진 저장 시 참조할 S3 경로"),
+                    fieldWithPath("[].fileName").description("요청한 원본 파일명 (URL 매칭용)"))));
   }
 
   @Test
-  void 사진을_저장한다() throws Exception {
+  void 사진을_여러장_저장한다() throws Exception {
     UUID coursePlaceId = UUID.randomUUID();
     String photoKey = "review/user-1/uuid-초코.jpg";
     LocalDate takenAt = LocalDate.of(2026, 7, 1);
     Photo photo = new Photo(UUID.randomUUID(), coursePlaceId, photoKey, takenAt);
-    when(photoService.savePhoto(any(), eq(coursePlaceId), eq(photoKey), eq(takenAt)))
-        .thenReturn(photo);
+    when(photoService.savePhotos(any(), any())).thenReturn(List.of(photo));
 
     String body =
-        objectMapper.writeValueAsString(new PhotoCreateRequest(coursePlaceId, photoKey, takenAt));
+        objectMapper.writeValueAsString(
+            new PhotoCreateRequest(
+                List.of(new PhotoCreateRequest.PhotoEntry(coursePlaceId, photoKey, takenAt))));
 
     mockMvc
         .perform(
@@ -100,17 +105,17 @@ class PhotoControllerTest {
             document(
                 "photo-create",
                 requestFields(
-                    fieldWithPath("coursePlaceId")
+                    fieldWithPath("photos[].coursePlaceId")
                         .description("방문 장소 ID (course_place_id). 방문 인증이 아니면 생략 가능")
                         .optional(),
-                    fieldWithPath("photoKey").description("업로드 URL 발급 시 받은 S3 경로"),
-                    fieldWithPath("takenAt").description("촬영일 (선택)").optional()),
+                    fieldWithPath("photos[].photoKey").description("업로드 URL 발급 시 받은 S3 경로"),
+                    fieldWithPath("photos[].takenAt").description("촬영일 (선택)").optional()),
                 responseFields(
-                    fieldWithPath("id").description("사진 ID"),
-                    fieldWithPath("coursePlaceId").description("방문 장소 ID").optional(),
-                    fieldWithPath("photoKey").description("S3 경로"),
-                    fieldWithPath("takenAt").description("촬영일").optional(),
-                    fieldWithPath("createdAt").description("생성일시").optional())));
+                    fieldWithPath("[].id").description("사진 ID"),
+                    fieldWithPath("[].coursePlaceId").description("방문 장소 ID").optional(),
+                    fieldWithPath("[].photoKey").description("S3 경로"),
+                    fieldWithPath("[].takenAt").description("촬영일").optional(),
+                    fieldWithPath("[].createdAt").description("생성일시").optional())));
   }
 
   @Test

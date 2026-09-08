@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -15,6 +16,7 @@ import java.net.URI;
 import java.net.URL;
 import java.time.Duration;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -67,21 +69,28 @@ class PhotoServiceTest {
   }
 
   @Test
-  void savePhoto는_사진을_저장한다() {
+  void savePhotos는_여러_사진을_순서대로_저장한다() {
     UUID userId = UUID.randomUUID();
     UUID coursePlaceId = UUID.randomUUID();
-    String photoKey = "photos/user-1/uuid-초코.jpg";
     LocalDate takenAt = LocalDate.of(2026, 7, 1);
     when(photoRepository.save(any(Photo.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
 
-    Photo result = photoService.savePhoto(userId, coursePlaceId, photoKey, takenAt);
+    List<Photo> result =
+        photoService.savePhotos(
+            userId,
+            List.of(
+                new PhotoSaveCommand(coursePlaceId, "review/u/1-a.jpg", takenAt),
+                new PhotoSaveCommand(null, "review/u/2-b.jpg", null)));
 
-    assertThat(result.getUserId()).isEqualTo(userId);
-    assertThat(result.getCoursePlaceId()).isEqualTo(coursePlaceId);
-    assertThat(result.getPhotoUrl()).isEqualTo(photoKey);
-    assertThat(result.getTakenAt()).isEqualTo(takenAt);
-    verify(photoRepository).save(any(Photo.class));
+    assertThat(result).hasSize(2);
+    assertThat(result.get(0).getUserId()).isEqualTo(userId);
+    assertThat(result.get(0).getCoursePlaceId()).isEqualTo(coursePlaceId);
+    assertThat(result.get(0).getPhotoUrl()).isEqualTo("review/u/1-a.jpg");
+    assertThat(result.get(0).getTakenAt()).isEqualTo(takenAt);
+    assertThat(result.get(1).getPhotoUrl()).isEqualTo("review/u/2-b.jpg");
+    assertThat(result.get(1).getCoursePlaceId()).isNull();
+    verify(photoRepository, times(2)).save(any(Photo.class));
   }
 
   @Test

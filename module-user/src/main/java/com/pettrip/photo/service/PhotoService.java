@@ -6,10 +6,11 @@ import com.pettrip.photo.repository.PhotoRepository;
 import io.awspring.cloud.s3.S3Operations;
 import java.net.URL;
 import java.time.Duration;
-import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class PhotoService {
@@ -38,8 +39,14 @@ public class PhotoService {
     return "%s/%s/%s-%s".formatted(type.folder(), userId, UUID.randomUUID(), fileName);
   }
 
-  public Photo savePhoto(UUID userId, UUID coursePlaceId, String photoKey, LocalDate takenAt) {
-    return photoRepository.save(new Photo(userId, coursePlaceId, photoKey, takenAt));
+  @Transactional
+  public List<Photo> savePhotos(UUID userId, List<PhotoSaveCommand> commands) {
+    return commands.stream().map(c -> saveOne(userId, c)).toList();
+  }
+
+  private Photo saveOne(UUID userId, PhotoSaveCommand command) {
+    return photoRepository.save(
+        new Photo(userId, command.coursePlaceId(), command.photoKey(), command.takenAt()));
   }
 
   public Photo getOwnedPhoto(UUID userId, UUID photoId) {
