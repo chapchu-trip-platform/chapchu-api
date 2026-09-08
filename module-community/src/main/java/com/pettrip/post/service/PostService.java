@@ -57,6 +57,7 @@ public class PostService {
           + "ORDER BY p.created_at DESC, p.post_id DESC LIMIT :size";
   private static final String POPULAR_SQL =
       ENRICHED_SELECT
+          + "WHERE p.created_at >= now() - INTERVAL '7 days' "
           + "ORDER BY p.recommendation_count DESC, p.created_at DESC, p.post_id DESC LIMIT :size";
   private static final String DETAIL_SQL = ENRICHED_SELECT + "WHERE p.post_id = :postId";
 
