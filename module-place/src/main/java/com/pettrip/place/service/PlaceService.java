@@ -8,11 +8,17 @@ import com.pettrip.place.repository.PlacePetPolicyRepository;
 import com.pettrip.place.repository.PlaceRepository;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,17 +27,47 @@ public class PlaceService {
 
   private static final Logger log = LoggerFactory.getLogger(PlaceService.class);
 
+  /**
+   * 찜 여부는 {@code place_wishlists}를 직접 조회한다.
+   *
+   * <p>이 테이블은 module-user 소관이지만, module-user가 이미 module-place를 의존하고 있어 반대 방향 의존을 추가하면 순환이 된다. 게시글에서
+   * {@code users}·{@code photos}를 직접 조회하는 것과 같은 방식이다.
+   */
+  private static final String WISHLISTED_SQL =
+      """
+      SELECT place_id FROM place_wishlists
+      WHERE user_id = :userId AND place_id IN (:placeIds)
+      """;
+
   private final PlaceRepository placeRepository;
   private final PlacePetPolicyRepository petPolicyRepository;
   private final TourApiClient tourApiClient;
+  private final NamedParameterJdbcTemplate jdbcTemplate;
 
   public PlaceService(
       PlaceRepository placeRepository,
       PlacePetPolicyRepository petPolicyRepository,
-      TourApiClient tourApiClient) {
+      TourApiClient tourApiClient,
+      NamedParameterJdbcTemplate jdbcTemplate) {
     this.placeRepository = placeRepository;
     this.petPolicyRepository = petPolicyRepository;
     this.tourApiClient = tourApiClient;
+    this.jdbcTemplate = jdbcTemplate;
+  }
+
+  /**
+   * 주어진 장소들 중 요청한 사용자가 찜한 것의 id를 돌려준다.
+   *
+   * <p>{@code GET /places/**}는 공개 엔드포인트라 비로그인 요청이 들어온다. 그 경우 빈 집합을 돌려주고 쿼리를 아예 돌리지 않는다.
+   */
+  @Transactional(readOnly = true)
+  public Set<String> findWishlistedPlaceIds(Optional<UUID> userId, Collection<String> placeIds) {
+    if (userId.isEmpty() || placeIds.isEmpty()) {
+      return Set.of();
+    }
+    MapSqlParameterSource params =
+        new MapSqlParameterSource().addValue("userId", userId.get()).addValue("placeIds", placeIds);
+    return Set.copyOf(jdbcTemplate.queryForList(WISHLISTED_SQL, params, String.class));
   }
 
   @Transactional(readOnly = true)

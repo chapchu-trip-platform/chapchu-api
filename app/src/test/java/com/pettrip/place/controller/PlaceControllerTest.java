@@ -2,6 +2,7 @@ package com.pettrip.place.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.document;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
@@ -9,6 +10,7 @@ import static org.springframework.restdocs.payload.PayloadDocumentation.response
 import static org.springframework.restdocs.request.RequestDocumentation.parameterWithName;
 import static org.springframework.restdocs.request.RequestDocumentation.pathParameters;
 import static org.springframework.restdocs.request.RequestDocumentation.queryParameters;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -19,6 +21,9 @@ import com.pettrip.place.service.PlaceNotFoundException;
 import com.pettrip.place.service.PlaceService;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -86,9 +91,36 @@ class PlaceControllerTest {
                     fieldWithPath("rating").description("평균 평점"),
                     fieldWithPath("reviewNum").description("리뷰 수"),
                     fieldWithPath("visitNum").description("방문 인증 수"),
+                    fieldWithPath("wishlisted").description("요청한 사용자가 찜했는지. 비로그인이면 false"),
                     fieldWithPath("petPolicy").description("반려동물 정책 (없으면 null)").optional(),
                     fieldWithPath("createdAt").description("등록일시"),
                     fieldWithPath("updatedAt").description("수정일시"))));
+  }
+
+  @Test
+  void 비로그인_장소_조회는_wishlisted가_false다() throws Exception {
+    when(placeService.getPlace("12345678")).thenReturn(samplePlace());
+    when(placeService.findWishlistedPlaceIds(eq(Optional.empty()), any())).thenReturn(Set.of());
+
+    mockMvc
+        .perform(get("/places/{externalPlaceId}", "12345678"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.wishlisted").value(false));
+  }
+
+  @Test
+  void 로그인_사용자가_찜한_장소는_wishlisted가_true다() throws Exception {
+    UUID userId = UUID.fromString("0198f3a0-1234-7000-8000-000000000001");
+    when(placeService.getPlace("12345678")).thenReturn(samplePlace());
+    when(placeService.findWishlistedPlaceIds(eq(Optional.of(userId)), any()))
+        .thenReturn(Set.of("12345678"));
+
+    mockMvc
+        .perform(
+            get("/places/{externalPlaceId}", "12345678")
+                .with(jwt().jwt(j -> j.subject(userId.toString()))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.wishlisted").value(true));
   }
 
   @Test
@@ -132,6 +164,7 @@ class PlaceControllerTest {
                     fieldWithPath("[].rating").description("평균 평점"),
                     fieldWithPath("[].reviewNum").description("리뷰 수"),
                     fieldWithPath("[].visitNum").description("방문 인증 수"),
+                    fieldWithPath("[].wishlisted").description("요청한 사용자가 찜했는지. 비로그인이면 false"),
                     fieldWithPath("[].petPolicy").description("반려동물 정책").optional(),
                     fieldWithPath("[].createdAt").description("등록일시"),
                     fieldWithPath("[].updatedAt").description("수정일시"))));
