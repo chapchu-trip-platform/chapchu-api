@@ -1,6 +1,7 @@
 package com.pettrip.config;
 
 import com.pettrip.common.service.CurrentUserId;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.core.MethodParameter;
 import org.springframework.security.core.Authentication;
@@ -21,8 +22,11 @@ public class CurrentUserIdArgumentResolver implements HandlerMethodArgumentResol
 
   @Override
   public boolean supportsParameter(MethodParameter parameter) {
-    return parameter.hasParameterAnnotation(CurrentUserId.class)
-        && UUID.class.equals(parameter.getParameterType());
+    if (!parameter.hasParameterAnnotation(CurrentUserId.class)) {
+      return false;
+    }
+    return UUID.class.equals(parameter.getParameterType())
+        || Optional.class.equals(parameter.getParameterType());
   }
 
   @Override
@@ -31,14 +35,22 @@ public class CurrentUserIdArgumentResolver implements HandlerMethodArgumentResol
       ModelAndViewContainer mavContainer,
       NativeWebRequest webRequest,
       WebDataBinderFactory binderFactory) {
+    boolean optional = Optional.class.equals(parameter.getParameterType());
     Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
     if (!(authentication instanceof JwtAuthenticationToken jwtAuthentication)) {
+      if (optional) {
+        return Optional.empty();
+      }
       throw new UnauthenticatedRequestException("인증된 JWT 정보가 없습니다.");
     }
 
     String subject = jwtAuthentication.getToken().getSubject();
     try {
-      return UUID.fromString(subject);
+      UUID userId = UUID.fromString(subject);
+      if (optional) {
+        return Optional.of(userId);
+      }
+      return userId;
     } catch (IllegalArgumentException | NullPointerException e) {
       throw new UnauthenticatedRequestException("JWT sub 클레임이 유효한 UUID가 아닙니다.");
     }

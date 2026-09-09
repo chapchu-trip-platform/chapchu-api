@@ -13,7 +13,8 @@ import java.lang.annotation.Target;
  * 016). 추출은 app 모듈의 {@code CurrentUserIdArgumentResolver}가 담당하므로, 이 애노테이션을 쓰는 도메인 모듈은 Spring
  * Security에 의존하지 않는다.
  *
- * <p>{@code UUID} 타입 파라미터에만 사용할 수 있다.
+ * <p>{@code UUID} 또는 {@code Optional<UUID>} 파라미터에 쓸 수 있다. 공개 엔드포인트(비로그인 접근 허용)에서는 {@code
+ * Optional<UUID>}를 써야 한다. {@code UUID}로 받으면 토큰이 없을 때 예외가 나 401로 떨어진다.
  *
  * <pre>{@code
  * @GetMapping

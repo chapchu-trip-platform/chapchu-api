@@ -468,6 +468,9 @@ include::{snippets}/my-bookmark-list/http-response.adoc[]
 
 `GET /users/me/wishlist`
 
+찜한 순서의 역순(최신 먼저)으로 돌려준다. 목록 화면을 바로 그릴 수 있게 장소 이름·이미지·주소·좌표·평점을
+함께 담는다. 항목마다 `GET /places/{id}`를 다시 부를 필요가 없다.
+
 [.request]
 ==== 요청
 
@@ -477,6 +480,35 @@ include::{snippets}/wishlist-list/http-request.adoc[]
 ==== 응답
 
 include::{snippets}/wishlist-list/http-response.adoc[]
+include::{snippets}/wishlist-list/response-fields.adoc[]
+
+=== 위시리스트 장소 추가
+
+`POST /users/me/wishlist/{placeId}`
+
+`placeId`는 한국관광공사 contentId(`places.external_place_id`)다.
+
+아직 서버에 동기화되지 않은 장소는 404다. `GET /places/nearby`가 응답에 담긴 장소를 모두 저장하므로,
+목록에서 본 장소는 찜할 수 있다.
+
+|===
+| 상태 코드 | 설명
+
+| `201 Created` | 찜 완료
+| `404 Not Found` | 서버에 없는 장소
+| `409 Conflict` | 이미 찜한 장소
+|===
+
+[.request]
+==== 요청
+
+include::{snippets}/wishlist-create/http-request.adoc[]
+include::{snippets}/wishlist-create/path-parameters.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/wishlist-create/http-response.adoc[]
 
 === 위시리스트 장소 제거
 

@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -24,7 +25,13 @@ public class WishlistController {
 
   @GetMapping
   public List<WishlistResponse> listMyWishlist(@CurrentUserId UUID userId) {
-    return wishlistService.listMyWishlist(userId).stream().map(WishlistResponse::from).toList();
+    return wishlistService.listMyWishlist(userId);
+  }
+
+  @PostMapping("/{placeId}")
+  @ResponseStatus(HttpStatus.CREATED)
+  public void addToWishlist(@CurrentUserId UUID userId, @PathVariable String placeId) {
+    wishlistService.addToWishlist(userId, placeId);
   }
 
   @DeleteMapping("/{placeId}")

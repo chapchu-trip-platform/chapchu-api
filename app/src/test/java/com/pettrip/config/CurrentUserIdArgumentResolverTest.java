@@ -52,6 +52,30 @@ class CurrentUserIdArgumentResolverTest {
   }
 
   @Test
+  void Optional_UUID_타입에_붙은_CurrentUserId도_지원한다() throws Exception {
+    assertThat(resolver.supportsParameter(parameterOf("annotatedOptional", 0))).isTrue();
+  }
+
+  @Test
+  void Optional_파라미터는_인증이_없으면_empty를_돌려준다() throws Exception {
+    Object resolved =
+        resolver.resolveArgument(parameterOf("annotatedOptional", 0), null, null, null);
+
+    assertThat(resolved).isEqualTo(java.util.Optional.empty());
+  }
+
+  @Test
+  void Optional_파라미터는_인증이_있으면_유저_id를_담아_돌려준다() throws Exception {
+    UUID userId = UUID.fromString("0198f3a0-1234-7000-8000-000000000001");
+    authenticateWithSubject(userId.toString());
+
+    Object resolved =
+        resolver.resolveArgument(parameterOf("annotatedOptional", 0), null, null, null);
+
+    assertThat(resolved).isEqualTo(java.util.Optional.of(userId));
+  }
+
+  @Test
   void 인증_정보가_없으면_예외를_던진다() {
     assertThatThrownBy(
             () -> resolver.resolveArgument(parameterOf("annotated", 0), null, null, null))
@@ -90,6 +114,8 @@ class CurrentUserIdArgumentResolverTest {
           case "annotated" -> Target.class.getDeclaredMethod("annotated", UUID.class);
           case "notAnnotated" -> Target.class.getDeclaredMethod("notAnnotated", UUID.class);
           case "wrongType" -> Target.class.getDeclaredMethod("wrongType", String.class);
+          case "annotatedOptional" ->
+              Target.class.getDeclaredMethod("annotatedOptional", java.util.Optional.class);
           default -> throw new IllegalArgumentException(methodName);
         };
     return new MethodParameter(method, index);
@@ -102,5 +128,7 @@ class CurrentUserIdArgumentResolverTest {
     void notAnnotated(UUID userId) {}
 
     void wrongType(@CurrentUserId String userId) {}
+
+    void annotatedOptional(@CurrentUserId java.util.Optional<UUID> userId) {}
   }
 }
