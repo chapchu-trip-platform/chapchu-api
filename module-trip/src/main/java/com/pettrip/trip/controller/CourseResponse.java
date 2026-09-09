@@ -26,6 +26,7 @@ public record CourseResponse(
       BigDecimal longitude,
       short visitOrder,
       boolean finalPlace,
+      String reason,
       PetPolicySummary petPolicy) {}
 
   public record PetPolicySummary(
@@ -69,6 +70,7 @@ public record CourseResponse(
         lng,
         cp.getVisitOrder(),
         cp.isFinalPlace(),
+        cp.getReason(),
         petPolicy);
   }
 

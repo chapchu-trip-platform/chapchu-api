@@ -3,6 +3,7 @@ package com.pettrip.trip.controller;
 import com.pettrip.common.service.CurrentUserId;
 import com.pettrip.trip.service.CourseService;
 import com.pettrip.trip.service.CourseService.TravelCourseDetail;
+import com.pettrip.trip.service.DestinationInput;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -28,6 +29,20 @@ public class CourseController {
   @ResponseStatus(HttpStatus.CREATED)
   public CourseResponse createCourse(
       @CurrentUserId UUID userId, @Valid @RequestBody CreateCourseRequest request) {
+    CreateCourseRequest.Destination d = request.destination();
+    DestinationInput destination =
+        new DestinationInput(
+            d.externalPlaceId(),
+            d.placeName(),
+            d.placeImageUrl(),
+            d.address(),
+            d.latitude(),
+            d.longitude(),
+            d.allowedPetSize(),
+            d.leashRequired(),
+            d.carrierRequired(),
+            d.indoorOutdoorType(),
+            d.placeCaution());
     var course =
         courseService.createCourse(
             userId,
@@ -36,10 +51,7 @@ public class CourseController {
             request.startLocation(),
             request.startLat(),
             request.startLng(),
-            request.endLocation(),
-            request.endLat(),
-            request.endLng(),
-            request.intermediateStopCount(),
+            destination,
             request.temperature(),
             request.humidity(),
             request.weatherStatus());

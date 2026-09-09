@@ -34,14 +34,27 @@ public class CoursePlace extends BaseEntity {
   @Column(name = "visited_at")
   private LocalDateTime visitedAt;
 
+  @Column(name = "reason", columnDefinition = "TEXT")
+  private String reason;
+
   protected CoursePlace() {}
 
   public CoursePlace(
       TravelCourse course, String externalPlaceId, short visitOrder, boolean finalPlace) {
+    this(course, externalPlaceId, visitOrder, finalPlace, null);
+  }
+
+  public CoursePlace(
+      TravelCourse course,
+      String externalPlaceId,
+      short visitOrder,
+      boolean finalPlace,
+      String reason) {
     this.course = course;
     this.externalPlaceId = externalPlaceId;
     this.visitOrder = visitOrder;
     this.finalPlace = finalPlace;
+    this.reason = reason;
   }
 
   public TravelCourse getCourse() {
@@ -66,6 +79,10 @@ public class CoursePlace extends BaseEntity {
 
   public LocalDateTime getVisitedAt() {
     return visitedAt;
+  }
+
+  public String getReason() {
+    return reason;
   }
 
   public void markVisited() {

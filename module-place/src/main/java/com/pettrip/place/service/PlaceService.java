@@ -137,6 +137,72 @@ public class PlaceService {
     return saved;
   }
 
+  /**
+   * FE가 보낸 장소 정보로 Place(+PlacePetPolicy)를 upsert한다. 코스 도착지 확정용.
+   *
+   * <p>정책은 반드시 저장된(관리 상태) Place 인스턴스로 생성해야 @MapsId 충돌(#202)이 안 난다.
+   */
+  @Transactional
+  public Place upsertPlace(
+      String externalPlaceId,
+      String placeName,
+      String placeImageUrl,
+      String address,
+      BigDecimal latitude,
+      BigDecimal longitude,
+      String allowedPetSize,
+      Boolean leashRequired,
+      Boolean carrierRequired,
+      String indoorOutdoorType,
+      String placeCaution) {
+    Place place =
+        placeRepository
+            .findById(externalPlaceId)
+            .orElseGet(
+                () ->
+                    new Place(
+                        externalPlaceId,
+                        null,
+                        placeName,
+                        placeImageUrl,
+                        address,
+                        latitude,
+                        longitude,
+                        null,
+                        null,
+                        null));
+    place.update(
+        null, placeName, placeImageUrl, address, latitude, longitude, null, null, null, null);
+    Place saved = placeRepository.save(place);
+
+    AllowedPetSize size = toAllowedPetSize(allowedPetSize);
+    IndoorOutdoorType indoor = toIndoorOutdoorType(indoorOutdoorType);
+    PlacePetPolicy policy =
+        petPolicyRepository
+            .findById(externalPlaceId)
+            .orElseGet(
+                () ->
+                    new PlacePetPolicy(
+                        saved, size, leashRequired, carrierRequired, indoor, null, placeCaution));
+    policy.update(size, leashRequired, carrierRequired, indoor, null, placeCaution);
+    petPolicyRepository.save(policy);
+    return saved;
+  }
+
+  private static AllowedPetSize toAllowedPetSize(String value) {
+    if (value == null || value.isBlank()) {
+      return null;
+    }
+    return AllowedPetSize.valueOf(value);
+  }
+
+  private static IndoorOutdoorType toIndoorOutdoorType(String value) {
+    if (value == null || value.isBlank()) {
+      return null;
+    }
+    return IndoorOutdoorType.valueOf(value);
+  }
+
   private void syncPetPolicy(Place place, String contentId) {
     if (petPolicyRepository.existsById(contentId)) return;
     TourApiClient.PetDetailItem detail = tourApiClient.fetchPetDetail(contentId);

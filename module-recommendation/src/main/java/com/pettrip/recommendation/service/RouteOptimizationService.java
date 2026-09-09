@@ -131,83 +131,81 @@ public class RouteOptimizationService {
     return places.stream().map(PlaceInfo::id).toList();
   }
 
-  public List<String> selectAndOrder(
-      List<PlaceInfo> startGroup,
-      List<List<PlaceInfo>> middleGroups,
-      List<PlaceInfo> endGroup,
-      int n,
+  /**
+   * 후보 풀에서 출발→도착 흐름·취향·날씨를 보고 중간 스탑을 최대 maxStops개 큐레이션한다(도착지 제외, 이유 포함). 실패 시 풀 상위 maxStops개로 폴백.
+   */
+  public List<SelectedPlace> curateCourse(
+      List<PlaceInfo> pool,
+      int maxStops,
       BigDecimal startLat,
       BigDecimal startLng,
-      BigDecimal endLat,
-      BigDecimal endLng,
+      String destinationName,
+      BigDecimal destLat,
+      BigDecimal destLng,
       String petSizeLabel,
       Integer petAge,
+      List<String> petActivities,
       String weatherStatus,
       Short temperature) {
-    if (startGroup.isEmpty() || endGroup.isEmpty()) {
-      return fallbackSelection(startGroup, middleGroups, endGroup);
+    if (pool.isEmpty() || maxStops <= 0) {
+      return List.of();
     }
-
-    List<List<PlaceInfo>> nonEmptyMiddle = middleGroups.stream().filter(g -> !g.isEmpty()).toList();
-    int actualMiddleCount = nonEmptyMiddle.size();
-
     try {
       String prompt =
-          buildSelectPrompt(
-              startGroup,
-              nonEmptyMiddle,
-              endGroup,
-              actualMiddleCount,
+          buildCuratePrompt(
+              pool,
+              maxStops,
               startLat,
               startLng,
-              endLat,
-              endLng,
+              destinationName,
+              destLat,
+              destLng,
               petSizeLabel,
               petAge,
+              petActivities,
               weatherStatus,
               temperature);
       String response = chatClient.prompt().user(prompt).call().content();
-      return parseAndValidateSelection(
-          response, startGroup, nonEmptyMiddle, endGroup, actualMiddleCount);
+      return parseCuration(response, pool, maxStops);
     } catch (Exception e) {
-      return fallbackSelection(startGroup, middleGroups, endGroup);
+      return curateFallback(pool, maxStops);
     }
   }
 
-  private String buildSelectPrompt(
-      List<PlaceInfo> startGroup,
-      List<List<PlaceInfo>> middleGroups,
-      List<PlaceInfo> endGroup,
-      int n,
+  private String buildCuratePrompt(
+      List<PlaceInfo> pool,
+      int maxStops,
       BigDecimal startLat,
       BigDecimal startLng,
-      BigDecimal endLat,
-      BigDecimal endLng,
+      String destinationName,
+      BigDecimal destLat,
+      BigDecimal destLng,
       String petSizeLabel,
       Integer petAge,
+      List<String> petActivities,
       String weatherStatus,
       Short temperature) {
-    StringBuilder groups = new StringBuilder();
-    groups.append("## 출발지 그룹\n");
-    appendGroup(groups, startGroup);
-    for (int i = 0; i < middleGroups.size(); i++) {
-      groups.append(String.format("## 중간 그룹 %d%n", i + 1));
-      appendGroup(groups, middleGroups.get(i));
+    StringBuilder poolBlock = new StringBuilder();
+    appendGroup(poolBlock, pool);
+
+    String activities = "";
+    if (petActivities != null && !petActivities.isEmpty()) {
+      activities = String.join(", ", petActivities);
     }
-    groups.append("## 도착지 그룹\n");
-    appendGroup(groups, endGroup);
 
     Map<String, String> vars = new LinkedHashMap<>();
-    vars.put("startLat", String.valueOf(startLat));
-    vars.put("startLng", String.valueOf(startLng));
-    vars.put("endLat", String.valueOf(endLat));
-    vars.put("endLng", String.valueOf(endLng));
     vars.put("petSize", nullToEmpty(petSizeLabel));
     vars.put("petAge", nullToEmpty(petAge));
+    vars.put("petActivities", activities);
     vars.put("weatherStatus", nullToEmpty(weatherStatus));
     vars.put("temperature", nullToEmpty(temperature));
-    vars.put("groupsBlock", groups.toString());
-    vars.put("arrayLength", String.valueOf(n + 2));
+    vars.put("startLat", String.valueOf(startLat));
+    vars.put("startLng", String.valueOf(startLng));
+    vars.put("destName", nullToEmpty(destinationName));
+    vars.put("destLat", String.valueOf(destLat));
+    vars.put("destLng", String.valueOf(destLng));
+    vars.put("maxStops", String.valueOf(maxStops));
+    vars.put("poolBlock", poolBlock.toString());
     return render(courseSelectTemplate, vars);
   }
 
@@ -240,66 +238,40 @@ public class RouteOptimizationService {
     return o.toString();
   }
 
-  private List<String> parseAndValidateSelection(
-      String response,
-      List<PlaceInfo> startGroup,
-      List<List<PlaceInfo>> middleGroups,
-      List<PlaceInfo> endGroup,
-      int n) {
+  private List<SelectedPlace> parseCuration(String response, List<PlaceInfo> pool, int maxStops) {
     try {
       String json = response.trim();
       int start = json.indexOf('[');
       int end = json.lastIndexOf(']');
       if (start == -1 || end == -1) {
-        return fallbackSelection(startGroup, middleGroups, endGroup);
+        return curateFallback(pool, maxStops);
       }
-      List<String> ids =
+      List<Map<String, String>> raw =
           objectMapper.readValue(
-              json.substring(start, end + 1), new TypeReference<List<String>>() {});
-      if (ids.size() != n + 2) {
-        return fallbackSelection(startGroup, middleGroups, endGroup);
-      }
-      Set<String> startIds = idSet(startGroup);
-      Set<String> endIds = idSet(endGroup);
-      if (!startIds.contains(ids.get(0))) {
-        return fallbackSelection(startGroup, middleGroups, endGroup);
-      }
-      if (!endIds.contains(ids.get(ids.size() - 1))) {
-        return fallbackSelection(startGroup, middleGroups, endGroup);
-      }
-      for (int i = 0; i < middleGroups.size(); i++) {
-        if (!idSet(middleGroups.get(i)).contains(ids.get(i + 1))) {
-          return fallbackSelection(startGroup, middleGroups, endGroup);
+              json.substring(start, end + 1), new TypeReference<List<Map<String, String>>>() {});
+      Set<String> poolIds = pool.stream().map(PlaceInfo::id).collect(Collectors.toSet());
+      List<SelectedPlace> selected = new ArrayList<>();
+      Set<String> seen = new java.util.HashSet<>();
+      for (Map<String, String> item : raw) {
+        String id = item.get("id");
+        if (id == null || !poolIds.contains(id) || !seen.add(id)) {
+          continue;
+        }
+        selected.add(new SelectedPlace(id, item.get("reason")));
+        if (selected.size() >= maxStops) {
+          break;
         }
       }
-      if (Set.copyOf(ids).size() != ids.size()) {
-        return fallbackSelection(startGroup, middleGroups, endGroup);
+      if (selected.isEmpty()) {
+        return curateFallback(pool, maxStops);
       }
-      return ids;
+      return selected;
     } catch (Exception e) {
-      return fallbackSelection(startGroup, middleGroups, endGroup);
+      return curateFallback(pool, maxStops);
     }
   }
 
-  private Set<String> idSet(List<PlaceInfo> group) {
-    return group.stream().map(PlaceInfo::id).collect(Collectors.toSet());
-  }
-
-  private List<String> fallbackSelection(
-      List<PlaceInfo> startGroup, List<List<PlaceInfo>> middleGroups, List<PlaceInfo> endGroup) {
-    List<String> ids = new ArrayList<>();
-    if (!startGroup.isEmpty()) {
-      ids.add(startGroup.get(0).id());
-    }
-    for (List<PlaceInfo> group : middleGroups) {
-      if (group.isEmpty()) {
-        continue;
-      }
-      ids.add(group.get(0).id());
-    }
-    if (!endGroup.isEmpty()) {
-      ids.add(endGroup.get(0).id());
-    }
-    return ids;
+  private List<SelectedPlace> curateFallback(List<PlaceInfo> pool, int maxStops) {
+    return pool.stream().limit(maxStops).map(p -> new SelectedPlace(p.id(), null)).toList();
   }
 }

@@ -1,7 +1,6 @@
 package com.pettrip.trip.controller;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.when;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.document;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
@@ -83,8 +82,7 @@ class CourseControllerTest {
   void 코스를_저장한다() throws Exception {
     TravelCourseDetail detail = sampleDetail();
     when(courseService.createCourse(
-            any(), any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), any(), any(),
-            any()))
+            any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
         .thenReturn(detail.course());
     when(courseService.getCourse(any(), any())).thenReturn(detail);
 
@@ -95,10 +93,19 @@ class CourseControllerTest {
             "강남구",
             new BigDecimal("37.5"),
             new BigDecimal("127.0"),
-            "종로구",
-            new BigDecimal("37.6"),
-            new BigDecimal("126.9"),
-            2,
+            new CreateCourseRequest.Destination(
+                "ext-001",
+                "도착장소",
+                "https://example.com/img.jpg",
+                new BigDecimal("37.6"),
+                new BigDecimal("126.9"),
+                "서울시 종로구",
+                "관광지",
+                "BOTH",
+                "ALL",
+                true,
+                false,
+                "주의사항 없음"),
             (short) 25,
             (short) 60,
             "맑음");
@@ -119,12 +126,27 @@ class CourseControllerTest {
                     fieldWithPath("startLocation").description("출발지 이름"),
                     fieldWithPath("startLat").description("출발지 위도"),
                     fieldWithPath("startLng").description("출발지 경도"),
-                    fieldWithPath("endLocation").description("도착지 이름"),
-                    fieldWithPath("endLat").description("도착지 위도"),
-                    fieldWithPath("endLng").description("도착지 경도"),
-                    fieldWithPath("intermediateStopCount")
-                        .description("출발지·도착지를 제외한 중간 경유 장소 수 (최소 0)")
-                        .type(JsonFieldType.NUMBER),
+                    fieldWithPath("destination.externalPlaceId")
+                        .description("도착지 장소 외부 ID (후보에서 고른 값)"),
+                    fieldWithPath("destination.placeName").description("도착지 이름"),
+                    fieldWithPath("destination.placeImageUrl")
+                        .description("도착지 이미지 URL")
+                        .optional(),
+                    fieldWithPath("destination.latitude").description("도착지 위도"),
+                    fieldWithPath("destination.longitude").description("도착지 경도"),
+                    fieldWithPath("destination.address").description("도착지 주소").optional(),
+                    fieldWithPath("destination.categoryLabel").description("카테고리").optional(),
+                    fieldWithPath("destination.indoorOutdoorType")
+                        .description("실내/실외 구분")
+                        .optional(),
+                    fieldWithPath("destination.allowedPetSize")
+                        .description("입장 가능 반려동물 크기")
+                        .optional(),
+                    fieldWithPath("destination.leashRequired").description("리드줄 필수 여부").optional(),
+                    fieldWithPath("destination.carrierRequired")
+                        .description("이동장 필수 여부")
+                        .optional(),
+                    fieldWithPath("destination.placeCaution").description("주의사항").optional(),
                     fieldWithPath("temperature").description("기온 (선택)").optional(),
                     fieldWithPath("humidity").description("습도 (선택)").optional(),
                     fieldWithPath("weatherStatus").description("날씨 상태 (선택)").optional()),
@@ -144,6 +166,9 @@ class CourseControllerTest {
                         .description("방문 순서")
                         .type(JsonFieldType.NUMBER),
                     fieldWithPath("places[].finalPlace").description("마지막 방문 장소 여부"),
+                    fieldWithPath("places[].reason")
+                        .description("이 곳을 고른 이유 (AI 큐레이션, 없을 수 있음)")
+                        .optional(),
                     fieldWithPath("places[].petPolicy").description("반려동물 정책").optional())));
   }
 
@@ -178,6 +203,9 @@ class CourseControllerTest {
                         .description("방문 순서")
                         .type(JsonFieldType.NUMBER),
                     fieldWithPath("places[].finalPlace").description("마지막 방문 장소 여부"),
+                    fieldWithPath("places[].reason")
+                        .description("이 곳을 고른 이유 (AI 큐레이션, 없을 수 있음)")
+                        .optional(),
                     fieldWithPath("places[].petPolicy").description("반려동물 정책").optional())));
   }
 
