@@ -15,6 +15,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.core.io.ClassPathResource;
 
 @ExtendWith(MockitoExtension.class)
 class RouteOptimizationServiceTest {
@@ -27,7 +28,12 @@ class RouteOptimizationServiceTest {
 
   @BeforeEach
   void setUp() {
-    service = new RouteOptimizationService(chatClient, new ObjectMapper());
+    service =
+        new RouteOptimizationService(
+            chatClient,
+            new ObjectMapper(),
+            new ClassPathResource("prompts/route-order.st"),
+            new ClassPathResource("prompts/course-select.st"));
   }
 
   @Test
@@ -61,6 +67,43 @@ class RouteOptimizationServiceTest {
     List<String> result = service.optimizeOrder(places, "소형", 3, "맑음", (short) 25);
 
     assertThat(result).containsExactly("p2", "p1");
+  }
+
+  @Test
+  void 프롬프트가_템플릿에서_렌더되고_미치환마커가_없다() {
+    when(chatClient.prompt()).thenReturn(requestSpec);
+    when(requestSpec.user(anyString())).thenReturn(requestSpec);
+    when(requestSpec.call()).thenReturn(callResponseSpec);
+    when(callResponseSpec.content()).thenReturn("[\"p1\",\"p2\"]");
+
+    List<PlaceInfo> places =
+        List.of(
+            new PlaceInfo(
+                "p1",
+                "장소A",
+                "주소A",
+                new BigDecimal("37.5"),
+                new BigDecimal("127.0"),
+                "관광지",
+                "OUTDOOR",
+                PlaceInfo.PlaceGroup.MIDDLE),
+            new PlaceInfo(
+                "p2",
+                "장소B",
+                "주소B",
+                new BigDecimal("37.6"),
+                new BigDecimal("127.1"),
+                "음식점",
+                "INDOOR",
+                PlaceInfo.PlaceGroup.MIDDLE));
+
+    service.optimizeOrder(places, "소형", 3, "맑음", (short) 25);
+
+    ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
+    verify(requestSpec).user(promptCaptor.capture());
+    String prompt = promptCaptor.getValue();
+    assertThat(prompt).contains("장소:").contains("장소A").contains("반려동물 정보: 소형견 3살");
+    assertThat(prompt).doesNotContain("{{").doesNotContain("}}");
   }
 
   @Test

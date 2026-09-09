@@ -2,12 +2,18 @@ package com.pettrip.recommendation.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -15,10 +21,35 @@ public class RouteOptimizationService {
 
   private final ChatClient chatClient;
   private final ObjectMapper objectMapper;
+  private final String routeOrderTemplate;
+  private final String courseSelectTemplate;
 
-  public RouteOptimizationService(ChatClient chatClient, ObjectMapper objectMapper) {
+  public RouteOptimizationService(
+      ChatClient chatClient,
+      ObjectMapper objectMapper,
+      @Value("classpath:/prompts/route-order.st") Resource routeOrderTemplate,
+      @Value("classpath:/prompts/course-select.st") Resource courseSelectTemplate) {
     this.chatClient = chatClient;
     this.objectMapper = objectMapper;
+    this.routeOrderTemplate = loadTemplate(routeOrderTemplate);
+    this.courseSelectTemplate = loadTemplate(courseSelectTemplate);
+  }
+
+  private static String loadTemplate(Resource resource) {
+    try {
+      return resource.getContentAsString(StandardCharsets.UTF_8);
+    } catch (IOException e) {
+      throw new IllegalStateException("프롬프트 템플릿 로드 실패: " + resource.getFilename(), e);
+    }
+  }
+
+  /** {@code {{key}}} 마커를 값으로 치환한다. 프롬프트의 JSON 예시 중괄호와 충돌하지 않게 이중 중괄호를 쓴다. */
+  private static String render(String template, Map<String, String> vars) {
+    String result = template;
+    for (Map.Entry<String, String> entry : vars.entrySet()) {
+      result = result.replace("{{" + entry.getKey() + "}}", entry.getValue());
+    }
+    return result;
   }
 
   public List<String> optimizeOrder(
@@ -45,28 +76,34 @@ public class RouteOptimizationService {
       Integer petAge,
       String weatherStatus,
       Short temperature) {
-    StringBuilder sb = new StringBuilder();
-    sb.append("다음 장소들을 반려동물 동반 하루 여행에 최적화된 방문 순서로 정렬해줘.\n");
-    sb.append("기준: 이동 동선 최소화(위경도 기반), 식당은 점심·저녁 시간대 배치.\n");
+    StringBuilder placesBlock = new StringBuilder();
+    appendGroup(placesBlock, places);
 
-    if (petSizeLabel != null || petAge != null) {
-      sb.append("반려동물 정보: ");
-      if (petSizeLabel != null) sb.append(petSizeLabel).append("견 ");
-      if (petAge != null) sb.append(petAge).append("살. ");
-      sb.append("\n");
+    Map<String, String> vars = new LinkedHashMap<>();
+    vars.put("petInfoLine", buildPetInfoLine(petSizeLabel, petAge));
+    vars.put("weatherLine", buildWeatherLine(weatherStatus, temperature));
+    vars.put("placesBlock", placesBlock.toString());
+    return render(routeOrderTemplate, vars);
+  }
+
+  private String buildPetInfoLine(String petSizeLabel, Integer petAge) {
+    if (petSizeLabel == null && petAge == null) {
+      return "";
     }
+    StringBuilder sb = new StringBuilder("반려동물 정보: ");
+    if (petSizeLabel != null) sb.append(petSizeLabel).append("견 ");
+    if (petAge != null) sb.append(petAge).append("살. ");
+    return sb.append("\n").toString();
+  }
 
-    if (weatherStatus != null || temperature != null) {
-      sb.append("날씨: ");
-      if (weatherStatus != null) sb.append(weatherStatus).append(" ");
-      if (temperature != null) sb.append(temperature).append("도. ");
-      sb.append("날씨에 맞게 실내/실외 비중을 조절해줘.\n");
+  private String buildWeatherLine(String weatherStatus, Short temperature) {
+    if (weatherStatus == null && temperature == null) {
+      return "";
     }
-
-    sb.append("반드시 JSON 배열로 id만 반환해. 예: [\"id1\",\"id2\"]\n\n");
-    sb.append("장소:\n");
-    appendGroup(sb, places);
-    return sb.toString();
+    StringBuilder sb = new StringBuilder("날씨: ");
+    if (weatherStatus != null) sb.append(weatherStatus).append(" ");
+    if (temperature != null) sb.append(temperature).append("도. ");
+    return sb.append("날씨에 맞게 실내/실외 비중을 조절해줘.\n").toString();
   }
 
   private List<String> parseAndValidate(String response, List<PlaceInfo> places) {
@@ -150,41 +187,28 @@ public class RouteOptimizationService {
       Integer petAge,
       String weatherStatus,
       Short temperature) {
-    StringBuilder sb = new StringBuilder();
-    sb.append("반려동물과 함께하는 하루 여행 코스를 만들어줘.\n");
-    sb.append("출발지에서 시작해 도착지에서 끝나며, 중간에 들를 장소를 골라 방문 순서를 정한다.\n\n");
-    sb.append(String.format("[출발지 좌표] 위도 %s, 경도 %s%n", startLat, startLng));
-    sb.append(String.format("[도착지 좌표] 위도 %s, 경도 %s%n%n", endLat, endLng));
-    sb.append(String.format("[반려동물 정보] %s, %s살%n", nullToEmpty(petSizeLabel), nullToEmpty(petAge)));
-    sb.append(
-        String.format(
-            "[날씨] %s, %s도. 날씨에 맞게 실내/실외 비중 조절해줘.%n%n",
-            nullToEmpty(weatherStatus), nullToEmpty(temperature)));
-    sb.append("아래 그룹에서 각각 정확히 1개씩 선택해:\n\n");
-
-    sb.append("## 출발지 그룹\n");
-    appendGroup(sb, startGroup);
-
+    StringBuilder groups = new StringBuilder();
+    groups.append("## 출발지 그룹\n");
+    appendGroup(groups, startGroup);
     for (int i = 0; i < middleGroups.size(); i++) {
-      sb.append(String.format("## 중간 그룹 %d%n", i + 1));
-      appendGroup(sb, middleGroups.get(i));
+      groups.append(String.format("## 중간 그룹 %d%n", i + 1));
+      appendGroup(groups, middleGroups.get(i));
     }
+    groups.append("## 도착지 그룹\n");
+    appendGroup(groups, endGroup);
 
-    sb.append("## 도착지 그룹\n");
-    appendGroup(sb, endGroup);
-
-    sb.append("\n선택 기준:\n");
-    sb.append("- 동선이 출발지 → 중간 → 도착지로 자연스럽게 이어지도록\n");
-    sb.append("- 식당(음식점)은 점심·저녁 시간대에 배치\n");
-    sb.append("- 날씨가 나쁘면 실내 장소 우선\n\n");
-    sb.append("반드시 아래 형식으로 id만 방문 순서대로 JSON 배열 출력:\n");
-    sb.append(String.format("- 배열 길이 정확히 %d%n", n + 2));
-    sb.append("- 첫 번째 id는 반드시 출발지 그룹\n");
-    sb.append("- 마지막 id는 반드시 도착지 그룹\n");
-    sb.append("- 가운데 id들은 각 중간 그룹에서 순서대로 하나씩, 중복 없음\n");
-    sb.append("- 설명 없이 배열만 출력\n\n");
-    sb.append("예시: [\"id1\",\"id2\",\"id3\",\"id4\"]\n");
-    return sb.toString();
+    Map<String, String> vars = new LinkedHashMap<>();
+    vars.put("startLat", String.valueOf(startLat));
+    vars.put("startLng", String.valueOf(startLng));
+    vars.put("endLat", String.valueOf(endLat));
+    vars.put("endLng", String.valueOf(endLng));
+    vars.put("petSize", nullToEmpty(petSizeLabel));
+    vars.put("petAge", nullToEmpty(petAge));
+    vars.put("weatherStatus", nullToEmpty(weatherStatus));
+    vars.put("temperature", nullToEmpty(temperature));
+    vars.put("groupsBlock", groups.toString());
+    vars.put("arrayLength", String.valueOf(n + 2));
+    return render(courseSelectTemplate, vars);
   }
 
   private void appendGroup(StringBuilder sb, List<PlaceInfo> group) {
