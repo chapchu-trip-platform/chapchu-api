@@ -1,6 +1,7 @@
 package com.pettrip.trip.service;
 
 import com.pettrip.pet.model.Pet;
+import com.pettrip.pet.model.PetActivity;
 import com.pettrip.pet.model.PetSize;
 import com.pettrip.pet.repository.PetRepository;
 import com.pettrip.pet.service.PetNotFoundException;
@@ -72,7 +73,8 @@ public class CourseService {
       int radiusMeters,
       Short temperature,
       Short humidity,
-      String weatherStatus) {
+      String weatherStatus,
+      Integer limit) {
 
     if (!petRepository.existsByIdAndUserId(petId, userId)) {
       throw new PetNotFoundException();
@@ -111,7 +113,16 @@ public class CourseService {
         .map(placeMap::get)
         .filter(Objects::nonNull)
         .map(p -> toRecommendedResult(p, policyMap.get(p.getExternalPlaceId())))
+        .limit(resolveLimit(limit))
         .toList();
+  }
+
+  /** limit이 없거나 0 이하면 제한 없음(전체). 있으면 상위 limit개로 자른다. */
+  private static int resolveLimit(Integer limit) {
+    if (limit == null || limit <= 0) {
+      return Integer.MAX_VALUE;
+    }
+    return limit;
   }
 
   @Transactional
@@ -459,6 +470,13 @@ public class CourseService {
     }
     if (pet.getAge() != null) {
       sb.append(pet.getAge()).append("살과 함께 ");
+    }
+    String activities =
+        pet.getPreferredActivities().stream()
+            .map(PetActivity::getActivityName)
+            .collect(Collectors.joining(", "));
+    if (!activities.isBlank()) {
+      sb.append(activities).append(" 활동을 즐기기 좋은 ");
     }
     sb.append("반려동물 동반 즐거운 여행 좋은 장소");
     return sb.toString();
