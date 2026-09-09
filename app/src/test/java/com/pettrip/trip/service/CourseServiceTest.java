@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.when;
 
 import com.pettrip.pet.model.Pet;
+import com.pettrip.pet.model.PetActivity;
 import com.pettrip.pet.model.PetSize;
 import com.pettrip.pet.repository.PetRepository;
 import com.pettrip.pet.service.PetNotFoundException;
@@ -29,9 +30,11 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -123,11 +126,79 @@ class CourseServiceTest {
 
     List<RecommendedPlaceResult> result =
         courseService.recommendPlaces(
-            userId, petId, new BigDecimal("37.5"), new BigDecimal("127.0"), 5000, null, null, null);
+            userId,
+            petId,
+            new BigDecimal("37.5"),
+            new BigDecimal("127.0"),
+            5000,
+            null,
+            null,
+            null,
+            null);
 
     assertThat(result).hasSize(2);
     assertThat(result.get(0).place().getExternalPlaceId()).isEqualTo("p1");
     assertThat(result.get(0).categoryLabel()).isNotNull();
+  }
+
+  @Test
+  void 추천은_limit이_있으면_상위_N개만_반환한다() {
+    UUID userId = UUID.randomUUID();
+    UUID petId = UUID.randomUUID();
+    mockPetAndPolicy(userId, petId);
+
+    List<Place> places =
+        List.of(samplePlace("p1", "A"), samplePlace("p2", "B"), samplePlace("p3", "C"));
+    when(placeService.searchNearby(any(), any(), anyInt())).thenReturn(places);
+    when(placeRagService.rankByReviewSimilarity(any(), any()))
+        .thenAnswer(inv -> inv.getArgument(0));
+    when(routeOptimizationService.optimizeOrder(any(), any(), any(), any(), any()))
+        .thenReturn(List.of("p1", "p2", "p3"));
+
+    List<RecommendedPlaceResult> result =
+        courseService.recommendPlaces(
+            userId,
+            petId,
+            new BigDecimal("37.5"),
+            new BigDecimal("127.0"),
+            5000,
+            null,
+            null,
+            null,
+            2);
+
+    assertThat(result).hasSize(2);
+  }
+
+  @Test
+  void 추천_RAG쿼리에_반려동물_취향이_포함된다() {
+    UUID userId = UUID.randomUUID();
+    UUID petId = UUID.randomUUID();
+    when(petRepository.existsByIdAndUserId(petId, userId)).thenReturn(true);
+    Pet pet = samplePet(userId);
+    pet.replaceActivities(Set.of(new PetActivity("수영")));
+    when(petRepository.findById(petId)).thenReturn(Optional.of(pet));
+    when(petPolicyRepository.findAllById(any())).thenReturn(List.of());
+    when(placeService.searchNearby(any(), any(), anyInt()))
+        .thenReturn(List.of(samplePlace("p1", "A")));
+    ArgumentCaptor<String> queryCaptor = ArgumentCaptor.forClass(String.class);
+    when(placeRagService.rankByReviewSimilarity(any(), queryCaptor.capture()))
+        .thenAnswer(inv -> inv.getArgument(0));
+    when(routeOptimizationService.optimizeOrder(any(), any(), any(), any(), any()))
+        .thenReturn(List.of("p1"));
+
+    courseService.recommendPlaces(
+        userId,
+        petId,
+        new BigDecimal("37.5"),
+        new BigDecimal("127.0"),
+        5000,
+        null,
+        null,
+        "맑음",
+        null);
+
+    assertThat(queryCaptor.getValue()).contains("수영");
   }
 
   @Test
@@ -152,6 +223,7 @@ class CourseServiceTest {
                     5000,
                     null,
                     null,
+                    null,
                     null))
         .isInstanceOf(NoPlacesFoundException.class);
   }
@@ -170,6 +242,7 @@ class CourseServiceTest {
                     new BigDecimal("37.5"),
                     new BigDecimal("127.0"),
                     5000,
+                    null,
                     null,
                     null,
                     null))

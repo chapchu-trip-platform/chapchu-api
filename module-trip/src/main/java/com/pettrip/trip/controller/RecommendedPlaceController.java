@@ -32,7 +32,8 @@ public class RecommendedPlaceController {
             resolveRadius(request.radiusMeters()),
             request.temperature(),
             request.humidity(),
-            request.weatherStatus())
+            request.weatherStatus(),
+            request.limit())
         .stream()
         .map(RecommendedPlaceResponse::from)
         .toList();

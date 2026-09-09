@@ -61,7 +61,8 @@ class RecommendedPlaceControllerTest {
             null);
     RecommendedPlaceResult result = new RecommendedPlaceResult(place, null, "관광지", "실외");
 
-    when(courseService.recommendPlaces(any(), any(), any(), any(), anyInt(), any(), any(), any()))
+    when(courseService.recommendPlaces(
+            any(), any(), any(), any(), anyInt(), any(), any(), any(), any()))
         .thenReturn(List.of(result));
 
     RecommendedPlaceRequest request =
@@ -72,7 +73,8 @@ class RecommendedPlaceControllerTest {
             5000,
             (short) 25,
             (short) 60,
-            "맑음");
+            "맑음",
+            5);
 
     mockMvc
         .perform(
@@ -93,7 +95,11 @@ class RecommendedPlaceControllerTest {
                         .type(JsonFieldType.NUMBER),
                     fieldWithPath("temperature").description("기온 (선택)").optional(),
                     fieldWithPath("humidity").description("습도 (선택)").optional(),
-                    fieldWithPath("weatherStatus").description("날씨 상태 (선택)").optional()),
+                    fieldWithPath("weatherStatus").description("날씨 상태 (선택)").optional(),
+                    fieldWithPath("limit")
+                        .description("반환 개수 상한 (선택). 도착지 후보는 5. 없거나 0 이하면 제한 없음")
+                        .type(JsonFieldType.NUMBER)
+                        .optional()),
                 responseFields(
                     fieldWithPath("[].externalPlaceId").description("장소 외부 ID"),
                     fieldWithPath("[].placeName").description("장소 이름"),

@@ -11,4 +11,5 @@ public record RecommendedPlaceRequest(
     int radiusMeters,
     Short temperature,
     Short humidity,
-    String weatherStatus) {}
+    String weatherStatus,
+    Integer limit) {}
