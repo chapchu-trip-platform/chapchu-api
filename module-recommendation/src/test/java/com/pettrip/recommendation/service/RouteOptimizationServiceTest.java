@@ -170,138 +170,152 @@ class RouteOptimizationServiceTest {
   }
 
   @Test
-  void 중간그룹이_비어있으면_건너뛰고_나머지로_코스를_구성한다() {
+  void curateCourse는_풀에서_maxStops이하를_이유와_함께_고른다() {
     when(chatClient.prompt()).thenReturn(requestSpec);
     when(requestSpec.user(anyString())).thenReturn(requestSpec);
     when(requestSpec.call()).thenReturn(callResponseSpec);
-    when(callResponseSpec.content()).thenReturn("[\"s1\",\"m2\",\"e1\"]");
+    when(callResponseSpec.content()).thenReturn("[{\"id\":\"m2\",\"reason\":\"물놀이 좋아요\"}]");
 
-    List<PlaceInfo> startGroup =
+    List<PlaceInfo> pool =
         List.of(
             new PlaceInfo(
-                "s1",
-                "출발",
+                "m1",
+                "장소A",
                 "주소",
-                new BigDecimal("37.5"),
-                new BigDecimal("127.0"),
+                new BigDecimal("37.51"),
+                new BigDecimal("127.01"),
                 "관광지",
                 "OUTDOOR",
-                PlaceInfo.PlaceGroup.START));
-    List<List<PlaceInfo>> middleGroups =
-        List.of(
-            List.of(),
-            List.of(
-                new PlaceInfo(
-                    "m2",
-                    "중간",
-                    "주소",
-                    new BigDecimal("37.55"),
-                    new BigDecimal("127.05"),
-                    "음식점",
-                    "INDOOR",
-                    PlaceInfo.PlaceGroup.MIDDLE)));
-    List<PlaceInfo> endGroup =
-        List.of(
+                PlaceInfo.PlaceGroup.MIDDLE),
             new PlaceInfo(
-                "e1",
-                "도착",
+                "m2",
+                "장소B",
                 "주소",
-                new BigDecimal("37.6"),
-                new BigDecimal("127.1"),
-                "관광지",
-                "OUTDOOR",
-                PlaceInfo.PlaceGroup.END));
+                new BigDecimal("37.55"),
+                new BigDecimal("127.05"),
+                "음식점",
+                "INDOOR",
+                PlaceInfo.PlaceGroup.MIDDLE));
 
-    List<String> result =
-        service.selectAndOrder(
-            startGroup,
-            middleGroups,
-            endGroup,
-            2,
+    List<SelectedPlace> result =
+        service.curateCourse(
+            pool,
+            3,
             new BigDecimal("37.5"),
             new BigDecimal("127.0"),
+            "도착장소",
             new BigDecimal("37.6"),
             new BigDecimal("127.1"),
             "소형",
             3,
+            List.of("수영"),
             "맑음",
             (short) 25);
 
-    assertThat(result).containsExactly("s1", "m2", "e1");
+    assertThat(result).hasSize(1);
+    assertThat(result.get(0).id()).isEqualTo("m2");
+    assertThat(result.get(0).reason()).isEqualTo("물놀이 좋아요");
   }
 
   @Test
-  void selectAndOrder_프롬프트에_반려동물_날씨_그룹_정보가_포함된다() {
+  void curateCourse_프롬프트에_취향_날씨_후보가_담기고_미치환마커가_없다() {
     ArgumentCaptor<String> promptCaptor = ArgumentCaptor.forClass(String.class);
     when(chatClient.prompt()).thenReturn(requestSpec);
     when(requestSpec.user(anyString())).thenReturn(requestSpec);
     when(requestSpec.call()).thenReturn(callResponseSpec);
-    when(callResponseSpec.content()).thenReturn("[\"s1\",\"m1\",\"e1\"]");
+    when(callResponseSpec.content()).thenReturn("[{\"id\":\"m1\",\"reason\":\"좋아요\"}]");
 
-    List<PlaceInfo> startGroup =
+    List<PlaceInfo> pool =
         List.of(
             new PlaceInfo(
-                "s1",
-                "출발장소",
+                "m1",
+                "중간장소",
                 "주소",
-                new BigDecimal("37.5"),
-                new BigDecimal("127.0"),
-                "관광지",
-                "OUTDOOR",
-                PlaceInfo.PlaceGroup.START));
-    List<List<PlaceInfo>> middleGroups =
-        List.of(
-            List.of(),
-            List.of(
-                new PlaceInfo(
-                    "m1",
-                    "중간장소",
-                    "주소",
-                    new BigDecimal("37.55"),
-                    new BigDecimal("127.05"),
-                    "음식점",
-                    "INDOOR",
-                    PlaceInfo.PlaceGroup.MIDDLE)));
-    List<PlaceInfo> endGroup =
-        List.of(
-            new PlaceInfo(
-                "e1",
-                "도착장소",
-                "주소",
-                new BigDecimal("37.6"),
-                new BigDecimal("127.1"),
-                "관광지",
-                "OUTDOOR",
-                PlaceInfo.PlaceGroup.END));
+                new BigDecimal("37.55"),
+                new BigDecimal("127.05"),
+                "음식점",
+                "INDOOR",
+                PlaceInfo.PlaceGroup.MIDDLE));
 
-    service.selectAndOrder(
-        startGroup,
-        middleGroups,
-        endGroup,
-        2,
+    service.curateCourse(
+        pool,
+        3,
         new BigDecimal("37.5"),
         new BigDecimal("127.0"),
+        "도착장소",
         new BigDecimal("37.6"),
         new BigDecimal("127.1"),
         "소형",
         3,
+        List.of("수영"),
         "맑음",
         (short) 25);
 
     verify(requestSpec).user(promptCaptor.capture());
     String prompt = promptCaptor.getValue();
-
-    assertThat(prompt).contains("소형");
-    assertThat(prompt).contains("3");
+    assertThat(prompt).contains("수영");
     assertThat(prompt).contains("맑음");
-    assertThat(prompt).contains("25");
-    assertThat(prompt).contains("s1");
-    assertThat(prompt).contains("출발장소");
-    assertThat(prompt).contains("e1");
-    assertThat(prompt).contains("도착장소");
-    assertThat(prompt).contains("m1");
     assertThat(prompt).contains("중간장소");
-    assertThat(prompt).contains("배열 길이 정확히 3");
+    assertThat(prompt).contains("도착장소");
+    assertThat(prompt).contains("최대 3");
+    assertThat(prompt).doesNotContain("{{").doesNotContain("}}");
+  }
+
+  @Test
+  void curateCourse_파싱실패시_풀_상위_maxStops로_폴백한다() {
+    when(chatClient.prompt()).thenReturn(requestSpec);
+    when(requestSpec.user(anyString())).thenReturn(requestSpec);
+    when(requestSpec.call()).thenReturn(callResponseSpec);
+    when(callResponseSpec.content()).thenReturn("죄송합니다, 고를 수 없습니다.");
+
+    List<PlaceInfo> pool =
+        List.of(
+            new PlaceInfo(
+                "m1",
+                "A",
+                "주소",
+                BigDecimal.ONE,
+                BigDecimal.ONE,
+                null,
+                null,
+                PlaceInfo.PlaceGroup.MIDDLE),
+            new PlaceInfo(
+                "m2",
+                "B",
+                "주소",
+                BigDecimal.ONE,
+                BigDecimal.ONE,
+                null,
+                null,
+                PlaceInfo.PlaceGroup.MIDDLE),
+            new PlaceInfo(
+                "m3",
+                "C",
+                "주소",
+                BigDecimal.ONE,
+                BigDecimal.ONE,
+                null,
+                null,
+                PlaceInfo.PlaceGroup.MIDDLE));
+
+    List<SelectedPlace> result =
+        service.curateCourse(
+            pool,
+            2,
+            new BigDecimal("37.5"),
+            new BigDecimal("127.0"),
+            "도착",
+            new BigDecimal("37.6"),
+            new BigDecimal("127.1"),
+            null,
+            null,
+            List.of(),
+            null,
+            null);
+
+    assertThat(result).hasSize(2);
+    assertThat(result.get(0).id()).isEqualTo("m1");
+    assertThat(result.get(0).reason()).isNull();
   }
 
   @Test

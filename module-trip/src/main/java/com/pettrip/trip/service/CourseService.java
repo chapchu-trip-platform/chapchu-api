@@ -14,6 +14,7 @@ import com.pettrip.place.service.PlaceService;
 import com.pettrip.recommendation.service.PlaceInfo;
 import com.pettrip.recommendation.service.PlaceRagService;
 import com.pettrip.recommendation.service.RouteOptimizationService;
+import com.pettrip.recommendation.service.SelectedPlace;
 import com.pettrip.trip.model.CoursePlace;
 import com.pettrip.trip.model.TravelCourse;
 import com.pettrip.trip.repository.CoursePlaceRepository;
@@ -21,12 +22,9 @@ import com.pettrip.trip.repository.TravelCourseRepository;
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -133,10 +131,7 @@ public class CourseService {
       String startLocation,
       BigDecimal startLat,
       BigDecimal startLng,
-      String endLocation,
-      BigDecimal endLat,
-      BigDecimal endLng,
-      int intermediateStopCount,
+      DestinationInput destination,
       Short temperature,
       Short humidity,
       String weatherStatus) {
@@ -146,229 +141,161 @@ public class CourseService {
     }
     Pet pet = petRepository.findById(petId).orElseThrow(PetNotFoundException::new);
 
-    BigDecimal latDelta = endLat.subtract(startLat);
-    BigDecimal lngDelta = endLng.subtract(startLng);
-    int totalZones = intermediateStopCount + 2;
+    // 사용자가 고른 도착지를 Place로 upsert(고정 도착 스탑). recommend가 readOnly라 DB에 없을 수 있어 여기서 확정 저장.
+    placeService.upsertPlace(
+        destination.externalPlaceId(),
+        destination.placeName(),
+        destination.placeImageUrl(),
+        destination.address(),
+        destination.latitude(),
+        destination.longitude(),
+        destination.allowedPetSize(),
+        destination.leashRequired(),
+        destination.carrierRequired(),
+        destination.indoorOutdoorType(),
+        destination.placeCaution());
 
-    Set<String> assigned = new HashSet<>();
-    List<Place> startRaw = new ArrayList<>();
-    List<List<Place>> middleRaws = new ArrayList<>();
-    List<Place> endRaw = new ArrayList<>();
-
-    for (int i = 0; i < totalZones; i++) {
-      BigDecimal ratio0 =
-          BigDecimal.valueOf(i).divide(BigDecimal.valueOf(totalZones), MathContext.DECIMAL64);
-      BigDecimal ratio1 =
-          BigDecimal.valueOf(i + 1).divide(BigDecimal.valueOf(totalZones), MathContext.DECIMAL64);
-
-      BigDecimal sliceStartLat = startLat.add(latDelta.multiply(ratio0));
-      BigDecimal sliceEndLat = startLat.add(latDelta.multiply(ratio1));
-      BigDecimal sliceStartLng = startLng.add(lngDelta.multiply(ratio0));
-      BigDecimal sliceEndLng = startLng.add(lngDelta.multiply(ratio1));
-
-      BigDecimal zoneMinLat = sliceStartLat.min(sliceEndLat);
-      BigDecimal zoneMaxLat = sliceStartLat.max(sliceEndLat);
-      BigDecimal zoneMinLng = sliceStartLng.min(sliceEndLng);
-      BigDecimal zoneMaxLng = sliceStartLng.max(sliceEndLng);
-
-      List<Place> zoneRaw = searchInZone(zoneMinLat, zoneMaxLat, zoneMinLng, zoneMaxLng);
-      List<Place> zoneGroup = assignGroup(zoneRaw, assigned);
-
-      if (i == 0) {
-        startRaw = zoneGroup;
-        continue;
-      }
-      if (i == totalZones - 1) {
-        endRaw = zoneGroup;
-        continue;
-      }
-      middleRaws.add(zoneGroup);
-    }
-
-    String ragQuery = buildRagQuery(pet, weatherStatus, temperature);
-    List<PlaceInfo> startInfos =
-        buildGroupInfos(startRaw, PlaceInfo.PlaceGroup.START, pet, ragQuery);
-    List<PlaceInfo> endInfos = buildGroupInfos(endRaw, PlaceInfo.PlaceGroup.END, pet, ragQuery);
-    List<List<PlaceInfo>> middleInfos =
-        middleRaws.stream()
-            .map(places -> buildGroupInfos(places, PlaceInfo.PlaceGroup.MIDDLE, pet, ragQuery))
-            .toList();
-
-    boolean anyFound =
-        !startInfos.isEmpty()
-            || !endInfos.isEmpty()
-            || middleInfos.stream().anyMatch(group -> !group.isEmpty());
-
-    // 전 구역(bbox)이 모두 비었을 때만 출발지·도착지 중심 반경(원)으로 최후 재검색.
-    // 일부만 비면 찾은 장소들로 코스를 만든다(스탑 수는 FE가 개수로 판단).
-    if (!anyFound) {
-      int radius = endpointRadius(startLat, startLng, endLat, endLng, totalZones);
-      startInfos =
-          buildGroupInfos(
-              assignGroup(searchAroundPoint(startLat, startLng, radius), assigned),
-              PlaceInfo.PlaceGroup.START,
-              pet,
-              ragQuery);
-      endInfos =
-          buildGroupInfos(
-              assignGroup(searchAroundPoint(endLat, endLng, radius), assigned),
-              PlaceInfo.PlaceGroup.END,
-              pet,
-              ragQuery);
-      if (startInfos.isEmpty() && endInfos.isEmpty()) {
-        throw new NoPlacesFoundException();
-      }
-    }
-
-    List<String> orderedIds =
-        routeOptimizationService.selectAndOrder(
-            startInfos,
-            middleInfos,
-            endInfos,
-            intermediateStopCount,
-            startLat,
-            startLng,
-            endLat,
-            endLng,
-            toPetSizeLabel(pet.getSize()),
-            pet.getAge(),
-            weatherStatus,
-            temperature);
-    if (orderedIds.isEmpty()) {
-      throw new NoPlacesFoundException();
-    }
-
-    TravelCourse course =
-        new TravelCourse(
-            userId, startLocation, startLat, startLng, endLocation, endLat, endLng, travelDate);
-    travelCourseRepository.save(course);
-
-    for (int i = 0; i < orderedIds.size(); i++) {
-      boolean isLast = (i == orderedIds.size() - 1);
-      String placeId = orderedIds.get(i);
-      coursePlaceRepository.save(new CoursePlace(course, placeId, (short) (i + 1), isLast));
-    }
-
-    return course;
-  }
-
-  /** 지점 주변을 반경(원)으로 검색한다. bbox 필터를 쓰지 않아 사방의 장소를 잡는다. 비면 한 번 넓혀 재시도. */
-  private List<Place> searchAroundPoint(BigDecimal lat, BigDecimal lng, int radius) {
-    List<Place> result = placeService.searchNearby(lat, lng, radius);
-    if (!result.isEmpty()) {
-      return result;
-    }
-    int expanded = (int) Math.min(radius * 2.0, 20000);
-    return placeService.searchNearby(lat, lng, expanded);
-  }
-
-  /** 출발/도착 반경 = 전체 거리를 구역 수로 나눈 값(최소 1.5km, 상한 20km). */
-  private int endpointRadius(
-      BigDecimal startLat,
-      BigDecimal startLng,
-      BigDecimal endLat,
-      BigDecimal endLng,
-      int totalZones) {
-    double segment =
+    BigDecimal destLat = destination.latitude();
+    BigDecimal destLng = destination.longitude();
+    double distance =
         haversineMeters(
             startLat.doubleValue(),
             startLng.doubleValue(),
-            endLat.doubleValue(),
-            endLng.doubleValue());
-    int perZone = (int) (segment / totalZones);
-    return Math.min(Math.max(perZone, 1500), 20000);
-  }
+            destLat.doubleValue(),
+            destLng.doubleValue());
+    int maxStops =
+        computeMaxStops(distance, pet.getSize(), pet.getAge(), weatherStatus, temperature);
 
-  private List<Place> searchInZone(
-      BigDecimal zoneMinLat, BigDecimal zoneMaxLat, BigDecimal zoneMinLng, BigDecimal zoneMaxLng) {
-
-    BigDecimal centerLat =
-        zoneMinLat.add(zoneMaxLat).divide(BigDecimal.valueOf(2), MathContext.DECIMAL64);
-    BigDecimal centerLng =
-        zoneMinLng.add(zoneMaxLng).divide(BigDecimal.valueOf(2), MathContext.DECIMAL64);
-    int radius =
-        (int)
-            Math.min(
-                haversineMeters(
-                    zoneMinLat.doubleValue(),
-                    zoneMinLng.doubleValue(),
-                    centerLat.doubleValue(),
-                    centerLng.doubleValue()),
-                20000);
-    radius = Math.max(radius, 1000);
-
-    List<Place> result =
-        filterByZone(
-            placeService.searchNearby(centerLat, centerLng, radius),
-            zoneMinLat,
-            zoneMaxLat,
-            zoneMinLng,
-            zoneMaxLng);
-    if (!result.isEmpty()) {
-      return result;
-    }
-
-    int expanded = (int) Math.min(radius * 1.5, 20000);
-    return filterByZone(
-        placeService.searchNearby(centerLat, centerLng, expanded),
-        zoneMinLat,
-        zoneMaxLat,
-        zoneMinLng,
-        zoneMaxLng);
-  }
-
-  private List<Place> filterByZone(
-      List<Place> places,
-      BigDecimal minLat,
-      BigDecimal maxLat,
-      BigDecimal minLng,
-      BigDecimal maxLng) {
-    return places.stream()
-        .filter(p -> p.getLatitude() != null && p.getLongitude() != null)
-        .filter(
-            p ->
-                p.getLatitude().compareTo(minLat) >= 0
-                    && p.getLatitude().compareTo(maxLat) <= 0
-                    && p.getLongitude().compareTo(minLng) >= 0
-                    && p.getLongitude().compareTo(maxLng) <= 0)
-        .toList();
-  }
-
-  private List<Place> assignGroup(List<Place> places, Set<String> assigned) {
-    List<Place> group = new ArrayList<>();
-    for (Place p : places) {
-      if (assigned.contains(p.getExternalPlaceId())) {
-        continue;
-      }
-      assigned.add(p.getExternalPlaceId());
-      group.add(p);
-    }
-    return group;
-  }
-
-  private List<PlaceInfo> buildGroupInfos(
-      List<Place> places, PlaceInfo.PlaceGroup group, Pet pet, String ragQuery) {
-    List<String> placeIds = places.stream().map(Place::getExternalPlaceId).toList();
+    // 출발~도착 사이 후보 풀 수집(도착지 제외) → 크기 필터 → 취향 RAG 랭킹.
+    List<Place> pool =
+        gatherCandidates(startLat, startLng, destLat, destLng, destination.externalPlaceId());
+    Map<String, Place> poolMap =
+        pool.stream()
+            .collect(Collectors.toMap(Place::getExternalPlaceId, Function.identity(), (a, b) -> a));
+    String ragQuery = buildRagQuery(pet, weatherStatus, temperature);
+    List<String> filteredIds = filterByPetSize(pool, pet.getSize());
+    List<String> rankedIds = placeRagService.rankByReviewSimilarity(filteredIds, ragQuery);
     Map<String, PlacePetPolicy> policyMap =
-        petPolicyRepository.findAllById(placeIds).stream()
+        petPolicyRepository.findAllById(rankedIds).stream()
             .collect(Collectors.toMap(PlacePetPolicy::getExternalPlaceId, Function.identity()));
-    List<String> filtered = filterByPetSizeWithPolicy(places, pet.getSize(), policyMap);
-    List<String> ranked = placeRagService.rankByReviewSimilarity(filtered, ragQuery);
-    Map<String, Place> placeMap =
-        places.stream().collect(Collectors.toMap(Place::getExternalPlaceId, Function.identity()));
-    return ranked.stream()
-        .map(placeMap::get)
-        .filter(Objects::nonNull)
-        .map(p -> toPlaceInfo(p, policyMap.get(p.getExternalPlaceId()), group))
+    List<PlaceInfo> poolInfos =
+        rankedIds.stream()
+            .map(poolMap::get)
+            .filter(Objects::nonNull)
+            .limit(30)
+            .map(
+                p ->
+                    toPlaceInfo(
+                        p, policyMap.get(p.getExternalPlaceId()), PlaceInfo.PlaceGroup.MIDDLE))
+            .toList();
+
+    List<String> activities =
+        pet.getPreferredActivities().stream().map(PetActivity::getActivityName).toList();
+    List<SelectedPlace> curated =
+        routeOptimizationService.curateCourse(
+            poolInfos,
+            maxStops,
+            startLat,
+            startLng,
+            destination.placeName(),
+            destLat,
+            destLng,
+            toPetSizeLabel(pet.getSize()),
+            pet.getAge(),
+            activities,
+            weatherStatus,
+            temperature);
+
+    TravelCourse course =
+        new TravelCourse(
+            userId,
+            startLocation,
+            startLat,
+            startLng,
+            destination.placeName(),
+            destLat,
+            destLng,
+            travelDate);
+    travelCourseRepository.save(course);
+
+    short order = 1;
+    for (SelectedPlace stop : curated) {
+      coursePlaceRepository.save(new CoursePlace(course, stop.id(), order, false, stop.reason()));
+      order++;
+    }
+    coursePlaceRepository.save(
+        new CoursePlace(course, destination.externalPlaceId(), order, true, "사용자가 선택한 도착지"));
+    return course;
+  }
+
+  /** 출발~도착 중점 반경으로 후보를 모은다(도착지 자신 제외). bbox 대신 원 하나로 회랑을 덮는다. */
+  private List<Place> gatherCandidates(
+      BigDecimal startLat,
+      BigDecimal startLng,
+      BigDecimal destLat,
+      BigDecimal destLng,
+      String excludeId) {
+    BigDecimal midLat = startLat.add(destLat).divide(BigDecimal.valueOf(2), MathContext.DECIMAL64);
+    BigDecimal midLng = startLng.add(destLng).divide(BigDecimal.valueOf(2), MathContext.DECIMAL64);
+    double d =
+        haversineMeters(
+            startLat.doubleValue(),
+            startLng.doubleValue(),
+            destLat.doubleValue(),
+            destLng.doubleValue());
+    int radius = (int) Math.min(Math.max(d / 2 + 2000, 2000), 20000);
+    return placeService.searchNearby(midLat, midLng, radius).stream()
+        .filter(p -> !p.getExternalPlaceId().equals(excludeId))
         .toList();
   }
 
-  private List<String> filterByPetSizeWithPolicy(
-      List<Place> places, PetSize petSize, Map<String, PlacePetPolicy> policyMap) {
-    return places.stream()
-        .map(Place::getExternalPlaceId)
-        .filter(id -> isPetAllowed(petSize, policyMap.get(id)))
-        .toList();
+  /** 중간 스탑 상한 N = 거리 base + 체력 보정 + 날씨 보정, 1~3 clamp. (docs/decisions/043) */
+  private int computeMaxStops(
+      double distanceMeters, PetSize size, Integer age, String weather, Short temperature) {
+    return clampStops(
+        distanceBase(distanceMeters)
+            + petAdjustment(size, age)
+            + weatherAdjustment(weather, temperature));
+  }
+
+  private int distanceBase(double meters) {
+    if (meters < 4000) {
+      return 1;
+    }
+    if (meters < 9000) {
+      return 2;
+    }
+    return 3;
+  }
+
+  private int petAdjustment(PetSize size, Integer age) {
+    if (size == PetSize.SMALL) {
+      return -1;
+    }
+    if (age != null && age >= 8) {
+      return -1;
+    }
+    return 0;
+  }
+
+  private int weatherAdjustment(String weather, Short temperature) {
+    if (temperature != null && temperature >= 30) {
+      return -1;
+    }
+    if (weather != null && (weather.contains("비") || weather.contains("눈"))) {
+      return -1;
+    }
+    return 0;
+  }
+
+  private int clampStops(int n) {
+    if (n < 1) {
+      return 1;
+    }
+    if (n > 3) {
+      return 3;
+    }
+    return n;
   }
 
   @Transactional

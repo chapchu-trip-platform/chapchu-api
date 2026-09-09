@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.pettrip.pet.model.Pet;
@@ -17,9 +19,9 @@ import com.pettrip.place.model.PlacePetPolicy;
 import com.pettrip.place.repository.PlacePetPolicyRepository;
 import com.pettrip.place.repository.PlaceRepository;
 import com.pettrip.place.service.PlaceService;
-import com.pettrip.recommendation.service.PlaceInfo;
 import com.pettrip.recommendation.service.PlaceRagService;
 import com.pettrip.recommendation.service.RouteOptimizationService;
+import com.pettrip.recommendation.service.SelectedPlace;
 import com.pettrip.trip.model.CoursePlace;
 import com.pettrip.trip.model.TravelCourse;
 import com.pettrip.trip.repository.CoursePlaceRepository;
@@ -249,43 +251,41 @@ class CourseServiceTest {
         .isInstanceOf(PetNotFoundException.class);
   }
 
+  private DestinationInput sampleDestination() {
+    return new DestinationInput(
+        "dest-1",
+        "도착장소",
+        null,
+        "서울시",
+        new BigDecimal("37.6"),
+        new BigDecimal("126.9"),
+        "ALL",
+        false,
+        false,
+        "BOTH",
+        null);
+  }
+
   @Test
-  void 중간좌표_검색으로_코스를_저장한다() {
+  void createCourse는_큐레이션_스탑과_고정_도착지를_저장한다() {
     UUID userId = UUID.randomUUID();
     UUID petId = UUID.randomUUID();
     mockPetAndPolicy(userId, petId);
     when(placeService.searchNearby(any(), any(), anyInt()))
-        .thenAnswer(
-            inv -> {
-              BigDecimal lat = inv.getArgument(0);
-              BigDecimal lng = inv.getArgument(1);
-              return List.of(samplePlace("p-" + lng.toPlainString(), "장소", lat, lng));
-            });
+        .thenReturn(List.of(samplePlace("p1", "A"), samplePlace("p2", "B")));
     when(placeRagService.rankByReviewSimilarity(any(), any()))
         .thenAnswer(inv -> inv.getArgument(0));
-    when(routeOptimizationService.selectAndOrder(
-            any(), any(), any(), anyInt(), any(), any(), any(), any(), any(), any(), any(), any()))
+    when(routeOptimizationService.curateCourse(
+            any(), anyInt(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(List.of(new SelectedPlace("p1", "물놀이 좋아요"), new SelectedPlace("p2", "산책 코스")));
+    when(travelCourseRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    List<CoursePlace> saved = new ArrayList<>();
+    when(coursePlaceRepository.save(any(CoursePlace.class)))
         .thenAnswer(
             inv -> {
-              List<PlaceInfo> startGroup = inv.getArgument(0);
-              List<List<PlaceInfo>> middleGroups = inv.getArgument(1);
-              List<PlaceInfo> endGroup = inv.getArgument(2);
-              List<String> ids = new ArrayList<>();
-              if (!startGroup.isEmpty()) {
-                ids.add(startGroup.get(0).id());
-              }
-              for (List<PlaceInfo> mg : middleGroups) {
-                if (!mg.isEmpty()) {
-                  ids.add(mg.get(0).id());
-                }
-              }
-              if (!endGroup.isEmpty()) {
-                ids.add(endGroup.get(0).id());
-              }
-              return ids;
+              saved.add(inv.getArgument(0));
+              return inv.getArgument(0);
             });
-    when(travelCourseRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-    when(coursePlaceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
     TravelCourse result =
         courseService.createCourse(
@@ -295,64 +295,32 @@ class CourseServiceTest {
             "강남구",
             new BigDecimal("37.5"),
             new BigDecimal("127.0"),
-            "종로구",
-            new BigDecimal("37.6"),
-            new BigDecimal("126.9"),
-            4,
+            sampleDestination(),
             (short) 25,
             (short) 60,
             "맑음");
 
     assertThat(result).isNotNull();
-    assertThat(result.getTravelDate()).isEqualTo(LocalDate.now());
-    assertThat(result.getStartLocation()).isEqualTo("강남구");
-    assertThat(result.getEndLocation()).isEqualTo("종로구");
+    assertThat(result.getEndLocation()).isEqualTo("도착장소");
+    assertThat(saved).hasSize(3);
+    assertThat(saved.get(0).getReason()).isEqualTo("물놀이 좋아요");
+    assertThat(saved.get(2).isFinalPlace()).isTrue();
+    assertThat(saved.get(2).getExternalPlaceId()).isEqualTo("dest-1");
   }
 
   @Test
-  void 마지막_장소에_finalPlace_true가_설정된다() {
+  void createCourse는_도착지를_upsert한다() {
     UUID userId = UUID.randomUUID();
     UUID petId = UUID.randomUUID();
     mockPetAndPolicy(userId, petId);
-    when(placeService.searchNearby(any(), any(), anyInt()))
-        .thenAnswer(
-            inv -> {
-              BigDecimal lat = inv.getArgument(0);
-              BigDecimal lng = inv.getArgument(1);
-              return List.of(samplePlace("p-" + lng.toPlainString(), "장소", lat, lng));
-            });
+    when(placeService.searchNearby(any(), any(), anyInt())).thenReturn(List.of());
     when(placeRagService.rankByReviewSimilarity(any(), any()))
         .thenAnswer(inv -> inv.getArgument(0));
-    when(routeOptimizationService.selectAndOrder(
-            any(), any(), any(), anyInt(), any(), any(), any(), any(), any(), any(), any(), any()))
-        .thenAnswer(
-            inv -> {
-              List<PlaceInfo> startGroup = inv.getArgument(0);
-              List<List<PlaceInfo>> middleGroups = inv.getArgument(1);
-              List<PlaceInfo> endGroup = inv.getArgument(2);
-              List<String> ids = new ArrayList<>();
-              if (!startGroup.isEmpty()) {
-                ids.add(startGroup.get(0).id());
-              }
-              for (List<PlaceInfo> mg : middleGroups) {
-                if (!mg.isEmpty()) {
-                  ids.add(mg.get(0).id());
-                }
-              }
-              if (!endGroup.isEmpty()) {
-                ids.add(endGroup.get(0).id());
-              }
-              return ids;
-            });
+    when(routeOptimizationService.curateCourse(
+            any(), anyInt(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(List.of());
     when(travelCourseRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-    var saved = new ArrayList<CoursePlace>();
-    when(coursePlaceRepository.save(any(CoursePlace.class)))
-        .thenAnswer(
-            inv -> {
-              saved.add(inv.getArgument(0));
-              return inv.getArgument(0);
-            });
+    when(coursePlaceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
     courseService.createCourse(
         userId,
@@ -361,44 +329,29 @@ class CourseServiceTest {
         "강남구",
         new BigDecimal("37.5"),
         new BigDecimal("127.0"),
-        "종로구",
-        new BigDecimal("37.6"),
-        new BigDecimal("126.9"),
-        1,
+        sampleDestination(),
         (short) 25,
         (short) 60,
         "맑음");
 
-    assertThat(saved).hasSize(3);
-    assertThat(saved.get(0).isFinalPlace()).isFalse();
-    assertThat(saved.get(2).isFinalPlace()).isTrue();
+    verify(placeService)
+        .upsertPlace(
+            eq("dest-1"), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
   }
 
   @Test
-  void 중간구역이_비어도_있는_장소만으로_코스를_저장한다() {
+  void createCourse는_후보가_없어도_도착지로_코스를_저장한다() {
     UUID userId = UUID.randomUUID();
     UUID petId = UUID.randomUUID();
     mockPetAndPolicy(userId, petId);
-    when(placeService.searchNearby(any(), any(), anyInt()))
-        .thenAnswer(
-            inv -> {
-              BigDecimal lat = inv.getArgument(0);
-              BigDecimal lng = inv.getArgument(1);
-              return List.of(samplePlace("p-" + lng.toPlainString(), "장소", lat, lng));
-            });
+    when(placeService.searchNearby(any(), any(), anyInt())).thenReturn(List.of());
     when(placeRagService.rankByReviewSimilarity(any(), any()))
         .thenAnswer(inv -> inv.getArgument(0));
-    when(routeOptimizationService.selectAndOrder(
-            any(), any(), any(), anyInt(), any(), any(), any(), any(), any(), any(), any(), any()))
-        .thenAnswer(
-            inv -> {
-              List<PlaceInfo> startGroup = inv.getArgument(0);
-              List<PlaceInfo> endGroup = inv.getArgument(2);
-              return List.of(startGroup.get(0).id(), endGroup.get(0).id());
-            });
+    when(routeOptimizationService.curateCourse(
+            any(), anyInt(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(List.of());
     when(travelCourseRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-    var saved = new ArrayList<CoursePlace>();
+    List<CoursePlace> saved = new ArrayList<>();
     when(coursePlaceRepository.save(any(CoursePlace.class)))
         .thenAnswer(
             inv -> {
@@ -414,141 +367,15 @@ class CourseServiceTest {
             "강남구",
             new BigDecimal("37.5"),
             new BigDecimal("127.0"),
-            "종로구",
-            new BigDecimal("37.6"),
-            new BigDecimal("126.9"),
-            4,
+            sampleDestination(),
             (short) 25,
             (short) 60,
             "맑음");
 
     assertThat(result).isNotNull();
-    assertThat(saved).hasSize(2);
-    assertThat(saved.get(0).isFinalPlace()).isFalse();
-    assertThat(saved.get(1).isFinalPlace()).isTrue();
-  }
-
-  @Test
-  void 출발_도착_구역이_비어도_중간_장소로_코스를_저장한다() {
-    UUID userId = UUID.randomUUID();
-    UUID petId = UUID.randomUUID();
-    mockPetAndPolicy(userId, petId);
-    // 출발(위도 낮은 끝)·도착(위도 높은 끝) 구역은 비우고, 중간 구역만 장소 반환
-    when(placeService.searchNearby(any(), any(), anyInt()))
-        .thenAnswer(
-            inv -> {
-              BigDecimal lat = inv.getArgument(0);
-              if (lat.compareTo(new BigDecimal("37.534")) < 0
-                  || lat.compareTo(new BigDecimal("37.566")) > 0) {
-                return List.of();
-              }
-              BigDecimal lng = inv.getArgument(1);
-              return List.of(samplePlace("p-" + lat.toPlainString(), "장소", lat, lng));
-            });
-    when(placeRagService.rankByReviewSimilarity(any(), any()))
-        .thenAnswer(inv -> inv.getArgument(0));
-    when(routeOptimizationService.selectAndOrder(
-            any(), any(), any(), anyInt(), any(), any(), any(), any(), any(), any(), any(), any()))
-        .thenAnswer(
-            inv -> {
-              List<PlaceInfo> startGroup = inv.getArgument(0);
-              List<List<PlaceInfo>> middleGroups = inv.getArgument(1);
-              List<PlaceInfo> endGroup = inv.getArgument(2);
-              List<String> ids = new ArrayList<>();
-              if (!startGroup.isEmpty()) {
-                ids.add(startGroup.get(0).id());
-              }
-              for (List<PlaceInfo> mg : middleGroups) {
-                if (!mg.isEmpty()) {
-                  ids.add(mg.get(0).id());
-                }
-              }
-              if (!endGroup.isEmpty()) {
-                ids.add(endGroup.get(0).id());
-              }
-              return ids;
-            });
-    when(travelCourseRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-    when(coursePlaceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-    TravelCourse result =
-        courseService.createCourse(
-            userId,
-            petId,
-            LocalDate.now(),
-            "강남구",
-            new BigDecimal("37.5"),
-            new BigDecimal("127.0"),
-            "종로구",
-            new BigDecimal("37.6"),
-            new BigDecimal("126.9"),
-            1,
-            (short) 25,
-            (short) 60,
-            "맑음");
-
-    assertThat(result).isNotNull();
-  }
-
-  @Test
-  void 모든_구역이_비면_출발도착_반경검색으로_코스를_저장한다() {
-    UUID userId = UUID.randomUUID();
-    UUID petId = UUID.randomUUID();
-    mockPetAndPolicy(userId, petId);
-    // bbox 구역 검색(중간 구간 좌표)은 전부 빈다. 출발/도착 지점 정확 좌표에서만 장소 반환(=반경 fallback)
-    when(placeService.searchNearby(any(), any(), anyInt()))
-        .thenAnswer(
-            inv -> {
-              BigDecimal lat = inv.getArgument(0);
-              BigDecimal lng = inv.getArgument(1);
-              boolean isStart =
-                  lat.compareTo(new BigDecimal("37.5")) == 0
-                      && lng.compareTo(new BigDecimal("127.0")) == 0;
-              boolean isEnd =
-                  lat.compareTo(new BigDecimal("37.6")) == 0
-                      && lng.compareTo(new BigDecimal("126.9")) == 0;
-              if (isStart || isEnd) {
-                return List.of(samplePlace("p-" + lat.toPlainString(), "장소", lat, lng));
-              }
-              return List.of();
-            });
-    when(placeRagService.rankByReviewSimilarity(any(), any()))
-        .thenAnswer(inv -> inv.getArgument(0));
-    when(routeOptimizationService.selectAndOrder(
-            any(), any(), any(), anyInt(), any(), any(), any(), any(), any(), any(), any(), any()))
-        .thenAnswer(
-            inv -> {
-              List<PlaceInfo> startGroup = inv.getArgument(0);
-              List<PlaceInfo> endGroup = inv.getArgument(2);
-              List<String> ids = new ArrayList<>();
-              if (!startGroup.isEmpty()) {
-                ids.add(startGroup.get(0).id());
-              }
-              if (!endGroup.isEmpty()) {
-                ids.add(endGroup.get(0).id());
-              }
-              return ids;
-            });
-    when(travelCourseRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-    when(coursePlaceRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-    TravelCourse result =
-        courseService.createCourse(
-            userId,
-            petId,
-            LocalDate.now(),
-            "강남구",
-            new BigDecimal("37.5"),
-            new BigDecimal("127.0"),
-            "종로구",
-            new BigDecimal("37.6"),
-            new BigDecimal("126.9"),
-            2,
-            (short) 25,
-            (short) 60,
-            "맑음");
-
-    assertThat(result).isNotNull();
+    assertThat(saved).hasSize(1);
+    assertThat(saved.get(0).isFinalPlace()).isTrue();
+    assertThat(saved.get(0).getExternalPlaceId()).isEqualTo("dest-1");
   }
 
   @Test
@@ -566,42 +393,11 @@ class CourseServiceTest {
                     "강남구",
                     new BigDecimal("37.5"),
                     new BigDecimal("127.0"),
-                    "종로구",
-                    new BigDecimal("37.6"),
-                    new BigDecimal("126.9"),
-                    4,
+                    sampleDestination(),
                     null,
                     null,
                     null))
         .isInstanceOf(PetNotFoundException.class);
-  }
-
-  @Test
-  void 검색결과가_없으면_코스_저장시_예외발생한다() {
-    UUID userId = UUID.randomUUID();
-    UUID petId = UUID.randomUUID();
-    mockPetAndPolicy(userId, petId);
-    when(placeService.searchNearby(any(), any(), anyInt())).thenReturn(List.of());
-    when(placeRagService.rankByReviewSimilarity(any(), any()))
-        .thenAnswer(inv -> inv.getArgument(0));
-
-    assertThatThrownBy(
-            () ->
-                courseService.createCourse(
-                    userId,
-                    petId,
-                    LocalDate.now(),
-                    "강남구",
-                    new BigDecimal("37.5"),
-                    new BigDecimal("127.0"),
-                    "종로구",
-                    new BigDecimal("37.6"),
-                    new BigDecimal("126.9"),
-                    4,
-                    null,
-                    null,
-                    null))
-        .isInstanceOf(NoPlacesFoundException.class);
   }
 
   @Test

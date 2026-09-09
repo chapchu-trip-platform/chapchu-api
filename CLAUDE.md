@@ -22,6 +22,7 @@
 - `POST /courses`에 `petId`는 **필수값(@NotNull)**. petId 없으면 코스 생성 불가 (400 반환)
 - 날씨 정보(`temperature`, `humidity`, `weatherStatus`)는 **FE가 수집해서 요청에 포함**. 백엔드에서 기상청 API 직접 호출 금지
 - 경로/지도 계산(거리, polyline)은 **FE가 처리**. 백엔드에서 카카오 Directions API 직접 호출 금지
+- **`intermediateStopCount` 제거됨(구역/bbox 방식 폐기).** 도착지는 `destination` 객체(사용자가 `/recommended-places` 후보에서 고른 반려견 장소)로 받아 Place upsert 후 고정 도착 스탑으로 사용. 중간 스탑은 AI가 취향·거리·날씨로 최대 3개 큐레이션(공식: docs/decisions/043). 스탑별 `reason` 저장(course_places.reason)
 
 ### 장소 필터링
 - 코스에 포함되는 장소는 **반드시 `place_pet_policies` 레코드가 있어야 함**
@@ -39,7 +40,7 @@
   - 각 장소의 `category`(음식점/관광지 등), `indoorOutdoor`(실내/실외/전구역)
 
 ### Flyway 마이그레이션 번호
-- 현재 최신: **V22**. 신규 마이그레이션은 **V23부터** 시작할 것
+- 현재 최신: **V29**. 신규 마이그레이션은 **V30부터** 시작할 것
 - 마이그레이션 PR은 **머지 직전에** 번호 선점 여부를 다시 확인할 것 (failures/030)
 
 ---
