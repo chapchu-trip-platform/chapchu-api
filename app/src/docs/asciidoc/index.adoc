@@ -525,6 +525,31 @@ include::{snippets}/wishlist-delete/path-parameters.adoc[]
 
 include::{snippets}/wishlist-delete/http-response.adoc[]
 
+=== 스탬프 도감 조회
+
+`GET /users/me/stamps`
+
+시·도 단위로 스탬프가 하나씩 있다. 코스에 담긴 장소를 방문 인증하면 그 장소가 속한 시·도의
+스탬프가 발급되고, 같은 지역을 다시 방문하면 `stampCount`만 올라간다.
+
+**미획득 지역도 함께 내려간다.** `acquired`가 `false`인 항목을 회색으로 그리면 된다.
+
+지역 판정은 TourAPI `areaCode`로 한다. 아직 동기화되지 않아 `places.area_code`가 비어 있는
+장소는 스탬프가 발급되지 않는다. 이 경우에도 방문 인증 자체는 정상 처리된다.
+
+NOTE: `imageUrl`(지자체 마스코트)은 이미지가 준비되는 대로 채운다. 그때까지는 `null`이다.
+
+[.request]
+==== 요청
+
+include::{snippets}/stamp-collection/http-request.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/stamp-collection/http-response.adoc[]
+include::{snippets}/stamp-collection/response-fields.adoc[]
+
 === 내가 작성한 리뷰 목록
 
 `GET /users/me/reviews`

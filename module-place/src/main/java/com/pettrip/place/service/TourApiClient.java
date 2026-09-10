@@ -154,6 +154,7 @@ public class TourApiClient {
         str(map, "title"),
         str(map, "firstimage"),
         str(map, "addr1"),
+        str(map, "areacode"),
         decimal(map, "mapy"),
         decimal(map, "mapx"),
         decimal(map, "dist"));
@@ -183,12 +184,17 @@ public class TourApiClient {
     }
   }
 
+  /**
+   * @param areaCode 시·도 코드(1=서울 … 39=제주). 스탬프 지역 판정에 쓴다. 주소 문자열을 파싱하면 '강원'과 '강원특별자치도'처럼 표기가 바뀔 때
+   *     깨진다
+   */
   public record NearbyItem(
       String contentId,
       String contentTypeId,
       String title,
       String firstImage,
       String addr1,
+      String areaCode,
       BigDecimal lat,
       BigDecimal lng,
       BigDecimal dist) {}
