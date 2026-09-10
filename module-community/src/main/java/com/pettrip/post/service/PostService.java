@@ -43,7 +43,9 @@ public class PostService {
              EXISTS(SELECT 1 FROM post_recommendations pr
                     WHERE pr.post_id = p.post_id AND pr.user_id = :userId) AS recommended,
              EXISTS(SELECT 1 FROM post_bookmarks pb
-                    WHERE pb.post_id = p.post_id AND pb.user_id = :userId) AS bookmarked
+                    WHERE pb.post_id = p.post_id AND pb.user_id = :userId) AS bookmarked,
+             (SELECT count(*) FROM post_photos ppc
+               WHERE ppc.post_id = p.post_id) AS photo_count
       FROM posts p
       LEFT JOIN users u ON p.user_id = u.user_id
       LEFT JOIN photos ph ON p.photo_id = ph.photo_id
@@ -75,6 +77,9 @@ public class PostService {
       INSERT INTO photos (photo_id, user_id, course_place_id, photo_url, taken_at, created_at)
       VALUES (:photoId, :userId, NULL, :photoUrl, :takenAt, now())
       """;
+
+  private static final String DELETE_POST_PHOTOS_SQL =
+      "DELETE FROM post_photos WHERE post_id = :postId";
 
   private static final String INSERT_POST_PHOTO_SQL =
       """
@@ -125,6 +130,7 @@ public class PostService {
               rs.getBoolean("bookmarked"),
               rs.getString("nickname"),
               rs.getString("photo_url"),
+              rs.getInt("photo_count"),
               List.of(),
               rs.getTimestamp("created_at").toLocalDateTime());
 
@@ -136,6 +142,7 @@ public class PostService {
               rs.getString("nickname"),
               rs.getInt("recommendation_count"),
               rs.getInt("comment_count"),
+              rs.getInt("photo_count"),
               thumbnailOf(rs.getObject("photo_id", UUID.class), rs.getString("photo_url")),
               rs.getTimestamp("created_at").toLocalDateTime());
 
@@ -258,13 +265,38 @@ public class PostService {
     return Date.valueOf(takenAt);
   }
 
+  /**
+   * 글을 수정한다. {@code photos}는 null이면 사진을 손대지 않고, 값이 오면 목록을 통째로 교체한다.
+   *
+   * <p>부분 삭제 대신 교체로 둔 이유: "3장 중 1장 빼기"를 하려면 어차피 남길 목록을 알아야 하고, 순서까지 프론트가 정할 수 있다. 빈 배열을 보내면 전부 뗀다.
+   *
+   * <p>{@code post_photos} 행만 지운다. {@code photos} 레코드와 S3 객체는 남는다. 같은 사진을 다른 글·리뷰가 참조할 수 있어서다.
+   *
+   * <p>{@code saveAndFlush}로 flush하는 이유는 {@link #createPost}와 같다. 하지 않으면 되읽을 때 수정 전 내용이 나간다.
+   */
   @Transactional
-  /** {@link #createPost}와 같은 이유로 flush한다. 여기서는 404 대신 수정 전 내용이 응답으로 나가는 형태로 드러난다. */
-  public PostResponse updatePost(UUID userId, UUID postId, String title, String content) {
+  public PostResponse updatePost(
+      UUID userId,
+      UUID postId,
+      String title,
+      String content,
+      List<PostCreateRequest.PhotoEntry> photos) {
     Post post = getOwnedPost(userId, postId);
     post.update(title, content);
+    if (photos != null) {
+      replacePostPhotos(userId, post, photos);
+    }
     postRepository.saveAndFlush(post);
     return fetchEnrichedPost(userId, postId);
+  }
+
+  private void replacePostPhotos(
+      UUID userId, Post post, List<PostCreateRequest.PhotoEntry> photos) {
+    MapSqlParameterSource params = new MapSqlParameterSource().addValue("postId", post.getId());
+    jdbcTemplate.update(DELETE_POST_PHOTOS_SQL, params);
+    List<UUID> photoIds = createPhotos(userId, photos);
+    linkPostPhotos(post.getId(), photoIds);
+    post.replaceThumbnail(firstOrNull(photoIds));
   }
 
   public void deletePost(UUID userId, UUID postId) {

@@ -20,7 +20,9 @@ public class MyPostService {
              EXISTS(SELECT 1 FROM post_recommendations pr
                     WHERE pr.post_id = p.post_id AND pr.user_id = :userId) AS recommended,
              EXISTS(SELECT 1 FROM post_bookmarks pb
-                    WHERE pb.post_id = p.post_id AND pb.user_id = :userId) AS bookmarked
+                    WHERE pb.post_id = p.post_id AND pb.user_id = :userId) AS bookmarked,
+             (SELECT count(*) FROM post_photos ppc
+               WHERE ppc.post_id = p.post_id) AS photo_count
       FROM posts p
       LEFT JOIN users u ON p.user_id = u.user_id
       LEFT JOIN photos ph ON p.photo_id = ph.photo_id
@@ -44,6 +46,7 @@ public class MyPostService {
               rs.getBoolean("bookmarked"),
               rs.getString("nickname"),
               rs.getString("photo_url"),
+              rs.getInt("photo_count"),
               List.of(),
               rs.getTimestamp("created_at").toLocalDateTime());
 

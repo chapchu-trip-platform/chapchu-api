@@ -58,7 +58,8 @@ public class PostController {
       @CurrentUserId UUID userId,
       @PathVariable UUID postId,
       @RequestBody @Valid PostUpdateRequest request) {
-    return postService.updatePost(userId, postId, request.title(), request.content());
+    return postService.updatePost(
+        userId, postId, request.title(), request.content(), request.photos());
   }
 
   @DeleteMapping("/{postId}")

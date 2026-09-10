@@ -72,6 +72,11 @@ public class Post {
     }
   }
 
+  /** 사진 목록을 교체할 때 대표 사진도 첫 장으로 다시 맞춘다. 사진을 전부 빼면 null이 된다. */
+  public void replaceThumbnail(UUID photoId) {
+    this.photoId = photoId;
+  }
+
   public void increaseViewCount() {
     this.viewCount++;
   }

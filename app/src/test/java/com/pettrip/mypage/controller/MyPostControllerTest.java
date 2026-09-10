@@ -53,6 +53,7 @@ class MyPostControllerTest {
             false,
             "닉네임",
             null,
+            0,
             List.of(),
             LocalDateTime.now());
     when(myPostService.listMyPosts(USER_ID)).thenReturn(List.of(response));
