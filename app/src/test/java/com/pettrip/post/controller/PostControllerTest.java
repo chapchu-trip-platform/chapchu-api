@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.document;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
@@ -62,6 +63,7 @@ class PostControllerTest {
         "https://bucket.s3.ap-northeast-2.amazonaws.com/profile/u/avatar.jpg?sig",
         3,
         1,
+        2,
         new PostResponse.PhotoView(
             UUID.randomUUID(),
             "post/user-1/x-강아지.jpg",
@@ -85,6 +87,7 @@ class PostControllerTest {
         "멍멍이아빠",
         "https://bucket.s3.ap-northeast-2.amazonaws.com/profile/u/avatar.jpg?sig",
         "https://example.com/photo.jpg",
+        1,
         List.of(
             new PostResponse.PhotoView(
                 UUID.randomUUID(),
@@ -127,6 +130,7 @@ class PostControllerTest {
                         .optional(),
                     fieldWithPath("posts[].recommendationCount").description("추천 수"),
                     fieldWithPath("posts[].commentCount").description("댓글 수"),
+                    fieldWithPath("posts[].photoCount").description("첨부된 사진 수"),
                     fieldWithPath("posts[].thumbnail")
                         .description("대표 사진(첫 장). 사진 없는 글이면 null")
                         .optional(),
@@ -176,6 +180,7 @@ class PostControllerTest {
                     fieldWithPath("viewCount").description("조회수"),
                     fieldWithPath("recommendationCount").description("추천 수"),
                     fieldWithPath("commentCount").description("댓글 수"),
+                    fieldWithPath("photoCount").description("첨부된 사진 수"),
                     fieldWithPath("recommended").description("요청한 사용자가 추천했는지. 추천 취소 버튼 노출 판단용"),
                     fieldWithPath("bookmarked").description("요청한 사용자가 북마크했는지"),
                     fieldWithPath("nickname").description("작성자 닉네임"),
@@ -345,7 +350,8 @@ class PostControllerTest {
 
   @Test
   void 게시글_수정_시_제목이_100자를_넘으면_400() throws Exception {
-    String body = objectMapper.writeValueAsString(new PostUpdateRequest("가".repeat(101), null));
+    String body =
+        objectMapper.writeValueAsString(new PostUpdateRequest("가".repeat(101), null, null));
 
     mockMvc
         .perform(
@@ -360,10 +366,10 @@ class PostControllerTest {
   void 게시글을_수정한다() throws Exception {
     UUID postId = UUID.randomUUID();
     PostResponse response = samplePostResponse();
-    when(postService.updatePost(any(), eq(postId), eq("수정된 제목"), eq("수정된 내용")))
+    when(postService.updatePost(any(), eq(postId), eq("수정된 제목"), eq("수정된 내용"), any()))
         .thenReturn(response);
 
-    String body = objectMapper.writeValueAsString(new PostUpdateRequest("수정된 제목", "수정된 내용"));
+    String body = objectMapper.writeValueAsString(new PostUpdateRequest("수정된 제목", "수정된 내용", null));
 
     mockMvc
         .perform(
@@ -378,7 +384,11 @@ class PostControllerTest {
                 pathParameters(parameterWithName("postId").description("게시글 ID")),
                 requestFields(
                     fieldWithPath("title").description("제목 (선택). 최대 100자").optional(),
-                    fieldWithPath("content").description("내용 (선택)").optional()),
+                    fieldWithPath("content").description("내용 (선택)").optional(),
+                    fieldWithPath("photos")
+                        .description("사진 목록을 통째로 교체 (선택). null이면 그대로 두고, 빈 배열이면 전부 뗀다")
+                        .type(JsonFieldType.ARRAY)
+                        .optional()),
                 responseFields(
                     fieldWithPath("id").description("게시글 ID"),
                     fieldWithPath("petId").description("동행한 반려견 ID (null 가능)").optional(),
@@ -389,6 +399,7 @@ class PostControllerTest {
                     fieldWithPath("viewCount").description("조회수"),
                     fieldWithPath("recommendationCount").description("추천 수"),
                     fieldWithPath("commentCount").description("댓글 수"),
+                    fieldWithPath("photoCount").description("첨부된 사진 수"),
                     fieldWithPath("recommended").description("요청한 사용자가 추천했는지. 추천 취소 버튼 노출 판단용"),
                     fieldWithPath("bookmarked").description("요청한 사용자가 북마크했는지"),
                     fieldWithPath("nickname").description("작성자 닉네임"),
@@ -402,6 +413,49 @@ class PostControllerTest {
                     fieldWithPath("photos[].downloadUrl")
                         .description("presigned GET URL(10분). 이 URL로 바로 표시"),
                     fieldWithPath("createdAt").description("작성일시"))));
+  }
+
+  @Test
+  void 게시글_수정으로_사진을_교체한다() throws Exception {
+    UUID postId = UUID.randomUUID();
+    when(postService.updatePost(any(), eq(postId), any(), any(), any()))
+        .thenReturn(samplePostResponse());
+
+    String body =
+        objectMapper.writeValueAsString(
+            new PostUpdateRequest(
+                "수정된 제목",
+                "수정된 내용",
+                List.of(
+                    new PostCreateRequest.PhotoEntry(
+                        "post/0198f3a0-1234-7000-8000-000000000001/a-강아지.jpg", null))));
+
+    mockMvc
+        .perform(
+            patch("/posts/{postId}", postId)
+                .contentType("application/json")
+                .content(body)
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isOk());
+  }
+
+  @Test
+  void 게시글_수정으로_사진을_전부_뺀다() throws Exception {
+    UUID postId = UUID.randomUUID();
+    when(postService.updatePost(any(), eq(postId), any(), any(), any()))
+        .thenReturn(samplePostResponse());
+
+    String body = objectMapper.writeValueAsString(new PostUpdateRequest(null, null, List.of()));
+
+    mockMvc
+        .perform(
+            patch("/posts/{postId}", postId)
+                .contentType("application/json")
+                .content(body)
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isOk());
+
+    verify(postService).updatePost(USER_ID, postId, null, null, List.of());
   }
 
   @Test
