@@ -15,6 +15,7 @@ import com.pettrip.recommendation.service.PlaceInfo;
 import com.pettrip.recommendation.service.PlaceRagService;
 import com.pettrip.recommendation.service.RouteOptimizationService;
 import com.pettrip.recommendation.service.SelectedPlace;
+import com.pettrip.stamp.service.StampService;
 import com.pettrip.trip.model.CoursePlace;
 import com.pettrip.trip.model.TravelCourse;
 import com.pettrip.trip.repository.CoursePlaceRepository;
@@ -40,6 +41,7 @@ public class CourseService {
   private final PetRepository petRepository;
   private final RouteOptimizationService routeOptimizationService;
   private final PlaceRagService placeRagService;
+  private final StampService stampService;
   private final TravelCourseRepository travelCourseRepository;
   private final CoursePlaceRepository coursePlaceRepository;
 
@@ -51,7 +53,8 @@ public class CourseService {
       RouteOptimizationService routeOptimizationService,
       PlaceRagService placeRagService,
       TravelCourseRepository travelCourseRepository,
-      CoursePlaceRepository coursePlaceRepository) {
+      CoursePlaceRepository coursePlaceRepository,
+      StampService stampService) {
     this.placeService = placeService;
     this.placeRepository = placeRepository;
     this.petPolicyRepository = petPolicyRepository;
@@ -60,6 +63,7 @@ public class CourseService {
     this.placeRagService = placeRagService;
     this.travelCourseRepository = travelCourseRepository;
     this.coursePlaceRepository = coursePlaceRepository;
+    this.stampService = stampService;
   }
 
   @Transactional(readOnly = true)
@@ -461,6 +465,7 @@ public class CourseService {
     if (coursePlace.isFinalPlace()) {
       coursePlace.getCourse().complete();
     }
+    stampService.grantForPlace(userId, coursePlace.getExternalPlaceId());
   }
 
   private static double haversineMeters(double lat1, double lng1, double lat2, double lng2) {

@@ -99,9 +99,20 @@ public class PlaceService {
     }
   }
 
+  private static Short toShort(String value) {
+    if (value == null || value.isBlank()) {
+      return null;
+    }
+    try {
+      return Short.parseShort(value);
+    } catch (NumberFormatException e) {
+      return null;
+    }
+  }
+
   private Place syncPlace(TourApiClient.NearbyItem item) {
-    Short contentTypeId =
-        item.contentTypeId() != null ? Short.parseShort(item.contentTypeId()) : null;
+    Short contentTypeId = toShort(item.contentTypeId());
+    Short areaCode = toShort(item.areaCode());
 
     Place place =
         placeRepository
@@ -130,7 +141,8 @@ public class PlaceService {
         null,
         null,
         null,
-        contentTypeId);
+        contentTypeId,
+        areaCode);
     Place saved = placeRepository.save(place);
 
     syncPetPolicy(saved, item.contentId());
@@ -172,7 +184,7 @@ public class PlaceService {
                         null,
                         null));
     place.update(
-        null, placeName, placeImageUrl, address, latitude, longitude, null, null, null, null);
+        null, placeName, placeImageUrl, address, latitude, longitude, null, null, null, null, null);
     Place saved = placeRepository.save(place);
 
     AllowedPetSize size = toAllowedPetSize(allowedPetSize);

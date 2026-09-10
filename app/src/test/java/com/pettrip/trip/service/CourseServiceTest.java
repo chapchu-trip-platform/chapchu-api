@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -22,6 +23,7 @@ import com.pettrip.place.service.PlaceService;
 import com.pettrip.recommendation.service.PlaceRagService;
 import com.pettrip.recommendation.service.RouteOptimizationService;
 import com.pettrip.recommendation.service.SelectedPlace;
+import com.pettrip.stamp.service.StampService;
 import com.pettrip.trip.model.CoursePlace;
 import com.pettrip.trip.model.TravelCourse;
 import com.pettrip.trip.repository.CoursePlaceRepository;
@@ -55,6 +57,7 @@ class CourseServiceTest {
   @Mock private CoursePlaceRepository coursePlaceRepository;
   @Mock private RouteOptimizationService routeOptimizationService;
   @Mock private PlaceRagService placeRagService;
+  @Mock private StampService stampService;
 
   @InjectMocks private CourseService courseService;
 
@@ -483,6 +486,36 @@ class CourseServiceTest {
 
     assertThat(coursePlace.isVisited()).isTrue();
     assertThat(coursePlace.getVisitedAt()).isNotNull();
+  }
+
+  @Test
+  void 방문_체크인시_해당_지역_스탬프를_발급한다() {
+    UUID userId = UUID.randomUUID();
+    UUID coursePlaceId = UUID.randomUUID();
+    TravelCourse course = sampleCourse(userId);
+    CoursePlace coursePlace = sampleCoursePlace(course, false);
+    when(coursePlaceRepository.findByIdAndCourseUserId(coursePlaceId, userId))
+        .thenReturn(Optional.of(coursePlace));
+    when(placeRepository.findById("place-1")).thenReturn(Optional.of(samplePlace("place-1", "장소")));
+
+    courseService.visitPlace(userId, coursePlaceId, 37.5, 127.0);
+
+    verify(stampService).grantForPlace(userId, "place-1");
+  }
+
+  @Test
+  void 이미_방문한_장소는_스탬프를_다시_발급하지_않는다() {
+    UUID userId = UUID.randomUUID();
+    UUID coursePlaceId = UUID.randomUUID();
+    TravelCourse course = sampleCourse(userId);
+    CoursePlace coursePlace = sampleCoursePlace(course, false);
+    coursePlace.markVisited();
+    when(coursePlaceRepository.findByIdAndCourseUserId(coursePlaceId, userId))
+        .thenReturn(Optional.of(coursePlace));
+
+    courseService.visitPlace(userId, coursePlaceId, 37.5, 127.0);
+
+    verify(stampService, never()).grantForPlace(any(), any());
   }
 
   @Test
