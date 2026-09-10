@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -70,6 +71,7 @@ class PostServiceTest {
         false,
         "닉네임",
         null,
+        0,
         List.of(),
         LocalDateTime.now());
   }
@@ -79,14 +81,14 @@ class PostServiceTest {
     lenient()
         .when(
             jdbcTemplate.query(
-                argThat(sql -> sql != null && sql.contains("post_photos")),
+                argThat(sql -> sql != null && sql.contains("FROM post_photos pp\n")),
                 any(SqlParameterSource.class),
                 any(RowMapper.class)))
         .thenReturn(List.of());
     lenient()
         .when(
             jdbcTemplate.query(
-                argThat(sql -> sql != null && !sql.contains("post_photos")),
+                argThat(sql -> sql != null && !sql.contains("FROM post_photos pp\n")),
                 any(SqlParameterSource.class),
                 any(RowMapper.class)))
         .thenReturn(List.of(expected));
@@ -206,14 +208,14 @@ class PostServiceTest {
     when(postRepository.findById(postId)).thenReturn(Optional.of(post));
     stubPostRead(samplePostResponse(userId));
 
-    postService.updatePost(userId, postId, "새 제목", "새 내용");
+    postService.updatePost(userId, postId, "새 제목", "새 내용", null);
 
     InOrder inOrder = inOrder(postRepository, jdbcTemplate);
     inOrder.verify(postRepository).saveAndFlush(post);
     inOrder
         .verify(jdbcTemplate)
         .query(
-            argThat(sql -> sql != null && !sql.contains("post_photos")),
+            argThat(sql -> sql != null && !sql.contains("FROM post_photos pp\n")),
             any(SqlParameterSource.class),
             any(RowMapper.class));
   }
@@ -247,6 +249,36 @@ class PostServiceTest {
   }
 
   @Test
+  void updatePost는_photos가_null이면_사진을_건드리지_않는다() {
+    UUID userId = UUID.randomUUID();
+    UUID postId = UUID.randomUUID();
+    Post post =
+        new Post(userId, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "제목", "내용");
+    when(postRepository.findById(postId)).thenReturn(Optional.of(post));
+    stubPostRead(samplePostResponse(userId));
+
+    postService.updatePost(userId, postId, "새 제목", null, null);
+
+    verify(jdbcTemplate, never())
+        .update(contains("DELETE FROM post_photos"), any(SqlParameterSource.class));
+  }
+
+  @Test
+  void updatePost는_photos가_빈_목록이면_사진을_전부_뗀다() {
+    UUID userId = UUID.randomUUID();
+    UUID postId = UUID.randomUUID();
+    Post post =
+        new Post(userId, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "제목", "내용");
+    when(postRepository.findById(postId)).thenReturn(Optional.of(post));
+    stubPostRead(samplePostResponse(userId));
+
+    postService.updatePost(userId, postId, null, null, List.of());
+
+    verify(jdbcTemplate).update(contains("DELETE FROM post_photos"), any(SqlParameterSource.class));
+    assertThat(post.getPhotoId()).isNull();
+  }
+
+  @Test
   void updatePost는_소유자가_아니면_예외를_던진다() {
     UUID ownerId = UUID.randomUUID();
     UUID otherId = UUID.randomUUID();
@@ -255,7 +287,7 @@ class PostServiceTest {
         new Post(ownerId, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "제목", "내용");
     when(postRepository.findById(postId)).thenReturn(Optional.of(post));
 
-    assertThatThrownBy(() -> postService.updatePost(otherId, postId, "새 제목", null))
+    assertThatThrownBy(() -> postService.updatePost(otherId, postId, "새 제목", null, null))
         .isInstanceOf(PostNotFoundException.class);
   }
 
@@ -386,7 +418,7 @@ class PostServiceTest {
     ArgumentCaptor<SqlParameterSource> captor = ArgumentCaptor.forClass(SqlParameterSource.class);
     verify(jdbcTemplate)
         .query(
-            argThat(sql -> sql != null && !sql.contains("post_photos")),
+            argThat(sql -> sql != null && !sql.contains("FROM post_photos pp\n")),
             captor.capture(),
             any(RowMapper.class));
     assertThat(captor.getValue().getValue("userId")).isEqualTo(userId);
