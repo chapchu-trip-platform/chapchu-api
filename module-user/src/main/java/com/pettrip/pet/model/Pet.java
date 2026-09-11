@@ -38,6 +38,10 @@ public class Pet extends BaseEntity {
   @Column(name = "age")
   private Integer age;
 
+  /** 무지개다리를 건넜는지. 이 값 하나로 앨범(false)과 추억앨범(true)이 갈린다. */
+  @Column(name = "is_die", nullable = false)
+  private boolean isDie = false;
+
   @ManyToMany(fetch = FetchType.LAZY)
   @JoinTable(
       name = "pet_preferences_activities",
@@ -53,6 +57,19 @@ public class Pet extends BaseEntity {
     this.petName = petName;
     this.size = size;
     this.age = age;
+  }
+
+  public void markDie() {
+    this.isDie = true;
+  }
+
+  /** 잘못 표시한 경우 되돌린다. */
+  public void restoreDie() {
+    this.isDie = false;
+  }
+
+  public boolean isDie() {
+    return isDie;
   }
 
   public void update(Breed newBreed, String newPetName, PetSize newSize, Integer newAge) {

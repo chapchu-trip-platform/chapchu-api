@@ -64,6 +64,22 @@ public class PetController {
     return PetResponse.from(pet);
   }
 
+  /**
+   * 무지개다리를 건넜다고 표시한다. 이 순간부터 그 아이의 앨범이 추억앨범으로 분류된다.
+   *
+   * <p>되돌리기 어려운 상태 변화라 {@code PATCH /pets/{petId}}와 분리했다.
+   */
+  @PatchMapping("/{petId}/memorial")
+  public PetResponse markMemorial(@CurrentUserId UUID userId, @PathVariable UUID petId) {
+    return PetResponse.from(petService.markDie(userId, petId));
+  }
+
+  /** 잘못 표시한 경우 되돌린다. */
+  @DeleteMapping("/{petId}/memorial")
+  public PetResponse restoreMemorial(@CurrentUserId UUID userId, @PathVariable UUID petId) {
+    return PetResponse.from(petService.restoreDie(userId, petId));
+  }
+
   @DeleteMapping("/{petId}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
   public void deletePet(@CurrentUserId UUID userId, @PathVariable UUID petId) {

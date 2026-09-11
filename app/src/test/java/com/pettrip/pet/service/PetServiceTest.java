@@ -128,4 +128,41 @@ class PetServiceTest {
 
     verify(petRepository).delete(pet);
   }
+
+  @Test
+  void markDie는_무지개다리_표시를_켠다() {
+    UUID userId = UUID.randomUUID();
+    UUID petId = UUID.randomUUID();
+    Pet pet = new Pet(userId, new Breed("골든리트리버"), "초코", PetSize.MEDIUM, 3);
+    when(petRepository.findById(petId)).thenReturn(Optional.of(pet));
+    when(petRepository.save(pet)).thenReturn(pet);
+
+    Pet result = petService.markDie(userId, petId);
+
+    assertThat(result.isDie()).isTrue();
+  }
+
+  @Test
+  void markDie는_남의_반려동물이면_예외를_던진다() {
+    UUID petId = UUID.randomUUID();
+    Pet pet = new Pet(UUID.randomUUID(), new Breed("골든리트리버"), "초코", PetSize.MEDIUM, 3);
+    when(petRepository.findById(petId)).thenReturn(Optional.of(pet));
+
+    assertThatThrownBy(() -> petService.markDie(UUID.randomUUID(), petId))
+        .isInstanceOf(PetNotFoundException.class);
+  }
+
+  @Test
+  void restoreDie는_표시를_되돌린다() {
+    UUID userId = UUID.randomUUID();
+    UUID petId = UUID.randomUUID();
+    Pet pet = new Pet(userId, new Breed("골든리트리버"), "초코", PetSize.MEDIUM, 3);
+    pet.markDie();
+    when(petRepository.findById(petId)).thenReturn(Optional.of(pet));
+    when(petRepository.save(pet)).thenReturn(pet);
+
+    Pet result = petService.restoreDie(userId, petId);
+
+    assertThat(result.isDie()).isFalse();
+  }
 }

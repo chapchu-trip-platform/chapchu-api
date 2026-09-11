@@ -15,6 +15,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -118,6 +119,7 @@ class PetControllerTest {
                     fieldWithPath("breedName").description("견종 이름"),
                     fieldWithPath("size").description("크기"),
                     fieldWithPath("age").description("나이"),
+                    fieldWithPath("isDie").description("무지개다리를 건넜는지. true면 이 아이의 앨범은 추억앨범이 된다"),
                     fieldWithPath("activities[].id").description("선호 활동 ID"),
                     fieldWithPath("activities[].name").description("선호 활동 이름"),
                     fieldWithPath("createdAt").description("생성일시"),
@@ -162,10 +164,48 @@ class PetControllerTest {
                     fieldWithPath("breedName").description("견종 이름"),
                     fieldWithPath("size").description("크기"),
                     fieldWithPath("age").description("나이"),
+                    fieldWithPath("isDie").description("무지개다리를 건넜는지. true면 이 아이의 앨범은 추억앨범이 된다"),
                     fieldWithPath("activities[].id").description("선호 활동 ID"),
                     fieldWithPath("activities[].name").description("선호 활동 이름"),
                     fieldWithPath("createdAt").description("생성일시"),
                     fieldWithPath("updatedAt").description("수정일시"))));
+  }
+
+  @Test
+  void 무지개다리를_건넜다고_표시한다() throws Exception {
+    UUID petId = UUID.randomUUID();
+    Pet pet = new Pet(UUID.randomUUID(), new Breed("골든리트리버"), "두부", PetSize.SMALL, 12);
+    pet.markDie();
+    when(petService.markDie(any(), eq(petId))).thenReturn(pet);
+
+    mockMvc
+        .perform(
+            patch("/pets/{petId}/memorial", petId)
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.isDie").value(true))
+        .andDo(
+            document(
+                "pet-memorial-mark",
+                pathParameters(parameterWithName("petId").description("반려견 ID"))));
+  }
+
+  @Test
+  void 무지개다리_표시를_되돌린다() throws Exception {
+    UUID petId = UUID.randomUUID();
+    Pet pet = new Pet(UUID.randomUUID(), new Breed("골든리트리버"), "두부", PetSize.SMALL, 12);
+    when(petService.restoreDie(any(), eq(petId))).thenReturn(pet);
+
+    mockMvc
+        .perform(
+            delete("/pets/{petId}/memorial", petId)
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.isDie").value(false))
+        .andDo(
+            document(
+                "pet-memorial-restore",
+                pathParameters(parameterWithName("petId").description("반려견 ID"))));
   }
 
   @Test

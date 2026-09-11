@@ -66,6 +66,24 @@ public class PetService {
   }
 
   @Transactional
+  /**
+   * 무지개다리를 건넜다고 표시한다. 이 순간부터 그 아이의 앨범은 추억앨범으로 분류된다.
+   *
+   * <p>되돌리기 어려운 상태 변화라 {@code PATCH /pets/{petId}}(이름·나이 수정)와 분리했다. 실수로 섞여 들어가면 곤란하다.
+   */
+  public Pet markDie(UUID userId, UUID petId) {
+    Pet pet = getOwnedPet(userId, petId);
+    pet.markDie();
+    return petRepository.save(pet);
+  }
+
+  /** 잘못 표시한 경우 되돌린다. */
+  public Pet restoreDie(UUID userId, UUID petId) {
+    Pet pet = getOwnedPet(userId, petId);
+    pet.restoreDie();
+    return petRepository.save(pet);
+  }
+
   public void deletePet(UUID userId, UUID petId) {
     Pet pet = getOwnedPet(userId, petId);
     petRepository.delete(pet);
