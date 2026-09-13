@@ -12,7 +12,6 @@ dependencies {
     implementation project(':module-user')
     implementation project(':module-place')
     implementation project(':module-trip')
-    implementation project(':module-album')
     implementation project(':module-review')
     implementation project(':module-recommendation')
     implementation project(':module-community')
