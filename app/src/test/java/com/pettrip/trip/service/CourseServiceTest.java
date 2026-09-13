@@ -13,6 +13,7 @@ import com.pettrip.pet.model.PetActivity;
 import com.pettrip.pet.model.PetSize;
 import com.pettrip.pet.repository.PetRepository;
 import com.pettrip.pet.service.PetNotFoundException;
+import com.pettrip.photo.service.PhotoService;
 import com.pettrip.place.model.AllowedPetSize;
 import com.pettrip.place.model.Place;
 import com.pettrip.place.model.PlacePetPolicy;
@@ -28,7 +29,9 @@ import com.pettrip.trip.repository.CoursePlaceRepository;
 import com.pettrip.trip.repository.TravelCourseRepository;
 import com.pettrip.trip.service.CourseService.RecommendedPlaceResult;
 import java.math.BigDecimal;
+import java.net.URI;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -42,6 +45,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.jdbc.core.RowMapper;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import org.springframework.jdbc.core.namedparam.SqlParameterSource;
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -55,6 +61,8 @@ class CourseServiceTest {
   @Mock private CoursePlaceRepository coursePlaceRepository;
   @Mock private RouteOptimizationService routeOptimizationService;
   @Mock private PlaceRagService placeRagService;
+  @Mock private PhotoService photoService;
+  @Mock private NamedParameterJdbcTemplate jdbcTemplate;
 
   @InjectMocks private CourseService courseService;
 
@@ -467,6 +475,46 @@ class CourseServiceTest {
     List<TravelCourse> result = courseService.listMyCourses(userId);
 
     assertThat(result).hasSize(2);
+  }
+
+  @Test
+  void getCourseReviews는_스탑별_주인리뷰와_사진을_묶어_반환한다() throws Exception {
+    UUID userId = UUID.randomUUID();
+    UUID courseId = UUID.randomUUID();
+    TravelCourse course = sampleCourse(userId);
+    CoursePlace cp1 = new CoursePlace(course, "p1", (short) 1, false);
+    CoursePlace cp2 = new CoursePlace(course, "p2", (short) 2, true);
+    when(travelCourseRepository.findById(courseId)).thenReturn(Optional.of(course));
+    when(coursePlaceRepository.findByCourseIdOrderByVisitOrderAsc(courseId))
+        .thenReturn(List.of(cp1, cp2));
+    when(placeRepository.findAllById(any()))
+        .thenReturn(List.of(samplePlace("p1", "공원"), samplePlace("p2", "도착지")));
+    when(petPolicyRepository.findAllById(any())).thenReturn(List.of());
+    UUID reviewId = UUID.randomUUID();
+    UUID photoId = UUID.randomUUID();
+    when(jdbcTemplate.query(any(String.class), any(SqlParameterSource.class), any(RowMapper.class)))
+        .thenReturn(
+            List.of(
+                new CourseService.CourseReviewRow(
+                    cp1.getId(),
+                    reviewId,
+                    (short) 5,
+                    "좋아요",
+                    "맑음",
+                    LocalDateTime.now(),
+                    photoId,
+                    "review/u/x.jpg",
+                    LocalDate.of(2026, 9, 10))));
+    when(photoService.issueDownloadUrl("review/u/x.jpg"))
+        .thenReturn(URI.create("https://s3/x").toURL());
+
+    CourseService.CourseReviewsDetail res = courseService.getCourseReviews(userId, courseId);
+
+    assertThat(res.stops()).hasSize(2);
+    assertThat(res.stops().get(0).review()).isNotNull();
+    assertThat(res.stops().get(0).review().photos()).hasSize(1);
+    assertThat(res.stops().get(0).review().photos().get(0).downloadUrl()).contains("https://s3");
+    assertThat(res.stops().get(1).review()).isNull();
   }
 
   @Test

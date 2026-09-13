@@ -19,9 +19,14 @@ import com.pettrip.place.model.Place;
 import com.pettrip.trip.model.CoursePlace;
 import com.pettrip.trip.model.TravelCourse;
 import com.pettrip.trip.service.CourseService;
+import com.pettrip.trip.service.CourseService.CourseReviewInStop;
+import com.pettrip.trip.service.CourseService.CourseReviewPhoto;
+import com.pettrip.trip.service.CourseService.CourseReviewStop;
+import com.pettrip.trip.service.CourseService.CourseReviewsDetail;
 import com.pettrip.trip.service.CourseService.TravelCourseDetail;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -221,5 +226,69 @@ class CourseControllerTest {
             document(
                 "course-complete",
                 pathParameters(parameterWithName("courseId").description("완료할 코스 ID"))));
+  }
+
+  @Test
+  void 코스_단위_리뷰를_조회한다() throws Exception {
+    UUID courseId = UUID.randomUUID();
+    CourseReviewsDetail detail =
+        new CourseReviewsDetail(
+            courseId,
+            List.of(
+                new CourseReviewStop(
+                    UUID.randomUUID(),
+                    "ext-1",
+                    "○○공원",
+                    (short) 1,
+                    new CourseReviewInStop(
+                        UUID.randomUUID(),
+                        (short) 5,
+                        "물놀이 최고였어요",
+                        "맑음",
+                        LocalDateTime.of(2026, 9, 10, 14, 30),
+                        List.of(
+                            new CourseReviewPhoto(
+                                UUID.randomUUID(),
+                                "https://bucket.s3.../x.jpg?sig=1",
+                                LocalDate.of(2026, 9, 10))))),
+                new CourseReviewStop(UUID.randomUUID(), "ext-2", "도착지", (short) 2, null)));
+    when(courseService.getCourseReviews(any(), any())).thenReturn(detail);
+
+    mockMvc
+        .perform(
+            get("/courses/{courseId}/reviews", courseId)
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isOk())
+        .andDo(
+            document(
+                "course-reviews",
+                pathParameters(parameterWithName("courseId").description("코스 ID")),
+                responseFields(
+                    fieldWithPath("courseId").description("코스 ID"),
+                    fieldWithPath("stops[]").description("코스 스탑 목록(방문 순서)"),
+                    fieldWithPath("stops[].coursePlaceId").description("코스 스탑 ID"),
+                    fieldWithPath("stops[].externalPlaceId").description("장소 외부 ID"),
+                    fieldWithPath("stops[].placeName").description("장소 이름"),
+                    fieldWithPath("stops[].visitOrder")
+                        .description("방문 순서")
+                        .type(JsonFieldType.NUMBER),
+                    fieldWithPath("stops[].review")
+                        .description("이 스탑에 대한 주인 리뷰. 아직 없으면 null")
+                        .optional(),
+                    fieldWithPath("stops[].review.reviewId").description("리뷰 ID").optional(),
+                    fieldWithPath("stops[].review.rating").description("별점").optional(),
+                    fieldWithPath("stops[].review.contents").description("후기 내용").optional(),
+                    fieldWithPath("stops[].review.weather").description("날씨").optional(),
+                    fieldWithPath("stops[].review.createdAt").description("작성일시").optional(),
+                    fieldWithPath("stops[].review.photos[]").description("리뷰 사진").optional(),
+                    fieldWithPath("stops[].review.photos[].photoId")
+                        .description("사진 ID")
+                        .optional(),
+                    fieldWithPath("stops[].review.photos[].downloadUrl")
+                        .description("presigned GET URL(10분)")
+                        .optional(),
+                    fieldWithPath("stops[].review.photos[].takenAt")
+                        .description("촬영일")
+                        .optional())));
   }
 }

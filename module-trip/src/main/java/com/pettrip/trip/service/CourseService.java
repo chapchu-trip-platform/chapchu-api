@@ -5,6 +5,7 @@ import com.pettrip.pet.model.PetActivity;
 import com.pettrip.pet.model.PetSize;
 import com.pettrip.pet.repository.PetRepository;
 import com.pettrip.pet.service.PetNotFoundException;
+import com.pettrip.photo.service.PhotoService;
 import com.pettrip.place.model.AllowedPetSize;
 import com.pettrip.place.model.Place;
 import com.pettrip.place.model.PlacePetPolicy;
@@ -22,12 +23,18 @@ import com.pettrip.trip.repository.TravelCourseRepository;
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.springframework.jdbc.core.RowMapper;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,6 +49,8 @@ public class CourseService {
   private final PlaceRagService placeRagService;
   private final TravelCourseRepository travelCourseRepository;
   private final CoursePlaceRepository coursePlaceRepository;
+  private final PhotoService photoService;
+  private final NamedParameterJdbcTemplate jdbcTemplate;
 
   public CourseService(
       PlaceService placeService,
@@ -51,7 +60,9 @@ public class CourseService {
       RouteOptimizationService routeOptimizationService,
       PlaceRagService placeRagService,
       TravelCourseRepository travelCourseRepository,
-      CoursePlaceRepository coursePlaceRepository) {
+      CoursePlaceRepository coursePlaceRepository,
+      PhotoService photoService,
+      NamedParameterJdbcTemplate jdbcTemplate) {
     this.placeService = placeService;
     this.placeRepository = placeRepository;
     this.petPolicyRepository = petPolicyRepository;
@@ -60,6 +71,103 @@ public class CourseService {
     this.placeRagService = placeRagService;
     this.travelCourseRepository = travelCourseRepository;
     this.coursePlaceRepository = coursePlaceRepository;
+    this.photoService = photoService;
+    this.jdbcTemplate = jdbcTemplate;
+  }
+
+  private static final String COURSE_REVIEWS_SQL =
+      """
+      SELECT r.course_place_id, r.review_id, r.rating, r.contents, r.weather, r.created_at,
+             rp.photo_id, ph.photo_url AS photo_key, ph.taken_at
+      FROM reviews r
+      LEFT JOIN review_photos rp ON rp.review_id = r.review_id
+      LEFT JOIN photos ph ON ph.photo_id = rp.photo_id
+      WHERE r.course_place_id IN (:coursePlaceIds) AND r.user_id = :ownerId
+      ORDER BY r.course_place_id, r.created_at, rp.photo_order
+      """;
+
+  private static final RowMapper<CourseReviewRow> COURSE_REVIEW_ROW_MAPPER =
+      (rs, n) ->
+          new CourseReviewRow(
+              rs.getObject("course_place_id", UUID.class),
+              rs.getObject("review_id", UUID.class),
+              (Short) rs.getObject("rating"),
+              rs.getString("contents"),
+              rs.getString("weather"),
+              rs.getTimestamp("created_at").toLocalDateTime(),
+              rs.getObject("photo_id", UUID.class),
+              rs.getString("photo_key"),
+              rs.getObject("taken_at", LocalDate.class));
+
+  record CourseReviewRow(
+      UUID coursePlaceId,
+      UUID reviewId,
+      Short rating,
+      String contents,
+      String weather,
+      LocalDateTime createdAt,
+      UUID photoId,
+      String photoKey,
+      LocalDate takenAt) {}
+
+  /**
+   * 코스 단위 리뷰·사진 조회. 코스 주인만. 스탑별로 주인이 쓴 리뷰(+사진)를 붙여 반환(리뷰 없는 스탑은 review=null).
+   * reviews·review_photos·photos는 module-trip 소관이 아니라 JdbcTemplate로 직접 조회(PlaceService가
+   * place_wishlists 읽는 방식).
+   */
+  @Transactional(readOnly = true)
+  public CourseReviewsDetail getCourseReviews(UUID userId, UUID courseId) {
+    TravelCourseDetail detail = getCourse(userId, courseId); // 소유권 검증 + 스탑·장소 로드
+    List<CoursePlace> stops = detail.coursePlaces();
+    List<UUID> coursePlaceIds = stops.stream().map(CoursePlace::getId).toList();
+
+    Map<UUID, CourseReviewInStop> reviewByStop = new LinkedHashMap<>();
+    if (!coursePlaceIds.isEmpty()) {
+      MapSqlParameterSource params =
+          new MapSqlParameterSource()
+              .addValue("coursePlaceIds", coursePlaceIds)
+              .addValue("ownerId", userId);
+      for (CourseReviewRow row :
+          jdbcTemplate.query(COURSE_REVIEWS_SQL, params, COURSE_REVIEW_ROW_MAPPER)) {
+        CourseReviewInStop review =
+            reviewByStop.computeIfAbsent(
+                row.coursePlaceId(),
+                k ->
+                    new CourseReviewInStop(
+                        row.reviewId(),
+                        row.rating(),
+                        row.contents(),
+                        row.weather(),
+                        row.createdAt(),
+                        new ArrayList<>()));
+        if (row.photoId() != null) {
+          review
+              .photos()
+              .add(
+                  new CourseReviewPhoto(
+                      row.photoId(),
+                      photoService.issueDownloadUrl(row.photoKey()).toString(),
+                      row.takenAt()));
+        }
+      }
+    }
+
+    List<CourseReviewStop> result = new ArrayList<>();
+    for (CoursePlace cp : stops) {
+      Place place = detail.placeMap().get(cp.getExternalPlaceId());
+      String placeName = cp.getExternalPlaceId();
+      if (place != null) {
+        placeName = place.getPlaceName();
+      }
+      result.add(
+          new CourseReviewStop(
+              cp.getId(),
+              cp.getExternalPlaceId(),
+              placeName,
+              cp.getVisitOrder(),
+              reviewByStop.get(cp.getId())));
+    }
+    return new CourseReviewsDetail(courseId, result);
   }
 
   @Transactional(readOnly = true)
@@ -484,4 +592,23 @@ public class CourseService {
       List<CoursePlace> coursePlaces,
       Map<String, Place> placeMap,
       Map<String, PlacePetPolicy> policyMap) {}
+
+  public record CourseReviewsDetail(UUID courseId, List<CourseReviewStop> stops) {}
+
+  public record CourseReviewStop(
+      UUID coursePlaceId,
+      String externalPlaceId,
+      String placeName,
+      short visitOrder,
+      CourseReviewInStop review) {}
+
+  public record CourseReviewInStop(
+      UUID reviewId,
+      Short rating,
+      String contents,
+      String weather,
+      LocalDateTime createdAt,
+      List<CourseReviewPhoto> photos) {}
+
+  public record CourseReviewPhoto(UUID photoId, String downloadUrl, LocalDate takenAt) {}
 }
