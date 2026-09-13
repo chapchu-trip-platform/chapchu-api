@@ -20,6 +20,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,6 +37,27 @@ public class ReviewService {
   private final ReviewPhotoRepository reviewPhotoRepository;
   private final PhotoRepository photoRepository;
   private final PhotoService photoService;
+  private final NamedParameterJdbcTemplate jdbcTemplate;
+
+  /**
+   * 코스 모든 스탑에 주인 리뷰가 달렸으면 완료 처리. course_places·travel_courses·reviews를 한 UPDATE로 자체 검증(module-trip
+   * 의존 없이 SQL로 직접 접근 — PlaceService가 place_wishlists를 읽는 것과 같은 방식).
+   */
+  private static final String COMPLETE_IF_ALL_REVIEWED_SQL =
+      """
+      UPDATE travel_courses tc
+      SET is_completed = true, updated_at = now()
+      WHERE tc.course_id = (SELECT course_id FROM course_places WHERE course_place_id = :coursePlaceId)
+        AND tc.is_completed = false
+        AND NOT EXISTS (
+          SELECT 1 FROM course_places cp
+          WHERE cp.course_id = tc.course_id
+            AND NOT EXISTS (
+              SELECT 1 FROM reviews r
+              WHERE r.course_place_id = cp.course_place_id AND r.user_id = tc.user_id
+            )
+        )
+      """;
 
   public ReviewService(
       ReviewRepository reviewRepository,
@@ -43,7 +66,8 @@ public class ReviewService {
       PetRepository petRepository,
       ReviewPhotoRepository reviewPhotoRepository,
       PhotoRepository photoRepository,
-      PhotoService photoService) {
+      PhotoService photoService,
+      NamedParameterJdbcTemplate jdbcTemplate) {
     this.reviewRepository = reviewRepository;
     this.reviewRecommendationRepository = reviewRecommendationRepository;
     this.reviewEmbeddingService = reviewEmbeddingService;
@@ -51,6 +75,14 @@ public class ReviewService {
     this.reviewPhotoRepository = reviewPhotoRepository;
     this.photoRepository = photoRepository;
     this.photoService = photoService;
+    this.jdbcTemplate = jdbcTemplate;
+  }
+
+  /** 리뷰가 코스 스탑에 달렸을 때, 그 코스의 모든 스탑에 주인 리뷰가 있으면 코스를 완료 처리한다. */
+  private void completeCourseIfAllReviewed(UUID coursePlaceId) {
+    jdbcTemplate.update(
+        COMPLETE_IF_ALL_REVIEWED_SQL,
+        new MapSqlParameterSource().addValue("coursePlaceId", coursePlaceId));
   }
 
   public ReviewDetail createReview(UUID userId, ReviewCreateRequest request) {
@@ -81,6 +113,9 @@ public class ReviewService {
         saved.getPetId(),
         saved.getRating(),
         photoIds.size());
+    if (request.coursePlaceId() != null) {
+      completeCourseIfAllReviewed(request.coursePlaceId());
+    }
     reviewEmbeddingService.generateAndSave(saved);
     return assemble(List.of(saved)).get(0);
   }
