@@ -43,6 +43,7 @@ public class MyPostService {
               rs.getBoolean("recommended"),
               rs.getBoolean("bookmarked"),
               rs.getString("nickname"),
+              null,
               rs.getString("photo_url"),
               List.of(),
               rs.getTimestamp("created_at").toLocalDateTime());
