@@ -18,6 +18,7 @@ import com.pettrip.post.repository.PostBookmarkRepository;
 import com.pettrip.post.repository.PostRecommendationRepository;
 import com.pettrip.post.repository.PostReportRepository;
 import com.pettrip.post.repository.PostRepository;
+import io.awspring.cloud.s3.S3Operations;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -41,6 +42,7 @@ class PostServiceTest {
   @Mock private PostBookmarkRepository postBookmarkRepository;
   @Mock private PostReportRepository postReportRepository;
   @Mock private NamedParameterJdbcTemplate jdbcTemplate;
+  @Mock private S3Operations s3Operations;
 
   private PostService postService;
 
@@ -52,7 +54,9 @@ class PostServiceTest {
             postRecommendationRepository,
             postBookmarkRepository,
             postReportRepository,
-            jdbcTemplate);
+            jdbcTemplate,
+            s3Operations,
+            "test-bucket");
   }
 
   private PostResponse samplePostResponse(UUID userId) {
@@ -69,6 +73,7 @@ class PostServiceTest {
         true,
         false,
         "닉네임",
+        null,
         null,
         List.of(),
         LocalDateTime.now());

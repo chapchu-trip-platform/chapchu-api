@@ -59,9 +59,13 @@ class PostControllerTest {
         UUID.randomUUID(),
         "첫 여행",
         "멍멍이아빠",
+        "https://bucket.s3.ap-northeast-2.amazonaws.com/profile/u/avatar.jpg?sig",
         3,
         1,
-        new PostResponse.PhotoView(UUID.randomUUID(), "post/user-1/x-강아지.jpg"),
+        new PostResponse.PhotoView(
+            UUID.randomUUID(),
+            "post/user-1/x-강아지.jpg",
+            "https://bucket.s3.ap-northeast-2.amazonaws.com/post/user-1/x-강아지.jpg?sig"),
         LocalDateTime.of(2024, 1, 15, 10, 30, 0));
   }
 
@@ -79,8 +83,13 @@ class PostControllerTest {
         true,
         false,
         "멍멍이아빠",
+        "https://bucket.s3.ap-northeast-2.amazonaws.com/profile/u/avatar.jpg?sig",
         "https://example.com/photo.jpg",
-        List.of(new PostResponse.PhotoView(UUID.randomUUID(), "post/user-1/x-강아지.jpg")),
+        List.of(
+            new PostResponse.PhotoView(
+                UUID.randomUUID(),
+                "post/user-1/x-강아지.jpg",
+                "https://bucket.s3.ap-northeast-2.amazonaws.com/post/user-1/x-강아지.jpg?sig")),
         LocalDateTime.of(2024, 1, 15, 10, 30, 0));
   }
 
@@ -113,14 +122,18 @@ class PostControllerTest {
                     fieldWithPath("posts[].id").description("게시글 ID"),
                     fieldWithPath("posts[].title").description("제목"),
                     fieldWithPath("posts[].nickname").description("작성자 닉네임"),
+                    fieldWithPath("posts[].authorProfilePhotoUrl")
+                        .description("작성자 프로필 사진 presigned URL(10분). 없으면 null")
+                        .optional(),
                     fieldWithPath("posts[].recommendationCount").description("추천 수"),
                     fieldWithPath("posts[].commentCount").description("댓글 수"),
                     fieldWithPath("posts[].thumbnail")
                         .description("대표 사진(첫 장). 사진 없는 글이면 null")
                         .optional(),
                     fieldWithPath("posts[].thumbnail.photoId").description("사진 ID").optional(),
-                    fieldWithPath("posts[].thumbnail.photoKey")
-                        .description("S3 경로. FE는 GET /photos/{photoId}로 다운로드 URL 발급")
+                    fieldWithPath("posts[].thumbnail.photoKey").description("S3 경로").optional(),
+                    fieldWithPath("posts[].thumbnail.downloadUrl")
+                        .description("presigned GET URL(10분). 이 URL로 바로 표시")
                         .optional(),
                     fieldWithPath("posts[].createdAt").description("작성일시"),
                     fieldWithPath("nextCursor")
@@ -166,11 +179,15 @@ class PostControllerTest {
                     fieldWithPath("recommended").description("요청한 사용자가 추천했는지. 추천 취소 버튼 노출 판단용"),
                     fieldWithPath("bookmarked").description("요청한 사용자가 북마크했는지"),
                     fieldWithPath("nickname").description("작성자 닉네임"),
+                    fieldWithPath("authorProfilePhotoUrl")
+                        .description("작성자 프로필 사진 presigned URL(10분). 없으면 null")
+                        .optional(),
                     fieldWithPath("photoUrl").description("대표 사진 URL (null 가능)").optional(),
                     fieldWithPath("photos[]").description("첨부 사진 목록").optional(),
                     fieldWithPath("photos[].photoId").description("사진 ID"),
-                    fieldWithPath("photos[].photoKey")
-                        .description("S3 경로. FE는 GET /photos/{photoId}로 다운로드 URL 발급"),
+                    fieldWithPath("photos[].photoKey").description("S3 경로(원본 식별용)"),
+                    fieldWithPath("photos[].downloadUrl")
+                        .description("presigned GET URL(10분). 이 URL로 바로 표시"),
                     fieldWithPath("createdAt").description("작성일시"))));
   }
 
@@ -375,11 +392,15 @@ class PostControllerTest {
                     fieldWithPath("recommended").description("요청한 사용자가 추천했는지. 추천 취소 버튼 노출 판단용"),
                     fieldWithPath("bookmarked").description("요청한 사용자가 북마크했는지"),
                     fieldWithPath("nickname").description("작성자 닉네임"),
+                    fieldWithPath("authorProfilePhotoUrl")
+                        .description("작성자 프로필 사진 presigned URL(10분). 없으면 null")
+                        .optional(),
                     fieldWithPath("photoUrl").description("대표 사진 URL (null 가능)").optional(),
                     fieldWithPath("photos[]").description("첨부 사진 목록").optional(),
                     fieldWithPath("photos[].photoId").description("사진 ID"),
-                    fieldWithPath("photos[].photoKey")
-                        .description("S3 경로. FE는 GET /photos/{photoId}로 다운로드 URL 발급"),
+                    fieldWithPath("photos[].photoKey").description("S3 경로(원본 식별용)"),
+                    fieldWithPath("photos[].downloadUrl")
+                        .description("presigned GET URL(10분). 이 URL로 바로 표시"),
                     fieldWithPath("createdAt").description("작성일시"))));
   }
 

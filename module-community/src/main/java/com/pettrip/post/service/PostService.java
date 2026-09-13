@@ -14,9 +14,11 @@ import com.pettrip.post.repository.PostBookmarkRepository;
 import com.pettrip.post.repository.PostRecommendationRepository;
 import com.pettrip.post.repository.PostReportRepository;
 import com.pettrip.post.repository.PostRepository;
+import io.awspring.cloud.s3.S3Operations;
 import java.sql.Date;
 import java.sql.Timestamp;
 import java.sql.Types;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -25,6 +27,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -34,12 +37,15 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class PostService {
 
+  private static final Duration DOWNLOAD_URL_DURATION = Duration.ofMinutes(10);
+
   private static final String ENRICHED_SELECT =
       """
       SELECT p.post_id, p.user_id, p.pet_id, p.photo_id, p.course_id,
              p.title, p.content, p.view_count, p.recommendation_count, p.comment_count, p.created_at,
              COALESCE(u.nickname, '(탈퇴한 사용자)') AS nickname,
              ph.photo_url,
+             pf.photo_url AS profile_photo_url,
              EXISTS(SELECT 1 FROM post_recommendations pr
                     WHERE pr.post_id = p.post_id AND pr.user_id = :userId) AS recommended,
              EXISTS(SELECT 1 FROM post_bookmarks pb
@@ -47,6 +53,7 @@ public class PostService {
       FROM posts p
       LEFT JOIN users u ON p.user_id = u.user_id
       LEFT JOIN photos ph ON p.photo_id = ph.photo_id
+      LEFT JOIN photos pf ON u.profile_photo_id = pf.photo_id
       """;
 
   private static final String LATEST_SQL =
@@ -109,7 +116,7 @@ public class PostService {
               rs.getObject("photo_id", UUID.class),
               rs.getString("photo_url"));
 
-  private static final RowMapper<PostResponse> POST_ROW_MAPPER =
+  private final RowMapper<PostResponse> postRowMapper =
       (rs, rowNum) ->
           new PostResponse(
               rs.getObject("post_id", UUID.class),
@@ -124,27 +131,37 @@ public class PostService {
               rs.getBoolean("recommended"),
               rs.getBoolean("bookmarked"),
               rs.getString("nickname"),
+              presign(rs.getString("profile_photo_url")),
               rs.getString("photo_url"),
               List.of(),
               rs.getTimestamp("created_at").toLocalDateTime());
 
-  private static final RowMapper<PostSummaryResponse> POST_SUMMARY_ROW_MAPPER =
+  private final RowMapper<PostSummaryResponse> postSummaryRowMapper =
       (rs, rowNum) ->
           new PostSummaryResponse(
               rs.getObject("post_id", UUID.class),
               rs.getString("title"),
               rs.getString("nickname"),
+              presign(rs.getString("profile_photo_url")),
               rs.getInt("recommendation_count"),
               rs.getInt("comment_count"),
               thumbnailOf(rs.getObject("photo_id", UUID.class), rs.getString("photo_url")),
               rs.getTimestamp("created_at").toLocalDateTime());
 
   /** 대표 사진(첫 장). photo_id가 없으면 사진 없는 글이라 null. */
-  private static PostResponse.PhotoView thumbnailOf(UUID photoId, String photoKey) {
+  private PostResponse.PhotoView thumbnailOf(UUID photoId, String photoKey) {
     if (photoId == null) {
       return null;
     }
-    return new PostResponse.PhotoView(photoId, photoKey);
+    return new PostResponse.PhotoView(photoId, photoKey, presign(photoKey));
+  }
+
+  /** S3 키를 presigned GET URL(문자열)로 바꾼다. 비공개 버킷이라 이 URL로만 열람 가능. 키가 없으면 null. */
+  private String presign(String photoKey) {
+    if (photoKey == null) {
+      return null;
+    }
+    return s3Operations.createSignedGetURL(bucket, photoKey, DOWNLOAD_URL_DURATION).toString();
   }
 
   private final PostRepository postRepository;
@@ -152,18 +169,24 @@ public class PostService {
   private final PostBookmarkRepository postBookmarkRepository;
   private final PostReportRepository postReportRepository;
   private final NamedParameterJdbcTemplate jdbcTemplate;
+  private final S3Operations s3Operations;
+  private final String bucket;
 
   public PostService(
       PostRepository postRepository,
       PostRecommendationRepository postRecommendationRepository,
       PostBookmarkRepository postBookmarkRepository,
       PostReportRepository postReportRepository,
-      NamedParameterJdbcTemplate jdbcTemplate) {
+      NamedParameterJdbcTemplate jdbcTemplate,
+      S3Operations s3Operations,
+      @Value("${app.s3.bucket}") String bucket) {
     this.postRepository = postRepository;
     this.postRecommendationRepository = postRecommendationRepository;
     this.postBookmarkRepository = postBookmarkRepository;
     this.postReportRepository = postReportRepository;
     this.jdbcTemplate = jdbcTemplate;
+    this.s3Operations = s3Operations;
+    this.bucket = bucket;
   }
 
   public PostListResponse listPosts(UUID userId, String sort, String cursor, int size) {
@@ -325,7 +348,7 @@ public class PostService {
     MapSqlParameterSource params =
         new MapSqlParameterSource().addValue("userId", userId).addValue("size", size);
     if (cursor == null) {
-      return toListResponse(jdbcTemplate.query(LATEST_SQL, params, POST_SUMMARY_ROW_MAPPER), size);
+      return toListResponse(jdbcTemplate.query(LATEST_SQL, params, postSummaryRowMapper), size);
     }
     String[] parts = cursor.split("~", 2);
     params.addValue(
@@ -333,14 +356,14 @@ public class PostService {
         Timestamp.valueOf(LocalDateTime.parse(parts[0], DateTimeFormatter.ISO_LOCAL_DATE_TIME)));
     params.addValue("cursorId", UUID.fromString(parts[1]));
     return toListResponse(
-        jdbcTemplate.query(LATEST_CURSOR_SQL, params, POST_SUMMARY_ROW_MAPPER), size);
+        jdbcTemplate.query(LATEST_CURSOR_SQL, params, postSummaryRowMapper), size);
   }
 
   private PostListResponse queryPopular(UUID userId, int size) {
     MapSqlParameterSource params =
         new MapSqlParameterSource().addValue("userId", userId).addValue("size", size);
     return new PostListResponse(
-        jdbcTemplate.query(POPULAR_SQL, params, POST_SUMMARY_ROW_MAPPER), null);
+        jdbcTemplate.query(POPULAR_SQL, params, postSummaryRowMapper), null);
   }
 
   /** 상세 조회에 각 글의 사진 전체를 배치로 붙인다. post_photos → photos 순서대로. */
@@ -356,7 +379,7 @@ public class PostService {
     for (PostPhotoRow row : rows) {
       byPost
           .computeIfAbsent(row.postId(), key -> new ArrayList<>())
-          .add(new PostResponse.PhotoView(row.photoId(), row.photoKey()));
+          .add(new PostResponse.PhotoView(row.photoId(), row.photoKey(), presign(row.photoKey())));
     }
     return posts.stream()
         .map(post -> post.withPhotos(byPost.getOrDefault(post.id(), List.of())))
@@ -377,7 +400,7 @@ public class PostService {
     MapSqlParameterSource params =
         new MapSqlParameterSource().addValue("userId", userId).addValue("postId", postId);
     PostResponse post =
-        jdbcTemplate.query(DETAIL_SQL, params, POST_ROW_MAPPER).stream()
+        jdbcTemplate.query(DETAIL_SQL, params, postRowMapper).stream()
             .findFirst()
             .orElseThrow(PostNotFoundException::new);
     return enrichWithPhotos(List.of(post)).get(0);
