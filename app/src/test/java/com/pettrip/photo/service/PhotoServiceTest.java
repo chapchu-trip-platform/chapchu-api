@@ -57,15 +57,26 @@ class PhotoServiceTest {
   }
 
   @Test
-  void issueUploadUrl은_S3Operations에_위임한다() throws Exception {
+  void issueUploadUrl은_Content_Type을_바인딩해_S3Operations에_위임한다() throws Exception {
     String photoKey = "photos/user-1/uuid-초코.jpg";
     URL expectedUrl = URI.create("https://test-bucket.s3.amazonaws.com/" + photoKey).toURL();
-    when(s3Operations.createSignedPutURL(eq("test-bucket"), eq(photoKey), any(Duration.class)))
+    when(s3Operations.createSignedPutURL(
+            eq("test-bucket"), eq(photoKey), any(Duration.class), any(), eq("image/jpeg")))
         .thenReturn(expectedUrl);
 
-    URL result = photoService.issueUploadUrl(photoKey);
+    URL result = photoService.issueUploadUrl(photoKey, "image/jpeg");
 
     assertThat(result).isEqualTo(expectedUrl);
+  }
+
+  @Test
+  void contentTypeFor는_확장자로_MIME_타입을_추론한다() {
+    assertThat(photoService.contentTypeFor("초코.jpg")).isEqualTo("image/jpeg");
+    assertThat(photoService.contentTypeFor("초코.JPEG")).isEqualTo("image/jpeg");
+    assertThat(photoService.contentTypeFor("a.png")).isEqualTo("image/png");
+    assertThat(photoService.contentTypeFor("a.webp")).isEqualTo("image/webp");
+    assertThat(photoService.contentTypeFor("a.svg")).isEqualTo("image/svg+xml");
+    assertThat(photoService.contentTypeFor("a.bin")).isEqualTo("application/octet-stream");
   }
 
   @Test

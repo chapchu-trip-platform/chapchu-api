@@ -1,3 +1,4 @@
 package com.pettrip.photo.controller;
 
-public record PhotoUploadUrlResponse(String uploadUrl, String photoKey, String fileName) {}
+public record PhotoUploadUrlResponse(
+    String uploadUrl, String photoKey, String fileName, String contentType) {}
