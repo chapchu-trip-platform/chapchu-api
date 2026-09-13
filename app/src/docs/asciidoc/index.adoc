@@ -759,7 +759,7 @@ include::{snippets}/place-nearby/response-fields.adoc[]
 `GET /posts?sort={sort}&cursor={cursor}&size={size}`
 
 목록은 카드용 **요약**(제목·닉네임·대표사진·추천수·댓글수·작성일)만 내려갑니다. 본문·참조·사진 전체는 상세 `GET /posts/{id}`에서 가져옵니다.
-`thumbnail`은 대표 사진(첫 장)이며 사진 없는 글이면 null입니다. 비공개 버킷이라 FE는 `thumbnail.photoId`로 `GET /photos/{photoId}`를 호출해 다운로드 URL을 발급받습니다.
+`thumbnail`은 대표 사진(첫 장)이며 사진 없는 글이면 null입니다. 작성자 프로필 사진(`authorProfilePhotoUrl`)과 대표 사진(`thumbnail.downloadUrl`)은 서버가 **presigned URL(10분)** 로 함께 내려주므로, FE는 별도 호출 없이 바로 표시합니다. 비공개 버킷이라 이 URL로만 열람할 수 있고 10분 뒤 만료되니, 목록을 새로 부를 때 받은 값을 그대로 사용합니다.
 
 cursor 값은 이전 응답의 `nextCursor` 필드를 그대로 전달합니다. 첫 페이지는 생략합니다. `nextCursor`가 null이면 마지막 페이지입니다.
 
@@ -778,6 +778,8 @@ include::{snippets}/post-list/response-fields.adoc[]
 === 게시글 상세 조회
 
 `GET /posts/{postId}`
+
+작성자 프로필 사진(`authorProfilePhotoUrl`)과 첨부 사진(`photos[].downloadUrl`)은 서버가 **presigned URL(10분)** 로 내려줍니다. FE는 이 URL을 그대로 `<img>`에 사용하며, 별도의 `GET /photos` 호출이 필요 없습니다. `photoKey`는 원본 식별용으로 유지됩니다.
 
 [.request]
 ==== 요청
