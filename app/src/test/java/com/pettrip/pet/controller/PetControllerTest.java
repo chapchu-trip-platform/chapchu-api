@@ -118,6 +118,7 @@ class PetControllerTest {
                     fieldWithPath("breedName").description("견종 이름"),
                     fieldWithPath("size").description("크기"),
                     fieldWithPath("age").description("나이"),
+                    fieldWithPath("isDie").description("사망 여부"),
                     fieldWithPath("activities[].id").description("선호 활동 ID"),
                     fieldWithPath("activities[].name").description("선호 활동 이름"),
                     fieldWithPath("createdAt").description("생성일시"),
@@ -130,11 +131,12 @@ class PetControllerTest {
     Breed breed = new Breed("말티즈");
     Pet pet = new Pet(UUID.randomUUID(), breed, "루이", PetSize.SMALL, 2);
     pet.replaceActivities(Set.of(new PetActivity("산책")));
-    when(petService.updatePet(any(), eq(petId), eq(null), eq("루이"), eq(null), eq(null), eq(null)))
+    when(petService.updatePet(
+            any(), eq(petId), eq(null), eq("루이"), eq(null), eq(null), eq(null), eq(null)))
         .thenReturn(pet);
 
     String body =
-        objectMapper.writeValueAsString(new PetUpdateRequest("루이", null, null, null, null));
+        objectMapper.writeValueAsString(new PetUpdateRequest("루이", null, null, null, null, null));
 
     mockMvc
         .perform(
@@ -152,6 +154,7 @@ class PetControllerTest {
                     fieldWithPath("breedId").description("견종 ID (선택)"),
                     fieldWithPath("size").description("크기 (선택)"),
                     fieldWithPath("age").description("나이 (선택)"),
+                    fieldWithPath("isDie").description("사망 여부 (선택). 생략하면 기존 값 유지").optional(),
                     fieldWithPath("activityIds")
                         .description("선호 활동 ID 목록. 생략하면 기존 값 유지, 빈 배열이면 전부 삭제")
                         .optional()),
@@ -162,6 +165,7 @@ class PetControllerTest {
                     fieldWithPath("breedName").description("견종 이름"),
                     fieldWithPath("size").description("크기"),
                     fieldWithPath("age").description("나이"),
+                    fieldWithPath("isDie").description("사망 여부"),
                     fieldWithPath("activities[].id").description("선호 활동 ID"),
                     fieldWithPath("activities[].name").description("선호 활동 이름"),
                     fieldWithPath("createdAt").description("생성일시"),

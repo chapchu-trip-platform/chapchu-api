@@ -14,6 +14,7 @@ public record PetResponse(
     String breedName,
     PetSize size,
     Integer age,
+    boolean isDie,
     List<PetActivityResponse> activities,
     LocalDateTime createdAt,
     LocalDateTime updatedAt) {
@@ -26,6 +27,7 @@ public record PetResponse(
         pet.getBreed().getBreedName(),
         pet.getSize(),
         pet.getAge(),
+        pet.isDie(),
         pet.getPreferredActivities().stream()
             .map(PetActivityResponse::from)
             .sorted(Comparator.comparing(PetActivityResponse::name))

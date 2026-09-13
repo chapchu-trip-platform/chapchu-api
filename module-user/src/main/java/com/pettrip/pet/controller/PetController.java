@@ -60,6 +60,7 @@ public class PetController {
             request.petName(),
             request.size(),
             request.age(),
+            request.isDie(),
             request.activityIds());
     return PetResponse.from(pet);
   }
