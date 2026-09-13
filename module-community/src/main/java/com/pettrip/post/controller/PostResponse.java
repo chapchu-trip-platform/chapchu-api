@@ -7,6 +7,7 @@ import java.util.UUID;
 /**
  * @param photoId 대표 사진(첫 장). 마이페이지 목록 등 단일 썸네일용으로 유지한다
  * @param photoUrl 대표 사진의 S3 키
+ * @param photoCount 첨부된 사진 수. {@code photos.size()}와 같지만 목록 응답과 필드를 맞춘다
  * @param photos 첨부된 사진 전체. 각 항목에 presigned {@code downloadUrl}(10분)이 포함된다
  * @param recommended 요청한 사용자가 이 글을 추천했는지. 추천 취소 버튼을 그리려면 필요하다
  * @param bookmarked 요청한 사용자가 이 글을 북마크했는지
@@ -27,6 +28,7 @@ public record PostResponse(
     String nickname,
     String authorProfilePhotoUrl,
     String photoUrl,
+    int photoCount,
     List<PhotoView> photos,
     LocalDateTime createdAt) {
 
@@ -47,6 +49,7 @@ public record PostResponse(
         nickname,
         authorProfilePhotoUrl,
         photoUrl,
+        photos.size(),
         photos,
         createdAt);
   }
