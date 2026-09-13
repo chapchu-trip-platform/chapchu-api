@@ -1129,6 +1129,25 @@ include::{snippets}/course-get/path-parameters.adoc[]
 include::{snippets}/course-get/http-response.adoc[]
 include::{snippets}/course-get/response-fields.adoc[]
 
+=== 코스 단위 리뷰·사진 조회
+
+`GET /courses/{courseId}/reviews`
+
+JWT 인증이 필요하며 **코스 주인만** 조회할 수 있습니다. 코스의 각 스탑(방문 순서대로)에 주인이 쓴 리뷰와 사진을 묶어 반환합니다.
+아직 리뷰가 없는 스탑은 `review`가 `null`입니다. 리뷰 사진의 `downloadUrl`은 presigned GET URL(10분)입니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/course-reviews/http-request.adoc[]
+include::{snippets}/course-reviews/path-parameters.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/course-reviews/http-response.adoc[]
+include::{snippets}/course-reviews/response-fields.adoc[]
+
 === 내 코스 목록 조회
 
 `GET /users/me/courses`

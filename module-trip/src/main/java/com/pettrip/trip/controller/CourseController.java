@@ -64,6 +64,12 @@ public class CourseController {
     return CourseResponse.from(courseService.getCourse(userId, courseId));
   }
 
+  @GetMapping("/{courseId}/reviews")
+  public CourseReviewsResponse getCourseReviews(
+      @CurrentUserId UUID userId, @PathVariable UUID courseId) {
+    return CourseReviewsResponse.from(courseService.getCourseReviews(userId, courseId));
+  }
+
   @PostMapping("/{courseId}/complete")
   @ResponseStatus(HttpStatus.OK)
   public void completeCourse(@CurrentUserId UUID userId, @PathVariable UUID courseId) {
