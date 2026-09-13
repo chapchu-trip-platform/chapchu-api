@@ -251,18 +251,7 @@ CREATE TABLE photos (
     created_at      TIMESTAMP DEFAULT now()
 );
 
-CREATE TABLE visit_verifications (
-    verification_id       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id               UUID REFERENCES users(user_id) ON DELETE SET NULL,
-    course_place_id       UUID NOT NULL REFERENCES course_places(course_place_id),
-    photo_id              UUID NOT NULL REFERENCES photos(photo_id),
-    verification_latitude  DECIMAL(10,7),
-    verification_longitude DECIMAL(10,7),
-    verification_status   VARCHAR(30),
-    verified_at           TIMESTAMP,
-    created_at            TIMESTAMP DEFAULT now(),
-    updated_at            TIMESTAMP DEFAULT now()
-);
+-- visit_verifications: V30에서 DROP (decisions/044 참조) — 장소인증 FE 전담 이관
 
 -- course_embeddings: V17에서 DROP (decisions/042 참조)
 
@@ -361,21 +350,8 @@ CREATE TABLE place_wishlists (
 -- ALBUM DOMAIN
 -- ============================================================
 
-CREATE TABLE albums (
-    album_id   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id    UUID REFERENCES users(user_id) ON DELETE SET NULL,
-    album_name VARCHAR(30),
-    created_at TIMESTAMP DEFAULT now(),
-    updated_at TIMESTAMP DEFAULT now()
-);
-
-CREATE TABLE album_photos (
-    album_photo_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    album_id       UUID NOT NULL REFERENCES albums(album_id) ON DELETE CASCADE,
-    photo_id       UUID NOT NULL REFERENCES photos(photo_id) ON DELETE CASCADE,
-    created_at     TIMESTAMP DEFAULT now(),
-    updated_at     TIMESTAMP DEFAULT now()
-);
+-- albums, album_photos: V30에서 DROP (decisions/044 참조)
+-- 앨범은 review_photos 파생으로 동작(GET /users/me/album)하며 별도 테이블은 미사용.
 
 CREATE TABLE keyring_cards (
     keyring_card_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
