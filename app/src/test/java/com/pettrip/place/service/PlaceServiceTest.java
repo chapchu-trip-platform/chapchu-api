@@ -50,6 +50,7 @@ class PlaceServiceTest {
         name,
         null,
         "서울시 영등포구",
+        "1",
         new BigDecimal("37.5263"),
         new BigDecimal("126.9342"),
         new BigDecimal("100"));
