@@ -1262,26 +1262,45 @@ include::{snippets}/weather-record-list/response-fields.adoc[]
 
 == 앨범 API
 
-앨범은 별도 저장 없이 **내가 쓴 리뷰들의 사진을 모아 보여주는** 파생 조회입니다(리뷰 사진 = `review_photos`).
+앨범은 별도 저장 없이 **여행 사진을 코스 단위로 묶어 보여주는** 파생 조회입니다.
+`photos.course_place_id → course_places → travel_courses` 경로로 코스에 연결된 내 사진을 모으고,
+사진이 `review_photos`에 연결돼 있으면 `isPublic=true`(공개), 아니면 개인(나만) 사진입니다.
+`downloadUrl`은 presigned GET URL(10분)이며, 코스는 `travel_courses.pet_id`로 펫과 연결됩니다.
 
 === 내 앨범 조회
 
 `GET /users/me/album`
 
-JWT 인증이 필요합니다. 내 리뷰 사진을 **최신 리뷰 → 리뷰 내 사진 순서**로 펼쳐서 반환합니다.
-각 항목에 `reviewId`·`placeId`가 있어 사진에서 원 리뷰·장소로 되짚을 수 있습니다.
-`downloadUrl`은 presigned GET URL(10분)입니다.
+JWT 인증 필요. 코스에 연결된 내 사진을 **코스 단위로 그룹**해 최신 여행일 순으로 반환합니다.
 
 [.request]
 ==== 요청
 
-include::{snippets}/album-list/http-request.adoc[]
+include::{snippets}/album-my/http-request.adoc[]
 
 [.response]
 ==== 응답
 
-include::{snippets}/album-list/http-response.adoc[]
-include::{snippets}/album-list/response-fields.adoc[]
+include::{snippets}/album-my/http-response.adoc[]
+include::{snippets}/album-my/response-fields.adoc[]
+
+=== 펫별 앨범 조회
+
+`GET /users/me/pets/{petId}/album`
+
+특정 펫과 함께한 코스의 사진만 코스 단위로 모아 반환합니다(펫 사망 후 추모용으로도 사용). 응답 형태는 내 앨범과 동일합니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/album-pet/http-request.adoc[]
+include::{snippets}/album-pet/path-parameters.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/album-pet/http-response.adoc[]
+include::{snippets}/album-pet/response-fields.adoc[]
 
 == 추천 API
 
