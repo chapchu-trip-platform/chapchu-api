@@ -60,6 +60,7 @@ class CourseControllerTest {
     TravelCourse course =
         new TravelCourse(
             USER_ID,
+            UUID.randomUUID(),
             "강남구",
             new BigDecimal("37.5"),
             new BigDecimal("127.0"),

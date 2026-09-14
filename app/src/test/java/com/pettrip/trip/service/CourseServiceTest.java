@@ -91,6 +91,7 @@ class CourseServiceTest {
   private TravelCourse sampleCourse(UUID userId) {
     return new TravelCourse(
         userId,
+        UUID.randomUUID(),
         "강남구",
         new BigDecimal("37.5"),
         new BigDecimal("127.0"),
@@ -309,6 +310,7 @@ class CourseServiceTest {
             "맑음");
 
     assertThat(result).isNotNull();
+    assertThat(result.getPetId()).isEqualTo(petId);
     assertThat(result.getEndLocation()).isEqualTo("도착장소");
     assertThat(saved).hasSize(3);
     assertThat(saved.get(0).getReason()).isEqualTo("물놀이 좋아요");

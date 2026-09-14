@@ -34,6 +34,7 @@ class WeatherServiceTest {
   private TravelCourse sampleCourse(UUID userId) {
     return new TravelCourse(
         userId,
+        UUID.randomUUID(),
         "강남구",
         new BigDecimal("37.5"),
         new BigDecimal("127.0"),

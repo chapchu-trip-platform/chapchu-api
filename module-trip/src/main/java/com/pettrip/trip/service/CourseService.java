@@ -317,6 +317,7 @@ public class CourseService {
     TravelCourse course =
         new TravelCourse(
             userId,
+            petId,
             startLocation,
             startLat,
             startLng,

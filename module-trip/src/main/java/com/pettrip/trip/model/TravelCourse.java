@@ -23,6 +23,9 @@ public class TravelCourse extends BaseEntity {
   @Column(name = "user_id")
   private UUID userId;
 
+  @Column(name = "pet_id")
+  private UUID petId;
+
   @Column(name = "start_location", length = 255)
   private String startLocation;
 
@@ -58,6 +61,7 @@ public class TravelCourse extends BaseEntity {
 
   public TravelCourse(
       UUID userId,
+      UUID petId,
       String startLocation,
       BigDecimal startLat,
       BigDecimal startLng,
@@ -66,6 +70,7 @@ public class TravelCourse extends BaseEntity {
       BigDecimal endLng,
       LocalDate travelDate) {
     this.userId = userId;
+    this.petId = petId;
     this.startLocation = startLocation;
     this.startLat = startLat;
     this.startLng = startLng;
@@ -77,6 +82,10 @@ public class TravelCourse extends BaseEntity {
 
   public UUID getUserId() {
     return userId;
+  }
+
+  public UUID getPetId() {
+    return petId;
   }
 
   public String getStartLocation() {
