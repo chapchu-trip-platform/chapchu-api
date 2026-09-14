@@ -79,8 +79,22 @@ class PetServiceTest {
     Pet pet = new Pet(ownerId, new Breed("골든리트리버"), "초코", PetSize.MEDIUM, 3);
     when(petRepository.findById(petId)).thenReturn(Optional.of(pet));
 
-    assertThatThrownBy(() -> petService.updatePet(otherId, petId, null, "루이", null, null, null))
+    assertThatThrownBy(
+            () -> petService.updatePet(otherId, petId, null, "루이", null, null, null, null))
         .isInstanceOf(PetNotFoundException.class);
+  }
+
+  @Test
+  void updatePet는_isDie를_반영한다() {
+    UUID ownerId = UUID.randomUUID();
+    UUID petId = UUID.randomUUID();
+    Pet pet = new Pet(ownerId, new Breed("말티즈"), "루이", PetSize.SMALL, 2);
+    when(petRepository.findById(petId)).thenReturn(Optional.of(pet));
+    when(petRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+    Pet result = petService.updatePet(ownerId, petId, null, null, null, null, true, null);
+
+    assertThat(result.isDie()).isTrue();
   }
 
   @Test

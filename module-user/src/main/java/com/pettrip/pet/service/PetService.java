@@ -57,10 +57,12 @@ public class PetService {
       String petName,
       PetSize size,
       Integer age,
+      Boolean isDie,
       List<UUID> activityIds) {
     Pet pet = getOwnedPet(userId, petId);
     Breed breed = breedId != null ? findBreed(breedId) : null;
     pet.update(breed, petName, size, age);
+    pet.updateIsDie(isDie);
     pet.replaceActivities(findActivities(activityIds));
     return petRepository.save(pet);
   }

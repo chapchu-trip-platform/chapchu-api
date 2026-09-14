@@ -38,6 +38,9 @@ public class Pet extends BaseEntity {
   @Column(name = "age")
   private Integer age;
 
+  @Column(name = "is_die", nullable = false)
+  private boolean isDie = false;
+
   @ManyToMany(fetch = FetchType.LAZY)
   @JoinTable(
       name = "pet_preferences_activities",
@@ -67,6 +70,13 @@ public class Pet extends BaseEntity {
     }
     if (newAge != null) {
       this.age = newAge;
+    }
+  }
+
+  /** 사망 여부 갱신. {@code null}이면 손대지 않는다(수정 요청에서 이 필드를 뺀 경우). */
+  public void updateIsDie(Boolean newIsDie) {
+    if (newIsDie != null) {
+      this.isDie = newIsDie;
     }
   }
 
@@ -102,6 +112,10 @@ public class Pet extends BaseEntity {
 
   public Integer getAge() {
     return age;
+  }
+
+  public boolean isDie() {
+    return isDie;
   }
 
   public Set<PetActivity> getPreferredActivities() {

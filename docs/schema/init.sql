@@ -127,6 +127,7 @@ CREATE TABLE pets (
     pet_name   VARCHAR(50) NOT NULL,
     size       VARCHAR(10),
     age        INTEGER,
+    is_die     BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMP DEFAULT now(),
     updated_at TIMESTAMP DEFAULT now()
 );
