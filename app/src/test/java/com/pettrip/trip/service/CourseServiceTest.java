@@ -213,7 +213,7 @@ class CourseServiceTest {
   }
 
   @Test
-  void 추천_장소_없을때_예외발생한다() {
+  void 추천_장소_없으면_빈_목록을_반환한다() {
     UUID userId = UUID.randomUUID();
     UUID petId = UUID.randomUUID();
     mockPetAndPolicy(userId, petId);
@@ -224,19 +224,11 @@ class CourseServiceTest {
     when(routeOptimizationService.optimizeOrder(any(), any(), any(), any(), any()))
         .thenReturn(List.of());
 
-    assertThatThrownBy(
-            () ->
-                courseService.recommendPlaces(
-                    userId,
-                    petId,
-                    new BigDecimal("0"),
-                    new BigDecimal("0"),
-                    5000,
-                    null,
-                    null,
-                    null,
-                    null))
-        .isInstanceOf(NoPlacesFoundException.class);
+    List<RecommendedPlaceResult> result =
+        courseService.recommendPlaces(
+            userId, petId, new BigDecimal("0"), new BigDecimal("0"), 5000, null, null, null, null);
+
+    assertThat(result).isEmpty();
   }
 
   @Test

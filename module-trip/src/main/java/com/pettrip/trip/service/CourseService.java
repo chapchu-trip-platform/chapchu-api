@@ -211,10 +211,8 @@ public class CourseService {
     List<String> orderedIds =
         routeOptimizationService.optimizeOrder(
             placeInfos, toPetSizeLabel(pet.getSize()), pet.getAge(), weatherStatus, temperature);
-    if (orderedIds.isEmpty()) {
-      throw new NoPlacesFoundException();
-    }
 
+    // 주변에 추천 장소가 없으면 에러(404)가 아니라 빈 목록(200)을 반환한다 — "결과 0건"은 정상 응답.
     return orderedIds.stream()
         .map(placeMap::get)
         .filter(Objects::nonNull)
