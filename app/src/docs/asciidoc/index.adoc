@@ -1108,9 +1108,11 @@ include::{snippets}/review-recommendation-delete/http-response.adoc[]
 `POST /courses`
 
 JWT 인증이 필요합니다. `petId`(본인 반려동물)가 필수이며, FE가 수집한 날씨 정보(temperature, humidity, weatherStatus)를 함께 전달합니다.
-**중간 개수(`intermediateStopCount`)는 없어졌습니다.** 사용자가 대략 목적지 좌표로 `POST /recommended-places`(limit=5)를 호출해 반려견 장소 후보를 받은 뒤, 그중 하나를 골라 그 정보를 `destination` 객체로 통째로 담아 보냅니다. 서버는 이 도착지를 Place로 upsert해 **고정 도착 스탑**으로 두고, 출발~도착 사이 후보를 모아 **AI가 취향(선호 활동)·거리·날씨를 보고 중간 스탑을 최대 3개까지 큐레이션**합니다. (중간 개수 N은 거리·반려동물 체력·날씨로 산정 — docs/decisions/043)
+**중간 개수(`intermediateStopCount`)는 없어졌습니다. 출발지·도착지는 고정 양 끝점이고, 시스템은 중간 스탑만 큐레이션합니다.**
+도착지는 **사용자가 임의로 고른 최종 지점**(우리 펫장소 DB와 무관)을 `destination` 객체로 보냅니다. 서버는 저장용으로 `destination`의 **`placeName`·`latitude`·`longitude`만 사용**하고, `allowedPetSize`는 **반려견 가능여부(`petAllowed`) 계산에만** 씁니다(그 외 `externalPlaceId`·정책 필드는 무시). **도착지는 `places`/RAG에 저장하지 않고** 고정 도착 스탑으로만 둡니다(decisions/045). 출발~도착 사이 후보를 모아 **AI가 취향(선호 활동)·거리·날씨를 보고 중간 스탑을 최대 3개까지 큐레이션**합니다. (중간 개수 N은 거리·반려동물 체력·날씨로 산정 — docs/decisions/043)
 따라서 응답 `places`는 **큐레이션 중간(0~3) + 고정 도착지 1** 로 구성되며(최대 4곳), 각 스탑에 `reason`(왜 이 곳)이 담깁니다. 후보가 없어도 도착지만으로 코스가 생성됩니다(404 아님).
-응답에 각 장소의 위경도, 이미지, 반려동물 정책이 포함됩니다.
+중간 스탑은 위경도·이미지·반려동물 정책이 채워지지만, **도착지 스탑은 임의 지점이라 `externalPlaceId`가 null이고 이름·좌표만** 있으며 정책·이미지는 비어 있을 수 있습니다.
+각 스탑의 `petAllowed`는 반려견 가능 여부를 나타냅니다(`true`/`false`, 정보 없으면 `null`). **반려견 불가여도 코스 생성을 막지 않고 표시만** 합니다 — 도착지 선택은 사용자가 보장하고, FE가 경고로 안내하면 됩니다.
 
 [.request]
 ==== 요청

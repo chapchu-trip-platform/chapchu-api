@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -315,11 +315,69 @@ class CourseServiceTest {
     assertThat(saved).hasSize(3);
     assertThat(saved.get(0).getReason()).isEqualTo("물놀이 좋아요");
     assertThat(saved.get(2).isFinalPlace()).isTrue();
-    assertThat(saved.get(2).getExternalPlaceId()).isEqualTo("dest-1");
+    // 도착지는 places에 안 쌓고 course_place에 비정규화 저장 → external_place_id null, 이름·좌표 세팅
+    assertThat(saved.get(2).getExternalPlaceId()).isNull();
+    assertThat(saved.get(2).getPlaceName()).isEqualTo("도착장소");
+    assertThat(saved.get(2).getLatitude()).isEqualByComparingTo("37.6");
+    // 도착지 allowedPetSize="ALL" + SMALL 펫 → 반려견 가능
+    assertThat(saved.get(2).getPetAllowed()).isTrue();
   }
 
   @Test
-  void createCourse는_도착지를_upsert한다() {
+  void createCourse는_도착지가_반려견_불가면_petAllowed를_false로_저장한다() {
+    UUID userId = UUID.randomUUID();
+    UUID petId = UUID.randomUUID();
+    when(petRepository.existsByIdAndUserId(petId, userId)).thenReturn(true);
+    when(petRepository.findById(petId))
+        .thenReturn(Optional.of(new Pet(userId, null, "왕", PetSize.LARGE, 5)));
+    when(petPolicyRepository.findAllById(any())).thenReturn(List.of());
+    when(placeService.searchNearby(any(), any(), anyInt())).thenReturn(List.of());
+    when(placeRagService.rankByReviewSimilarity(any(), any()))
+        .thenAnswer(inv -> inv.getArgument(0));
+    when(routeOptimizationService.curateCourse(
+            any(), anyInt(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(List.of());
+    when(travelCourseRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    List<CoursePlace> saved = new ArrayList<>();
+    when(coursePlaceRepository.save(any(CoursePlace.class)))
+        .thenAnswer(
+            inv -> {
+              saved.add(inv.getArgument(0));
+              return inv.getArgument(0);
+            });
+
+    // 도착지 allowedPetSize="SMALL" + LARGE 펫 → 반려견 불가
+    DestinationInput smallOnly =
+        new DestinationInput(
+            "dest-1",
+            "소형견 전용 카페",
+            null,
+            "서울시",
+            new BigDecimal("37.6"),
+            new BigDecimal("126.9"),
+            "SMALL",
+            false,
+            false,
+            "BOTH",
+            null);
+    courseService.createCourse(
+        userId,
+        petId,
+        LocalDate.now(),
+        "강남구",
+        new BigDecimal("37.5"),
+        new BigDecimal("127.0"),
+        smallOnly,
+        (short) 25,
+        (short) 60,
+        "맑음");
+
+    assertThat(saved.get(0).isFinalPlace()).isTrue();
+    assertThat(saved.get(0).getPetAllowed()).isFalse();
+  }
+
+  @Test
+  void createCourse는_도착지를_places에_upsert하지_않는다() {
     UUID userId = UUID.randomUUID();
     UUID petId = UUID.randomUUID();
     mockPetAndPolicy(userId, petId);
@@ -344,9 +402,8 @@ class CourseServiceTest {
         (short) 60,
         "맑음");
 
-    verify(placeService)
-        .upsertPlace(
-            eq("dest-1"), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
+    verify(placeService, never())
+        .upsertPlace(any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
   }
 
   @Test
@@ -385,7 +442,8 @@ class CourseServiceTest {
     assertThat(result).isNotNull();
     assertThat(saved).hasSize(1);
     assertThat(saved.get(0).isFinalPlace()).isTrue();
-    assertThat(saved.get(0).getExternalPlaceId()).isEqualTo("dest-1");
+    assertThat(saved.get(0).getExternalPlaceId()).isNull();
+    assertThat(saved.get(0).getPlaceName()).isEqualTo("도착장소");
   }
 
   @Test

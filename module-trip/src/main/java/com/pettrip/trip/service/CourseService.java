@@ -27,6 +27,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -249,20 +250,8 @@ public class CourseService {
     }
     Pet pet = petRepository.findById(petId).orElseThrow(PetNotFoundException::new);
 
-    // 사용자가 고른 도착지를 Place로 upsert(고정 도착 스탑). recommend가 readOnly라 DB에 없을 수 있어 여기서 확정 저장.
-    placeService.upsertPlace(
-        destination.externalPlaceId(),
-        destination.placeName(),
-        destination.placeImageUrl(),
-        destination.address(),
-        destination.latitude(),
-        destination.longitude(),
-        destination.allowedPetSize(),
-        destination.leashRequired(),
-        destination.carrierRequired(),
-        destination.indoorOutdoorType(),
-        destination.placeCaution());
-
+    // 도착지는 사용자가 임의로 고른 고정 끝점이라 places/RAG에 축적하지 않는다(decisions/045).
+    // 아래에서 course_place 스탑으로만 비정규화 저장한다(리뷰·사진·앨범 대상).
     BigDecimal destLat = destination.latitude();
     BigDecimal destLng = destination.longitude();
     double distance =
@@ -332,8 +321,18 @@ public class CourseService {
       coursePlaceRepository.save(new CoursePlace(course, stop.id(), order, false, stop.reason()));
       order++;
     }
+    // 도착지 반려견 가능 여부는 요청에 딸려온 정책(allowedPetSize)으로만 계산 — 추천/RAG와 무관, 표시용.
+    Boolean destPetAllowed =
+        computeDestinationPetAllowed(pet.getSize(), destination.allowedPetSize());
     coursePlaceRepository.save(
-        new CoursePlace(course, destination.externalPlaceId(), order, true, "사용자가 선택한 도착지"));
+        CoursePlace.destination(
+            course,
+            order,
+            destination.placeName(),
+            destLat,
+            destLng,
+            destPetAllowed,
+            "사용자가 선택한 도착지"));
     return course;
   }
 
@@ -434,13 +433,39 @@ public class CourseService {
 
   private boolean isPetAllowed(PetSize petSize, PlacePetPolicy policy) {
     if (policy == null) return true;
-    AllowedPetSize allowed = policy.getAllowedPetSize();
+    return isSizeAllowed(petSize, policy.getAllowedPetSize());
+  }
+
+  private boolean isSizeAllowed(PetSize petSize, AllowedPetSize allowed) {
     if (allowed == null || allowed == AllowedPetSize.ALL) return true;
     return switch (petSize) {
       case SMALL -> true;
       case MEDIUM -> allowed == AllowedPetSize.MEDIUM || allowed == AllowedPetSize.LARGE;
       case LARGE -> allowed == AllowedPetSize.LARGE;
     };
+  }
+
+  /**
+   * 도착지 반려견 가능 여부. 요청 destination의 allowedPetSize(FE 제공)로만 계산한다 — places/RAG와 무관. 값이 없거나 파싱 불가면
+   * '모름'(null)을 반환한다(막지 않고 표시만).
+   */
+  private Boolean computeDestinationPetAllowed(PetSize petSize, String allowedPetSizeRaw) {
+    AllowedPetSize allowed = parseAllowedPetSize(allowedPetSizeRaw);
+    if (allowed == null) {
+      return null;
+    }
+    return isSizeAllowed(petSize, allowed);
+  }
+
+  private AllowedPetSize parseAllowedPetSize(String raw) {
+    if (raw == null || raw.isBlank()) {
+      return null;
+    }
+    try {
+      return AllowedPetSize.valueOf(raw.trim().toUpperCase(Locale.ROOT));
+    } catch (IllegalArgumentException e) {
+      return null;
+    }
   }
 
   private PlaceInfo toPlaceInfo(Place p, PlacePetPolicy policy, PlaceInfo.PlaceGroup group) {
@@ -529,7 +554,12 @@ public class CourseService {
     List<CoursePlace> coursePlaces =
         coursePlaceRepository.findByCourseIdOrderByVisitOrderAsc(courseId);
 
-    List<String> placeIds = coursePlaces.stream().map(CoursePlace::getExternalPlaceId).toList();
+    // 도착지 스탑은 external_place_id가 NULL(임의 끝점)이라 places 조회 대상에서 제외한다.
+    List<String> placeIds =
+        coursePlaces.stream()
+            .map(CoursePlace::getExternalPlaceId)
+            .filter(Objects::nonNull)
+            .toList();
 
     Map<String, Place> placeMap =
         placeRepository.findAllById(placeIds).stream()
