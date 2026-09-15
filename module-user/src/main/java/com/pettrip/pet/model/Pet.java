@@ -38,6 +38,14 @@ public class Pet extends BaseEntity {
   @Column(name = "age")
   private Integer age;
 
+  /** 프로필 사진. NULL이면 사진 없음. 기본 이미지는 프론트가 처리한다. */
+  @Column(name = "profile_photo_id")
+  private UUID profilePhotoId;
+
+  /** 프로필 배경화면. 프로필 사진과 같은 경로(type=PROFILE)에 올린다. */
+  @Column(name = "background_photo_id")
+  private UUID backgroundPhotoId;
+
   @Column(name = "is_die", nullable = false)
   private boolean isDie = false;
 
@@ -112,6 +120,22 @@ public class Pet extends BaseEntity {
 
   public Integer getAge() {
     return age;
+  }
+
+  public void updateProfilePhoto(UUID photoId) {
+    this.profilePhotoId = photoId;
+  }
+
+  public UUID getProfilePhotoId() {
+    return profilePhotoId;
+  }
+
+  public void updateBackgroundPhoto(UUID photoId) {
+    this.backgroundPhotoId = photoId;
+  }
+
+  public UUID getBackgroundPhotoId() {
+    return backgroundPhotoId;
   }
 
   public boolean isDie() {
