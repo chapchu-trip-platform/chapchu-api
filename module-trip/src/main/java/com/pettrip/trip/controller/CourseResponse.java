@@ -27,6 +27,7 @@ public record CourseResponse(
       short visitOrder,
       boolean finalPlace,
       String reason,
+      Boolean petAllowed,
       PetPolicySummary petPolicy) {}
 
   public record PetPolicySummary(
@@ -56,11 +57,21 @@ public record CourseResponse(
   }
 
   private static CoursePlaceItem toItem(CoursePlace cp, Place place, PlacePetPolicy policy) {
-    String name = place != null ? place.getPlaceName() : cp.getExternalPlaceId();
-    String imageUrl = place != null ? place.getPlaceImageUrl() : null;
-    BigDecimal lat = place != null ? place.getLatitude() : null;
-    BigDecimal lng = place != null ? place.getLongitude() : null;
-    PetPolicySummary petPolicy = policy != null ? toPolicySummary(policy) : null;
+    // 기본값은 도착지 스탑의 비정규화 필드(place가 없을 때). 중간 스탑은 place 값으로 덮어쓴다.
+    String name = cp.getPlaceName();
+    String imageUrl = null;
+    BigDecimal lat = cp.getLatitude();
+    BigDecimal lng = cp.getLongitude();
+    if (place != null) {
+      name = place.getPlaceName();
+      imageUrl = place.getPlaceImageUrl();
+      lat = place.getLatitude();
+      lng = place.getLongitude();
+    }
+    PetPolicySummary petPolicy = null;
+    if (policy != null) {
+      petPolicy = toPolicySummary(policy);
+    }
     return new CoursePlaceItem(
         cp.getId(),
         cp.getExternalPlaceId(),
@@ -71,6 +82,7 @@ public record CourseResponse(
         cp.getVisitOrder(),
         cp.isFinalPlace(),
         cp.getReason(),
+        cp.getPetAllowed(),
         petPolicy);
   }
 

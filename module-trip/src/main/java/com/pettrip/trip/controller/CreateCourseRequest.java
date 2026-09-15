@@ -22,9 +22,14 @@ public record CreateCourseRequest(
     Short humidity,
     String weatherStatus) {
 
-  /** 사용자가 고른 최종 도착지(반려견 장소). recommend 응답 항목을 그대로 담는다. */
+  /**
+   * 사용자가 임의로 고른 최종 도착지(고정 끝점). 우리 펫장소 DB와 무관하며 places/RAG에 축적하지 않는다(decisions/045).
+   *
+   * <p>서버는 {@code placeName·latitude·longitude}만 사용한다. {@code externalPlaceId}·정책 필드(allowedPetSize
+   * 등)는 보내도 무시하며 저장하지 않는다.
+   */
   public record Destination(
-      @NotBlank String externalPlaceId,
+      String externalPlaceId,
       @NotBlank String placeName,
       String placeImageUrl,
       @NotNull BigDecimal latitude,

@@ -163,7 +163,9 @@ class CourseControllerTest {
                     fieldWithPath("endLocation").description("도착지 이름"),
                     fieldWithPath("places").description("방문 장소 목록").type(JsonFieldType.ARRAY),
                     fieldWithPath("places[].coursePlaceId").description("코스 장소 ID"),
-                    fieldWithPath("places[].externalPlaceId").description("장소 외부 ID"),
+                    fieldWithPath("places[].externalPlaceId")
+                        .description("장소 외부 ID (도착지는 임의 장소라 null)")
+                        .optional(),
                     fieldWithPath("places[].placeName").description("장소 이름"),
                     fieldWithPath("places[].placeImageUrl").description("장소 이미지 URL").optional(),
                     fieldWithPath("places[].latitude").description("위도").optional(),
@@ -174,6 +176,9 @@ class CourseControllerTest {
                     fieldWithPath("places[].finalPlace").description("마지막 방문 장소 여부"),
                     fieldWithPath("places[].reason")
                         .description("이 곳을 고른 이유 (AI 큐레이션, 없을 수 있음)")
+                        .optional(),
+                    fieldWithPath("places[].petAllowed")
+                        .description("반려견 가능 여부(도착지 표시용). true/false, 정보 없으면 null")
                         .optional(),
                     fieldWithPath("places[].petPolicy").description("반려동물 정책").optional())));
   }
@@ -200,7 +205,9 @@ class CourseControllerTest {
                     fieldWithPath("endLocation").description("도착지 이름"),
                     fieldWithPath("places").description("방문 장소 목록").type(JsonFieldType.ARRAY),
                     fieldWithPath("places[].coursePlaceId").description("코스 장소 ID"),
-                    fieldWithPath("places[].externalPlaceId").description("장소 외부 ID"),
+                    fieldWithPath("places[].externalPlaceId")
+                        .description("장소 외부 ID (도착지는 임의 장소라 null)")
+                        .optional(),
                     fieldWithPath("places[].placeName").description("장소 이름"),
                     fieldWithPath("places[].placeImageUrl").description("장소 이미지 URL").optional(),
                     fieldWithPath("places[].latitude").description("위도").optional(),
@@ -211,6 +218,9 @@ class CourseControllerTest {
                     fieldWithPath("places[].finalPlace").description("마지막 방문 장소 여부"),
                     fieldWithPath("places[].reason")
                         .description("이 곳을 고른 이유 (AI 큐레이션, 없을 수 있음)")
+                        .optional(),
+                    fieldWithPath("places[].petAllowed")
+                        .description("반려견 가능 여부(도착지 표시용). true/false, 정보 없으면 null")
                         .optional(),
                     fieldWithPath("places[].petPolicy").description("반려동물 정책").optional())));
   }
