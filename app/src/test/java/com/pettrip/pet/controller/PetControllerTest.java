@@ -3,6 +3,7 @@ package com.pettrip.pet.controller;
 import static com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper.document;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
@@ -15,6 +16,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -23,6 +25,8 @@ import com.pettrip.pet.model.Breed;
 import com.pettrip.pet.model.Pet;
 import com.pettrip.pet.model.PetActivity;
 import com.pettrip.pet.model.PetSize;
+import com.pettrip.pet.service.PetDetail;
+import com.pettrip.pet.service.PetPhotoView;
 import com.pettrip.pet.service.PetService;
 import java.util.List;
 import java.util.Set;
@@ -34,6 +38,7 @@ import org.springframework.boot.test.autoconfigure.restdocs.AutoConfigureRestDoc
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.restdocs.RestDocumentationExtension;
+import org.springframework.restdocs.payload.JsonFieldType;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -71,7 +76,7 @@ class PetControllerTest {
   void 반려견_목록을_조회한다() throws Exception {
     Breed breed = new Breed("골든리트리버");
     Pet pet = new Pet(UUID.randomUUID(), breed, "초코", PetSize.MEDIUM, 3);
-    when(petService.listPets(any())).thenReturn(List.of(pet));
+    when(petService.listPets(any())).thenReturn(List.of(new PetDetail(pet, null, null)));
 
     mockMvc
         .perform(get("/pets").with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
@@ -87,7 +92,7 @@ class PetControllerTest {
     Pet pet = new Pet(UUID.randomUUID(), breed, "초코", PetSize.MEDIUM, 3);
     pet.replaceActivities(Set.of(new PetActivity("산책")));
     when(petService.createPet(any(), eq(breedId), eq("초코"), eq(PetSize.MEDIUM), eq(3), any()))
-        .thenReturn(pet);
+        .thenReturn(new PetDetail(pet, null, null));
 
     String body =
         objectMapper.writeValueAsString(
@@ -119,6 +124,30 @@ class PetControllerTest {
                     fieldWithPath("size").description("크기"),
                     fieldWithPath("age").description("나이"),
                     fieldWithPath("isDie").description("사망 여부"),
+                    fieldWithPath("profilePhoto")
+                        .description("프로필 사진. 사진이 없으면 null. 기본 이미지는 프론트가 처리한다")
+                        .type(JsonFieldType.OBJECT)
+                        .optional(),
+                    fieldWithPath("profilePhoto.photoId")
+                        .description("사진 ID")
+                        .type(JsonFieldType.STRING)
+                        .optional(),
+                    fieldWithPath("profilePhoto.downloadUrl")
+                        .description("presigned GET URL (10분)")
+                        .type(JsonFieldType.STRING)
+                        .optional(),
+                    fieldWithPath("backgroundPhoto")
+                        .description("프로필 배경화면. 없으면 null")
+                        .type(JsonFieldType.OBJECT)
+                        .optional(),
+                    fieldWithPath("backgroundPhoto.photoId")
+                        .description("사진 ID")
+                        .type(JsonFieldType.STRING)
+                        .optional(),
+                    fieldWithPath("backgroundPhoto.downloadUrl")
+                        .description("presigned GET URL (10분)")
+                        .type(JsonFieldType.STRING)
+                        .optional(),
                     fieldWithPath("activities[].id").description("선호 활동 ID"),
                     fieldWithPath("activities[].name").description("선호 활동 이름"),
                     fieldWithPath("createdAt").description("생성일시"),
@@ -133,7 +162,7 @@ class PetControllerTest {
     pet.replaceActivities(Set.of(new PetActivity("산책")));
     when(petService.updatePet(
             any(), eq(petId), eq(null), eq("루이"), eq(null), eq(null), eq(null), eq(null)))
-        .thenReturn(pet);
+        .thenReturn(new PetDetail(pet, null, null));
 
     String body =
         objectMapper.writeValueAsString(new PetUpdateRequest("루이", null, null, null, null, null));
@@ -166,10 +195,116 @@ class PetControllerTest {
                     fieldWithPath("size").description("크기"),
                     fieldWithPath("age").description("나이"),
                     fieldWithPath("isDie").description("사망 여부"),
+                    fieldWithPath("profilePhoto")
+                        .description("프로필 사진. 사진이 없으면 null. 기본 이미지는 프론트가 처리한다")
+                        .type(JsonFieldType.OBJECT)
+                        .optional(),
+                    fieldWithPath("profilePhoto.photoId")
+                        .description("사진 ID")
+                        .type(JsonFieldType.STRING)
+                        .optional(),
+                    fieldWithPath("profilePhoto.downloadUrl")
+                        .description("presigned GET URL (10분)")
+                        .type(JsonFieldType.STRING)
+                        .optional(),
+                    fieldWithPath("backgroundPhoto")
+                        .description("프로필 배경화면. 없으면 null")
+                        .type(JsonFieldType.OBJECT)
+                        .optional(),
+                    fieldWithPath("backgroundPhoto.photoId")
+                        .description("사진 ID")
+                        .type(JsonFieldType.STRING)
+                        .optional(),
+                    fieldWithPath("backgroundPhoto.downloadUrl")
+                        .description("presigned GET URL (10분)")
+                        .type(JsonFieldType.STRING)
+                        .optional(),
                     fieldWithPath("activities[].id").description("선호 활동 ID"),
                     fieldWithPath("activities[].name").description("선호 활동 이름"),
                     fieldWithPath("createdAt").description("생성일시"),
                     fieldWithPath("updatedAt").description("수정일시"))));
+  }
+
+  @Test
+  void 반려견_프로필_사진을_설정한다() throws Exception {
+    UUID petId = UUID.randomUUID();
+    UUID photoId = UUID.randomUUID();
+    Pet pet = new Pet(UUID.randomUUID(), new Breed("골든리트리버"), "초코", PetSize.MEDIUM, 3);
+    PetPhotoView view = new PetPhotoView(photoId, "https://bucket/profile/u/a.jpg?sig");
+    when(petService.updateProfilePhoto(any(), eq(petId), eq(photoId)))
+        .thenReturn(new PetDetail(pet, view, null));
+
+    String body = objectMapper.writeValueAsString(new PetPhotoUpdateRequest(photoId));
+
+    mockMvc
+        .perform(
+            patch("/pets/{petId}/photo", petId)
+                .contentType("application/json")
+                .content(body)
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.profilePhoto.photoId").value(photoId.toString()))
+        .andExpect(
+            jsonPath("$.profilePhoto.downloadUrl").value("https://bucket/profile/u/a.jpg?sig"))
+        .andDo(
+            document(
+                "pet-photo-update",
+                pathParameters(parameterWithName("petId").description("반려견 ID")),
+                requestFields(
+                    fieldWithPath("photoId")
+                        .description("POST /photos로 등록한 사진 ID. null로 보내면 사진을 뗀다")
+                        .type(JsonFieldType.STRING)
+                        .optional())));
+  }
+
+  @Test
+  void 반려견_프로필_사진을_뗀다() throws Exception {
+    UUID petId = UUID.randomUUID();
+    Pet pet = new Pet(UUID.randomUUID(), new Breed("골든리트리버"), "초코", PetSize.MEDIUM, 3);
+    when(petService.updateProfilePhoto(any(), eq(petId), isNull()))
+        .thenReturn(new PetDetail(pet, null, null));
+
+    String body = objectMapper.writeValueAsString(new PetPhotoUpdateRequest(null));
+
+    mockMvc
+        .perform(
+            patch("/pets/{petId}/photo", petId)
+                .contentType("application/json")
+                .content(body)
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.profilePhoto").doesNotExist());
+  }
+
+  @Test
+  void 반려견_프로필_배경화면을_설정한다() throws Exception {
+    UUID petId = UUID.randomUUID();
+    UUID photoId = UUID.randomUUID();
+    Pet pet = new Pet(UUID.randomUUID(), new Breed("골든리트리버"), "초코", PetSize.MEDIUM, 3);
+    PetPhotoView view = new PetPhotoView(photoId, "https://bucket/profile/u/bg.jpg?sig");
+    when(petService.updateBackgroundPhoto(any(), eq(petId), eq(photoId)))
+        .thenReturn(new PetDetail(pet, null, view));
+
+    String body = objectMapper.writeValueAsString(new PetPhotoUpdateRequest(photoId));
+
+    mockMvc
+        .perform(
+            patch("/pets/{petId}/background", petId)
+                .contentType("application/json")
+                .content(body)
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.backgroundPhoto.photoId").value(photoId.toString()))
+        .andExpect(jsonPath("$.profilePhoto").doesNotExist())
+        .andDo(
+            document(
+                "pet-background-update",
+                pathParameters(parameterWithName("petId").description("반려견 ID")),
+                requestFields(
+                    fieldWithPath("photoId")
+                        .description("POST /photos로 등록한 사진 ID. null로 보내면 배경을 뗀다")
+                        .type(JsonFieldType.STRING)
+                        .optional())));
   }
 
   @Test

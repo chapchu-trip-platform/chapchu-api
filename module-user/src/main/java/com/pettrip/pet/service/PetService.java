@@ -7,6 +7,9 @@ import com.pettrip.pet.model.PetSize;
 import com.pettrip.pet.repository.BreedRepository;
 import com.pettrip.pet.repository.PetActivityRepository;
 import com.pettrip.pet.repository.PetRepository;
+import com.pettrip.photo.model.Photo;
+import com.pettrip.photo.repository.PhotoRepository;
+import com.pettrip.photo.service.PhotoService;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -20,23 +23,79 @@ public class PetService {
   private final PetRepository petRepository;
   private final BreedRepository breedRepository;
   private final PetActivityRepository petActivityRepository;
+  private final PhotoRepository photoRepository;
+  private final PhotoService photoService;
 
   public PetService(
       PetRepository petRepository,
       BreedRepository breedRepository,
-      PetActivityRepository petActivityRepository) {
+      PetActivityRepository petActivityRepository,
+      PhotoRepository photoRepository,
+      PhotoService photoService) {
     this.petRepository = petRepository;
     this.breedRepository = breedRepository;
     this.petActivityRepository = petActivityRepository;
+    this.photoRepository = photoRepository;
+    this.photoService = photoService;
   }
 
   @Transactional(readOnly = true)
-  public List<Pet> listPets(UUID userId) {
-    return petRepository.findByUserId(userId);
+  public List<PetDetail> listPets(UUID userId) {
+    return petRepository.findByUserId(userId).stream().map(this::assemble).toList();
+  }
+
+  /**
+   * 프로필 사진을 연결하거나 해제한다.
+   *
+   * <p>{@code photoId}가 null이면 해제한다. 값이 있으면 본인 사진인지 먼저 확인한다 — 남의 사진 id를 붙이지 못하게 막는다.
+   *
+   * <p>사진 교체는 별도 UI 동작이라 {@code PATCH /pets/{petId}}(이름·나이 수정)와 분리했다. 유저 프사도 {@code PATCH
+   * /users/me/photo}로 나뉘어 있다.
+   */
+  @Transactional
+  public PetDetail updateProfilePhoto(UUID userId, UUID petId, UUID photoId) {
+    Pet pet = getOwnedPet(userId, petId);
+    verifyPhotoOwnership(userId, photoId);
+    pet.updateProfilePhoto(photoId);
+    return assemble(petRepository.save(pet));
+  }
+
+  /** 프로필 배경화면을 연결하거나 해제한다. 사진은 프로필과 같은 경로(type=PROFILE)에 올린다. */
+  @Transactional
+  public PetDetail updateBackgroundPhoto(UUID userId, UUID petId, UUID photoId) {
+    Pet pet = getOwnedPet(userId, petId);
+    verifyPhotoOwnership(userId, photoId);
+    pet.updateBackgroundPhoto(photoId);
+    return assemble(petRepository.save(pet));
+  }
+
+  private void verifyPhotoOwnership(UUID userId, UUID photoId) {
+    if (photoId == null) {
+      return;
+    }
+    photoService.getOwnedPhoto(userId, photoId);
+  }
+
+  /** 사진이 없으면 해당 뷰를 null로 둔다. 기본 이미지는 프론트가 처리한다. */
+  private PetDetail assemble(Pet pet) {
+    return new PetDetail(
+        pet, photoView(pet.getProfilePhotoId()), photoView(pet.getBackgroundPhotoId()));
+  }
+
+  private PetPhotoView photoView(UUID photoId) {
+    if (photoId == null) {
+      return null;
+    }
+    Photo photo = photoRepository.findById(photoId).orElse(null);
+    if (photo == null) {
+      return null;
+    }
+    return new PetPhotoView(
+        photo.getId(), photoService.issueDownloadUrl(photo.getPhotoUrl()).toString());
   }
 
   @Transactional
-  public Pet createPet(
+  public PetDetail createPet(
       UUID userId,
       Integer breedId,
       String petName,
@@ -46,11 +105,11 @@ public class PetService {
     Breed breed = findBreed(breedId);
     Pet pet = new Pet(userId, breed, petName, size, age);
     pet.replaceActivities(findActivities(activityIds));
-    return petRepository.save(pet);
+    return assemble(petRepository.save(pet));
   }
 
   @Transactional
-  public Pet updatePet(
+  public PetDetail updatePet(
       UUID userId,
       UUID petId,
       Integer breedId,
@@ -64,7 +123,7 @@ public class PetService {
     pet.update(breed, petName, size, age);
     pet.updateIsDie(isDie);
     pet.replaceActivities(findActivities(activityIds));
-    return petRepository.save(pet);
+    return assemble(petRepository.save(pet));
   }
 
   @Transactional
