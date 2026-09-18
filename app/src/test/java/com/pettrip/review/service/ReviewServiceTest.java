@@ -271,4 +271,97 @@ class ReviewServiceTest {
     verify(reviewRecommendationRepository, times(1)).deleteByReviewIdAndUserId(reviewId, userId);
     verify(reviewRepository).save(review);
   }
+
+  private ReviewService.ReviewEnrichRow enrichRow(UUID userId, UUID petId, UUID courseId) {
+    return new ReviewService.ReviewEnrichRow(
+        userId,
+        "연승",
+        UUID.fromString("0198f3a0-0000-7000-8000-00000000aaaa"),
+        "profile/u/me.jpg",
+        petId,
+        "두부",
+        "포메라니안",
+        UUID.fromString("0198f3a0-0000-7000-8000-00000000bbbb"),
+        "profile/u/dubu.jpg",
+        "남이섬",
+        "강원특별자치도 춘천시",
+        courseId,
+        LocalDate.of(2026, 9, 14));
+  }
+
+  @SuppressWarnings("unchecked")
+  private void stubEnrich(ReviewService.ReviewEnrichRow row) {
+    when(jdbcTemplate.query(
+            any(String.class),
+            any(SqlParameterSource.class),
+            any(org.springframework.jdbc.core.RowMapper.class)))
+        .thenReturn(row == null ? List.of() : List.of(row));
+  }
+
+  @Test
+  void getReview는_작성자_반려동물_장소_이름을_채운다() throws Exception {
+    UUID reviewId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    UUID petId = UUID.randomUUID();
+    UUID courseId = UUID.randomUUID();
+    Review review = new Review("126508", userId, petId, (short) 5, "좋았어요", "SUNNY");
+    when(reviewRepository.findById(reviewId)).thenReturn(Optional.of(review));
+    stubEnrich(enrichRow(userId, petId, courseId));
+    when(photoService.issueDownloadUrl(any())).thenReturn(URI.create("https://s3/x").toURL());
+
+    ReviewFullDetail detail = reviewService.getReview(reviewId);
+
+    assertThat(detail.author().nickname()).isEqualTo("연승");
+    assertThat(detail.pet().petName()).isEqualTo("두부");
+    assertThat(detail.pet().breedName()).isEqualTo("포메라니안");
+    assertThat(detail.place().placeName()).isEqualTo("남이섬");
+    assertThat(detail.place().externalPlaceId()).isEqualTo("126508");
+    assertThat(detail.course().courseId()).isEqualTo(courseId);
+    assertThat(detail.course().travelDate()).isEqualTo(LocalDate.of(2026, 9, 14));
+  }
+
+  @Test
+  void getReview는_코스에_안_달린_리뷰면_course가_null이다() {
+    UUID reviewId = UUID.randomUUID();
+    UUID userId = UUID.randomUUID();
+    UUID petId = UUID.randomUUID();
+    Review review = new Review("126508", userId, petId, (short) 5, "좋았어요", "SUNNY");
+    when(reviewRepository.findById(reviewId)).thenReturn(Optional.of(review));
+    ReviewService.ReviewEnrichRow row =
+        new ReviewService.ReviewEnrichRow(
+            userId, "연승", null, null, petId, "두부", "포메라니안", null, null, "남이섬", "춘천시", null, null);
+    stubEnrich(row);
+
+    ReviewFullDetail detail = reviewService.getReview(reviewId);
+
+    assertThat(detail.course()).isNull();
+    assertThat(detail.author().profilePhoto()).isNull();
+    assertThat(detail.pet().profilePhoto()).isNull();
+  }
+
+  @Test
+  void getReview는_주변정보가_없어도_리뷰_본문은_내려준다() {
+    UUID reviewId = UUID.randomUUID();
+    Review review =
+        new Review("126508", UUID.randomUUID(), UUID.randomUUID(), (short) 3, "무난", "CLOUDY");
+    when(reviewRepository.findById(reviewId)).thenReturn(Optional.of(review));
+    stubEnrich(null);
+
+    ReviewFullDetail detail = reviewService.getReview(reviewId);
+
+    assertThat(detail.review().getContents()).isEqualTo("무난");
+    assertThat(detail.author()).isNull();
+    assertThat(detail.pet()).isNull();
+    assertThat(detail.place().externalPlaceId()).isEqualTo("126508");
+    assertThat(detail.place().placeName()).isNull();
+  }
+
+  @Test
+  void getReview는_없는_리뷰면_예외를_던진다() {
+    UUID reviewId = UUID.randomUUID();
+    when(reviewRepository.findById(reviewId)).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> reviewService.getReview(reviewId))
+        .isInstanceOf(ReviewNotFoundException.class);
+  }
 }

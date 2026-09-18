@@ -12,6 +12,7 @@ import static org.springframework.restdocs.request.RequestDocumentation.paramete
 import static org.springframework.restdocs.request.RequestDocumentation.pathParameters;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -19,6 +20,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pettrip.config.SecurityConfig;
 import com.pettrip.review.model.Review;
 import com.pettrip.review.service.ReviewDetail;
+import com.pettrip.review.service.ReviewFullDetail;
 import com.pettrip.review.service.ReviewPhotoView;
 import com.pettrip.review.service.ReviewService;
 import java.time.LocalDate;
@@ -136,5 +138,141 @@ class ReviewControllerTest {
                 pathParameters(parameterWithName("reviewId").description("삭제할 리뷰 ID"))));
 
     verify(reviewService).deleteReview(any(), eq(reviewId));
+  }
+
+  @Test
+  void 리뷰_단건을_상세_조회한다() throws Exception {
+    UUID reviewId = UUID.fromString("0198f3a0-1234-7000-8000-0000000000aa");
+    UUID petId = UUID.fromString("0198f3a0-1234-7000-8000-0000000000bb");
+    UUID courseId = UUID.fromString("0198f3a0-1234-7000-8000-0000000000cc");
+    UUID photoId = UUID.fromString("0198f3a0-1234-7000-8000-0000000000dd");
+    Review review = new Review("126508", USER_ID, petId, (short) 5, "산책로가 넓어서 좋았어요", "SUNNY");
+    ReviewFullDetail detail =
+        new ReviewFullDetail(
+            review,
+            new ReviewFullDetail.Author(
+                USER_ID, "연승", new ReviewFullDetail.PhotoRef(photoId, "https://bucket/me.jpg")),
+            new ReviewFullDetail.PetInfo(
+                petId,
+                "두부",
+                "포메라니안",
+                new ReviewFullDetail.PhotoRef(photoId, "https://bucket/dubu.jpg")),
+            new ReviewFullDetail.PlaceInfo("126508", "남이섬", "강원특별자치도 춘천시 남산면"),
+            new ReviewFullDetail.CourseInfo(courseId, LocalDate.of(2026, 9, 14)),
+            List.of(
+                new ReviewPhotoView(
+                    photoId, "https://bucket/photo.jpg", LocalDate.of(2026, 9, 14))));
+    when(reviewService.getReview(reviewId)).thenReturn(detail);
+
+    mockMvc
+        .perform(
+            get("/reviews/{reviewId}", reviewId)
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isOk())
+        .andDo(
+            document(
+                "review-get",
+                pathParameters(parameterWithName("reviewId").description("조회할 리뷰 ID")),
+                responseFields(
+                    fieldWithPath("id").type(JsonFieldType.STRING).description("리뷰 ID"),
+                    fieldWithPath("rating")
+                        .type(JsonFieldType.NUMBER)
+                        .optional()
+                        .description("별점(1~5)"),
+                    fieldWithPath("contents")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("리뷰 본문"),
+                    fieldWithPath("weather")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("작성 당시 날씨"),
+                    fieldWithPath("recommendationCount")
+                        .type(JsonFieldType.NUMBER)
+                        .description("추천 수"),
+                    fieldWithPath("createdAt")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("작성 시각"),
+                    fieldWithPath("coursePlaceId")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("코스 스탑 ID. 코스와 무관한 리뷰면 null"),
+                    fieldWithPath("author")
+                        .type(JsonFieldType.OBJECT)
+                        .optional()
+                        .description("작성자. 탈퇴했으면 null"),
+                    fieldWithPath("author.userId").type(JsonFieldType.STRING).description("작성자 ID"),
+                    fieldWithPath("author.nickname")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("작성자 닉네임"),
+                    fieldWithPath("author.profilePhoto")
+                        .type(JsonFieldType.OBJECT)
+                        .optional()
+                        .description("작성자 프로필 사진. 없으면 null"),
+                    fieldWithPath("author.profilePhoto.photoId")
+                        .type(JsonFieldType.STRING)
+                        .description("사진 ID"),
+                    fieldWithPath("author.profilePhoto.downloadUrl")
+                        .type(JsonFieldType.STRING)
+                        .description("presigned GET URL(10분)"),
+                    fieldWithPath("pet")
+                        .type(JsonFieldType.OBJECT)
+                        .optional()
+                        .description("동반 반려동물. 삭제됐으면 null"),
+                    fieldWithPath("pet.petId").type(JsonFieldType.STRING).description("반려동물 ID"),
+                    fieldWithPath("pet.petName")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("반려동물 이름"),
+                    fieldWithPath("pet.breedName")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("견종 이름"),
+                    fieldWithPath("pet.profilePhoto")
+                        .type(JsonFieldType.OBJECT)
+                        .optional()
+                        .description("반려동물 프로필 사진. 없으면 null"),
+                    fieldWithPath("pet.profilePhoto.photoId")
+                        .type(JsonFieldType.STRING)
+                        .description("사진 ID"),
+                    fieldWithPath("pet.profilePhoto.downloadUrl")
+                        .type(JsonFieldType.STRING)
+                        .description("presigned GET URL(10분)"),
+                    fieldWithPath("place").type(JsonFieldType.OBJECT).description("장소"),
+                    fieldWithPath("place.externalPlaceId")
+                        .type(JsonFieldType.STRING)
+                        .description("TourAPI 장소 ID"),
+                    fieldWithPath("place.placeName")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("장소 이름. places에 없으면 null"),
+                    fieldWithPath("place.address")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("장소 주소. places에 없으면 null"),
+                    fieldWithPath("course")
+                        .type(JsonFieldType.OBJECT)
+                        .optional()
+                        .description("여행 코스. 코스와 무관한 리뷰면 null"),
+                    fieldWithPath("course.courseId")
+                        .type(JsonFieldType.STRING)
+                        .description("코스 ID"),
+                    fieldWithPath("course.travelDate")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("여행 날짜"),
+                    fieldWithPath("photos").type(JsonFieldType.ARRAY).description("리뷰 사진 목록"),
+                    fieldWithPath("photos[].photoId")
+                        .type(JsonFieldType.STRING)
+                        .description("사진 ID"),
+                    fieldWithPath("photos[].downloadUrl")
+                        .type(JsonFieldType.STRING)
+                        .description("presigned GET URL(10분)"),
+                    fieldWithPath("photos[].takenAt")
+                        .type(JsonFieldType.STRING)
+                        .optional()
+                        .description("촬영일"))));
   }
 }
