@@ -1117,6 +1117,40 @@ include::{snippets}/review-create/request-fields.adoc[]
 include::{snippets}/review-create/http-response.adoc[]
 include::{snippets}/review-create/response-fields.adoc[]
 
+=== 리뷰 단건 상세 조회
+
+`GET /reviews/{reviewId}`
+
+JWT 인증이 필요합니다. 본인 리뷰가 아니어도 조회할 수 있습니다.
+
+목록 API(`GET /users/me/reviews`, `GET /places/{placeId}/reviews`)는 `placeId`·`petId`를 ID 그대로
+내려주지만, 이 API는 **작성자 닉네임·반려동물 이름·견종·장소 이름·주소까지 채워서** 줍니다.
+SNS 카드처럼 사람이 읽는 화면을 그릴 때 씁니다.
+
+`author`·`pet`·`course`는 각각 `null`일 수 있습니다.
+
+* `author` — 작성자가 탈퇴한 경우
+* `pet` — 반려동물이 삭제된 경우
+* `course` — 코스를 통하지 않고 장소에 바로 쓴 리뷰인 경우
+
+`place.placeName`·`place.address`는 해당 장소가 `places`에 적재돼 있지 않으면 `null`이고,
+`place.externalPlaceId`는 항상 채워집니다.
+
+NOTE: 프로필 사진과 리뷰 사진의 `downloadUrl`은 모두 presigned GET URL이며 **10분 후 만료**됩니다.
+카드를 이미지로 만들어 보관할 경우 만료 전에 렌더링해야 합니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/review-get/http-request.adoc[]
+include::{snippets}/review-get/path-parameters.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/review-get/http-response.adoc[]
+include::{snippets}/review-get/response-fields.adoc[]
+
 === 리뷰 삭제
 
 `DELETE /reviews/{reviewId}`
