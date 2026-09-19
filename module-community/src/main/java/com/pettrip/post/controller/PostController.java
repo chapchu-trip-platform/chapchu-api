@@ -1,6 +1,7 @@
 package com.pettrip.post.controller;
 
 import com.pettrip.common.service.CurrentUserId;
+import com.pettrip.post.model.PostType;
 import com.pettrip.post.service.PostService;
 import jakarta.validation.Valid;
 import java.util.UUID;
@@ -30,9 +31,10 @@ public class PostController {
   public PostListResponse listPosts(
       @CurrentUserId UUID userId,
       @RequestParam(name = "sort", defaultValue = "latest") String sort,
+      @RequestParam(name = "type", required = false) PostType type,
       @RequestParam(name = "cursor", required = false) String cursor,
       @RequestParam(name = "size", defaultValue = "20") int size) {
-    return postService.listPosts(userId, sort, cursor, size);
+    return postService.listPosts(userId, sort, type, cursor, size);
   }
 
   @GetMapping("/{postId}")
@@ -48,6 +50,7 @@ public class PostController {
         userId,
         request.petId(),
         request.courseId(),
+        request.postType(),
         request.title(),
         request.content(),
         request.photos());
@@ -59,7 +62,7 @@ public class PostController {
       @PathVariable UUID postId,
       @RequestBody @Valid PostUpdateRequest request) {
     return postService.updatePost(
-        userId, postId, request.title(), request.content(), request.photos());
+        userId, postId, request.postType(), request.title(), request.content(), request.photos());
   }
 
   @DeleteMapping("/{postId}")

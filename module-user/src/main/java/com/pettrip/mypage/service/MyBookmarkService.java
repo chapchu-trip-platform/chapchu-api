@@ -1,6 +1,7 @@
 package com.pettrip.mypage.service;
 
 import com.pettrip.post.controller.PostResponse;
+import com.pettrip.post.model.PostType;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.jdbc.core.RowMapper;
@@ -13,7 +14,7 @@ public class MyBookmarkService {
 
   private static final String MY_BOOKMARKS_SQL =
       """
-      SELECT p.post_id, p.user_id, p.pet_id, p.photo_id, p.course_id,
+      SELECT p.post_id, p.user_id, p.pet_id, p.photo_id, p.course_id, p.post_type,
              p.title, p.content, p.view_count, p.recommendation_count, p.comment_count, p.created_at,
              COALESCE(u.nickname, '(탈퇴한 사용자)') AS nickname,
              ph.photo_url,
@@ -37,6 +38,7 @@ public class MyBookmarkService {
               rs.getObject("pet_id", UUID.class),
               rs.getObject("photo_id", UUID.class),
               rs.getObject("course_id", UUID.class),
+              PostType.valueOf(rs.getString("post_type")),
               rs.getString("title"),
               rs.getString("content"),
               rs.getInt("view_count"),

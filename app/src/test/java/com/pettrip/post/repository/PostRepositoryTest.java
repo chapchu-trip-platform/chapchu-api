@@ -3,6 +3,7 @@ package com.pettrip.post.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.pettrip.post.model.Post;
+import com.pettrip.post.model.PostType;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +24,7 @@ class PostRepositoryTest {
             UUID.randomUUID(),
             UUID.randomUUID(),
             UUID.randomUUID(),
+            PostType.GENERAL,
             "첫 여행",
             "즐거웠어요"));
 
@@ -40,6 +42,7 @@ class PostRepositoryTest {
             UUID.randomUUID(),
             UUID.randomUUID(),
             UUID.randomUUID(),
+            PostType.GENERAL,
             "덜 인기",
             "내용");
     Post high =
@@ -48,6 +51,7 @@ class PostRepositoryTest {
             UUID.randomUUID(),
             UUID.randomUUID(),
             UUID.randomUUID(),
+            PostType.GENERAL,
             "더 인기",
             "내용");
     high.incrementRecommendationCount();
@@ -68,9 +72,23 @@ class PostRepositoryTest {
     UUID ownerId = UUID.randomUUID();
     UUID otherId = UUID.randomUUID();
     postRepository.save(
-        new Post(ownerId, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "내 글", "내용"));
+        new Post(
+            ownerId,
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            PostType.GENERAL,
+            "내 글",
+            "내용"));
     postRepository.save(
-        new Post(otherId, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "남의 글", "내용"));
+        new Post(
+            otherId,
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            PostType.GENERAL,
+            "남의 글",
+            "내용"));
 
     var result = postRepository.findByUserIdOrderByCreatedAtDesc(ownerId);
 
