@@ -21,7 +21,7 @@ public class StampService {
   /**
    * 방문한 장소가 속한 도의 스탬프를 찾는다.
    *
-   * <p>스탬프는 9개 도 단위다. 특별시·광역시는 {@code stamp_area_codes}에 없어 스탬프가 발급되지 않는다.
+   * <p>스탬프는 17개 광역자치단체(시·도) 단위다.
    *
    * <p>{@code places.area_code}가 NULL이면(동기화 전 데이터, TourAPI가 areaCode를 안 준 경우) 결과가 비고, 스탬프는 발급되지
    * 않는다. 방문 인증 자체를 막지는 않는다.
@@ -34,10 +34,10 @@ public class StampService {
       WHERE p.external_place_id = :placeId
       """;
 
-  /** 도감은 미획득 도도 보여준다. 그래서 stamps를 기준으로 LEFT JOIN 한다. */
+  /** 도감은 미획득 지역도 보여준다. 그래서 stamps를 기준으로 LEFT JOIN 한다. */
   private static final String COLLECTION_SQL =
       """
-      SELECT s.stamp_id, s.stamp_name, s.image_url,
+      SELECT s.stamp_id, s.stamp_name,
              COALESCE(us.stamp_count, 0) AS stamp_count,
              us.first_acquired_at
       FROM stamps s
@@ -55,7 +55,6 @@ public class StampService {
         return new StampResponse(
             rs.getObject("stamp_id", UUID.class),
             rs.getString("stamp_name"),
-            rs.getString("image_url"),
             firstAcquiredAt != null,
             rs.getInt("stamp_count"),
             firstAcquiredAt);

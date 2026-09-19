@@ -44,16 +44,12 @@ class StampControllerTest {
     StampCollectionResponse response =
         new StampCollectionResponse(
             1,
-            2,
+            3,
             List.of(
                 new StampResponse(
-                    UUID.randomUUID(),
-                    "강원",
-                    "https://example.com/mascot-gangwon.png",
-                    true,
-                    2,
-                    LocalDateTime.of(2026, 9, 1, 10, 0)),
-                new StampResponse(UUID.randomUUID(), "경기", null, false, 0, null)));
+                    UUID.randomUUID(), "강원", true, 2, LocalDateTime.of(2026, 9, 1, 10, 0)),
+                new StampResponse(UUID.randomUUID(), "경기", false, 0, null),
+                new StampResponse(UUID.randomUUID(), "서울", false, 0, null)));
     when(stampService.listMyStamps(USER_ID)).thenReturn(response);
 
     mockMvc
@@ -62,20 +58,18 @@ class StampControllerTest {
         .andExpect(jsonPath("$.acquiredCount").value(1))
         .andExpect(jsonPath("$.stamps[0].acquired").value(true))
         .andExpect(jsonPath("$.stamps[1].acquired").value(false))
+        .andExpect(jsonPath("$.stamps[2].stampName").value("서울"))
         .andExpect(jsonPath("$.stamps[1].firstAcquiredAt").doesNotExist())
         .andDo(
             document(
                 "stamp-collection",
                 responseFields(
                     fieldWithPath("acquiredCount").description("획득한 스탬프 수"),
-                    fieldWithPath("totalCount").description("전체 스탬프 수 (9개 도)"),
+                    fieldWithPath("totalCount").description("전체 스탬프 수 (17개 시·도)"),
                     fieldWithPath("stamps[].stampId").description("스탬프 ID"),
                     fieldWithPath("stamps[].stampName")
-                        .description("도 이름 (경기·강원·충북·충남·전북·전남·경북·경남·제주)"),
-                    fieldWithPath("stamps[].imageUrl")
-                        .description("도 마스코트 이미지 URL. 아직 등록 전이면 null")
-                        .type(JsonFieldType.STRING)
-                        .optional(),
+                        .description(
+                            "시·도 이름 (서울·부산·대구·인천·광주·대전·울산·세종·" + "경기·강원·충북·충남·전북·전남·경북·경남·제주)"),
                     fieldWithPath("stamps[].acquired").description("획득 여부. false면 회색 처리"),
                     fieldWithPath("stamps[].stampCount").description("방문 횟수. 미획득이면 0"),
                     fieldWithPath("stamps[].firstAcquiredAt")

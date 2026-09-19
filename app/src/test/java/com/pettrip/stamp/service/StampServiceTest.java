@@ -86,13 +86,8 @@ class StampServiceTest {
     List<StampResponse> rows =
         List.of(
             new StampResponse(
-                UUID.randomUUID(),
-                "강원",
-                "https://example.com/m.png",
-                true,
-                2,
-                LocalDateTime.of(2026, 9, 1, 10, 0)),
-            new StampResponse(UUID.randomUUID(), "경기", null, false, 0, null));
+                UUID.randomUUID(), "강원", true, 2, LocalDateTime.of(2026, 9, 1, 10, 0)),
+            new StampResponse(UUID.randomUUID(), "경기", false, 0, null));
     when(jdbcTemplate.query(any(String.class), any(SqlParameterSource.class), any(RowMapper.class)))
         .thenReturn(rows);
 
@@ -101,5 +96,24 @@ class StampServiceTest {
     assertThat(result.stamps()).hasSize(2);
     assertThat(result.totalCount()).isEqualTo(2);
     assertThat(result.acquiredCount()).isEqualTo(1);
+  }
+
+  @Test
+  void listMyStamps는_광역시도_도감에_포함한다() {
+    UUID userId = UUID.randomUUID();
+    List<StampResponse> rows =
+        List.of(
+            new StampResponse(
+                UUID.randomUUID(), "서울", true, 1, LocalDateTime.of(2026, 9, 18, 9, 0)),
+            new StampResponse(UUID.randomUUID(), "부산", false, 0, null),
+            new StampResponse(UUID.randomUUID(), "제주", false, 0, null));
+    when(jdbcTemplate.query(any(String.class), any(SqlParameterSource.class), any(RowMapper.class)))
+        .thenReturn(rows);
+
+    StampCollectionResponse result = stampService.listMyStamps(userId);
+
+    assertThat(result.stamps()).extracting(StampResponse::stampName).contains("서울", "부산");
+    assertThat(result.acquiredCount()).isEqualTo(1);
+    assertThat(result.totalCount()).isEqualTo(3);
   }
 }
