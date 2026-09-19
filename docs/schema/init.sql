@@ -296,6 +296,7 @@ CREATE TABLE posts (
     pet_id               UUID NOT NULL REFERENCES pets(pet_id),
     photo_id             UUID NOT NULL REFERENCES photos(photo_id),
     course_id            UUID NOT NULL REFERENCES travel_courses(course_id),
+    post_type            VARCHAR(20) NOT NULL DEFAULT 'GENERAL',  -- GENERAL=일반, TRAVEL_REVIEW=여행후기 (V36)
     title                VARCHAR(100),
     content              TEXT,
     view_count           INT DEFAULT 0,

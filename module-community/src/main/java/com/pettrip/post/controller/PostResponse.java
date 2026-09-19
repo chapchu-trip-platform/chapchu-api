@@ -1,10 +1,12 @@
 package com.pettrip.post.controller;
 
+import com.pettrip.post.model.PostType;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
 /**
+ * @param postType 글 종류 (GENERAL=일반, TRAVEL_REVIEW=여행후기)
  * @param photoId 대표 사진(첫 장). 마이페이지 목록 등 단일 썸네일용으로 유지한다
  * @param photoUrl 대표 사진의 S3 키
  * @param photoCount 첨부된 사진 수. {@code photos.size()}와 같지만 목록 응답과 필드를 맞춘다
@@ -18,6 +20,7 @@ public record PostResponse(
     UUID petId,
     UUID photoId,
     UUID courseId,
+    PostType postType,
     String title,
     String content,
     int viewCount,
@@ -39,6 +42,7 @@ public record PostResponse(
         petId,
         photoId,
         courseId,
+        postType,
         title,
         content,
         viewCount,

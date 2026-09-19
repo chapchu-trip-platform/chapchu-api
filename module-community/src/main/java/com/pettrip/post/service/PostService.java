@@ -10,6 +10,7 @@ import com.pettrip.post.model.Post;
 import com.pettrip.post.model.PostBookmark;
 import com.pettrip.post.model.PostRecommendation;
 import com.pettrip.post.model.PostReport;
+import com.pettrip.post.model.PostType;
 import com.pettrip.post.repository.PostBookmarkRepository;
 import com.pettrip.post.repository.PostRecommendationRepository;
 import com.pettrip.post.repository.PostReportRepository;
@@ -41,7 +42,7 @@ public class PostService {
 
   private static final String ENRICHED_SELECT =
       """
-      SELECT p.post_id, p.user_id, p.pet_id, p.photo_id, p.course_id,
+      SELECT p.post_id, p.user_id, p.pet_id, p.photo_id, p.course_id, p.post_type,
              p.title, p.content, p.view_count, p.recommendation_count, p.comment_count, p.created_at,
              COALESCE(u.nickname, '(탈퇴한 사용자)') AS nickname,
              ph.photo_url,
@@ -58,17 +59,29 @@ public class PostService {
       LEFT JOIN photos pf ON u.profile_photo_id = pf.photo_id
       """;
 
-  private static final String LATEST_SQL =
-      ENRICHED_SELECT + "ORDER BY p.created_at DESC, p.post_id DESC LIMIT :size";
-  private static final String LATEST_CURSOR_SQL =
-      ENRICHED_SELECT
-          + "WHERE (p.created_at < :cursorAt OR (p.created_at = :cursorAt AND p.post_id < :cursorId)) "
-          + "ORDER BY p.created_at DESC, p.post_id DESC LIMIT :size";
-  private static final String POPULAR_SQL =
-      ENRICHED_SELECT
-          + "WHERE p.created_at >= now() - INTERVAL '7 days' "
-          + "ORDER BY p.recommendation_count DESC, p.created_at DESC, p.post_id DESC LIMIT :size";
+  /**
+   * 목록 조회는 정렬(최신/인기) × 커서 유무 × 타입 필터 유무 조합이라 SQL을 통짜 상수로 두면 경우의 수만큼 문자열이 늘어난다. 조건절만 따로 두고 {@link
+   * #where(List)}로 이어 붙인다.
+   */
+  private static final String LATEST_TAIL =
+      "ORDER BY p.created_at DESC, p.post_id DESC LIMIT :size";
+
+  private static final String POPULAR_TAIL =
+      "ORDER BY p.recommendation_count DESC, p.created_at DESC, p.post_id DESC LIMIT :size";
+  private static final String CURSOR_PREDICATE =
+      "(p.created_at < :cursorAt OR (p.created_at = :cursorAt AND p.post_id < :cursorId))";
+  private static final String POPULAR_WINDOW_PREDICATE =
+      "p.created_at >= now() - INTERVAL '7 days'";
+  private static final String TYPE_PREDICATE = "p.post_type = :postType";
   private static final String DETAIL_SQL = ENRICHED_SELECT + "WHERE p.post_id = :postId";
+
+  /** 조건이 하나도 없으면 WHERE 절 자체를 빼고, 있으면 AND로 잇는다. */
+  private static String where(List<String> predicates) {
+    if (predicates.isEmpty()) {
+      return "";
+    }
+    return "WHERE " + String.join(" AND ", predicates) + " ";
+  }
 
   private static final String PHOTOS_BY_POST_SQL =
       """
@@ -128,6 +141,7 @@ public class PostService {
               rs.getObject("pet_id", UUID.class),
               rs.getObject("photo_id", UUID.class),
               rs.getObject("course_id", UUID.class),
+              PostType.valueOf(rs.getString("post_type")),
               rs.getString("title"),
               rs.getString("content"),
               rs.getInt("view_count"),
@@ -146,6 +160,7 @@ public class PostService {
       (rs, rowNum) ->
           new PostSummaryResponse(
               rs.getObject("post_id", UUID.class),
+              PostType.valueOf(rs.getString("post_type")),
               rs.getString("title"),
               rs.getString("nickname"),
               presign(rs.getString("profile_photo_url")),
@@ -196,11 +211,17 @@ public class PostService {
     this.bucket = bucket;
   }
 
-  public PostListResponse listPosts(UUID userId, String sort, String cursor, int size) {
+  /**
+   * 게시글 목록. {@code postType}이 null이면 종류를 가리지 않고 전부 돌려준다.
+   *
+   * @param sort {@code "popular"}면 최근 7일 추천순(커서 없음), 그 외에는 최신순 커서 페이지네이션
+   */
+  public PostListResponse listPosts(
+      UUID userId, String sort, PostType postType, String cursor, int size) {
     if ("popular".equals(sort)) {
-      return queryPopular(userId, size);
+      return queryPopular(userId, postType, size);
     }
-    return queryLatest(userId, cursor, size);
+    return queryLatest(userId, postType, cursor, size);
   }
 
   @Transactional
@@ -222,6 +243,7 @@ public class PostService {
       UUID userId,
       UUID petId,
       UUID courseId,
+      PostType postType,
       String title,
       String content,
       List<PostCreateRequest.PhotoEntry> photos) {
@@ -233,7 +255,14 @@ public class PostService {
     List<UUID> photoIds = createPhotos(userId, entries);
     Post post =
         postRepository.saveAndFlush(
-            new Post(userId, petId, firstOrNull(photoIds), courseId, title, content));
+            new Post(
+                userId,
+                petId,
+                firstOrNull(photoIds),
+                courseId,
+                defaultType(postType),
+                title,
+                content));
     linkPostPhotos(post.getId(), photoIds);
   }
 
@@ -301,11 +330,12 @@ public class PostService {
   public PostResponse updatePost(
       UUID userId,
       UUID postId,
+      PostType postType,
       String title,
       String content,
       List<PostCreateRequest.PhotoEntry> photos) {
     Post post = getOwnedPost(userId, postId);
-    post.update(title, content);
+    post.update(postType, title, content);
     if (photos != null) {
       replacePostPhotos(userId, post, photos);
     }
@@ -376,26 +406,51 @@ public class PostService {
     postReportRepository.save(new PostReport(postId, userId, reportReason, reportDetail));
   }
 
-  private PostListResponse queryLatest(UUID userId, String cursor, int size) {
+  private PostListResponse queryLatest(UUID userId, PostType postType, String cursor, int size) {
     MapSqlParameterSource params =
         new MapSqlParameterSource().addValue("userId", userId).addValue("size", size);
+    List<String> predicates = new ArrayList<>();
+    addTypeFilter(predicates, params, postType);
     if (cursor == null) {
-      return toListResponse(jdbcTemplate.query(LATEST_SQL, params, postSummaryRowMapper), size);
+      String sql = ENRICHED_SELECT + where(predicates) + LATEST_TAIL;
+      return toListResponse(jdbcTemplate.query(sql, params, postSummaryRowMapper), size);
     }
     String[] parts = cursor.split("~", 2);
     params.addValue(
         "cursorAt",
         Timestamp.valueOf(LocalDateTime.parse(parts[0], DateTimeFormatter.ISO_LOCAL_DATE_TIME)));
     params.addValue("cursorId", UUID.fromString(parts[1]));
-    return toListResponse(
-        jdbcTemplate.query(LATEST_CURSOR_SQL, params, postSummaryRowMapper), size);
+    predicates.add(CURSOR_PREDICATE);
+    String sql = ENRICHED_SELECT + where(predicates) + LATEST_TAIL;
+    return toListResponse(jdbcTemplate.query(sql, params, postSummaryRowMapper), size);
   }
 
-  private PostListResponse queryPopular(UUID userId, int size) {
+  private PostListResponse queryPopular(UUID userId, PostType postType, int size) {
     MapSqlParameterSource params =
         new MapSqlParameterSource().addValue("userId", userId).addValue("size", size);
-    return new PostListResponse(
-        jdbcTemplate.query(POPULAR_SQL, params, postSummaryRowMapper), null);
+    List<String> predicates = new ArrayList<>();
+    predicates.add(POPULAR_WINDOW_PREDICATE);
+    addTypeFilter(predicates, params, postType);
+    String sql = ENRICHED_SELECT + where(predicates) + POPULAR_TAIL;
+    return new PostListResponse(jdbcTemplate.query(sql, params, postSummaryRowMapper), null);
+  }
+
+  /** 타입을 보내지 않은 글은 일반글로 저장한다. */
+  private static PostType defaultType(PostType postType) {
+    if (postType == null) {
+      return PostType.GENERAL;
+    }
+    return postType;
+  }
+
+  /** 타입이 지정된 경우에만 조건과 바인딩 파라미터를 더한다. */
+  private void addTypeFilter(
+      List<String> predicates, MapSqlParameterSource params, PostType postType) {
+    if (postType == null) {
+      return;
+    }
+    predicates.add(TYPE_PREDICATE);
+    params.addValue("postType", postType.name());
   }
 
   /** 상세 조회에 각 글의 사진 전체를 배치로 붙인다. post_photos → photos 순서대로. */

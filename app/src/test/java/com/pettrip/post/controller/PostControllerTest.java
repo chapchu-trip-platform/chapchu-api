@@ -24,6 +24,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pettrip.common.service.InvalidReferenceException;
 import com.pettrip.config.SecurityConfig;
+import com.pettrip.post.model.PostType;
 import com.pettrip.post.service.PostService;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -58,6 +59,7 @@ class PostControllerTest {
   private PostSummaryResponse sampleSummary() {
     return new PostSummaryResponse(
         UUID.randomUUID(),
+        PostType.GENERAL,
         "첫 여행",
         "멍멍이아빠",
         "https://bucket.s3.ap-northeast-2.amazonaws.com/profile/u/avatar.jpg?sig",
@@ -77,6 +79,7 @@ class PostControllerTest {
         UUID.randomUUID(),
         UUID.randomUUID(),
         UUID.randomUUID(),
+        PostType.GENERAL,
         "첫 여행",
         "즐거웠어요",
         0,
@@ -99,7 +102,7 @@ class PostControllerTest {
   @Test
   void 게시글_목록을_조회한다() throws Exception {
     PostListResponse listResponse = new PostListResponse(List.of(sampleSummary()), null);
-    when(postService.listPosts(any(), any(), any(), anyInt())).thenReturn(listResponse);
+    when(postService.listPosts(any(), any(), any(), any(), anyInt())).thenReturn(listResponse);
 
     mockMvc
         .perform(
@@ -119,10 +122,15 @@ class PostControllerTest {
                         .optional()
                         .description(
                             "이전 페이지 마지막 항목의 커서. 형식: {createdAt}~{postId} (예: 2024-01-15T10:30:00~uuid). 첫 페이지 생략"),
+                    parameterWithName("type")
+                        .optional()
+                        .description("글 종류 필터: GENERAL(일반) / TRAVEL_REVIEW(여행후기). 생략하면 전체"),
                     parameterWithName("size").optional().description("페이지 크기 (기본값: 20)")),
                 responseFields(
                     fieldWithPath("posts[]").description("게시글 목록 (카드용 요약)"),
                     fieldWithPath("posts[].id").description("게시글 ID"),
+                    fieldWithPath("posts[].postType")
+                        .description("글 종류: GENERAL(일반) / TRAVEL_REVIEW(여행후기)"),
                     fieldWithPath("posts[].title").description("제목"),
                     fieldWithPath("posts[].nickname").description("작성자 닉네임"),
                     fieldWithPath("posts[].authorProfilePhotoUrl")
@@ -148,7 +156,8 @@ class PostControllerTest {
   @Test
   void 게시글_목록을_추천순으로_조회한다() throws Exception {
     PostListResponse listResponse = new PostListResponse(List.of(sampleSummary()), null);
-    when(postService.listPosts(any(), eq("popular"), any(), anyInt())).thenReturn(listResponse);
+    when(postService.listPosts(any(), eq("popular"), any(), any(), anyInt()))
+        .thenReturn(listResponse);
 
     mockMvc
         .perform(
@@ -156,6 +165,43 @@ class PostControllerTest {
                 .param("sort", "popular")
                 .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
         .andExpect(status().isOk());
+  }
+
+  @Test
+  void 게시글_목록을_종류로_거른다() throws Exception {
+    PostListResponse listResponse = new PostListResponse(List.of(sampleSummary()), null);
+    when(postService.listPosts(any(), any(), any(), any(), anyInt())).thenReturn(listResponse);
+
+    mockMvc
+        .perform(
+            get("/posts")
+                .param("type", "TRAVEL_REVIEW")
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isOk());
+
+    verify(postService).listPosts(USER_ID, "latest", PostType.TRAVEL_REVIEW, null, 20);
+  }
+
+  @Test
+  void 종류를_생략하면_전체를_조회한다() throws Exception {
+    PostListResponse listResponse = new PostListResponse(List.of(sampleSummary()), null);
+    when(postService.listPosts(any(), any(), any(), any(), anyInt())).thenReturn(listResponse);
+
+    mockMvc
+        .perform(get("/posts").with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isOk());
+
+    verify(postService).listPosts(USER_ID, "latest", null, null, 20);
+  }
+
+  @Test
+  void 알_수_없는_종류로_거르면_400이다() throws Exception {
+    mockMvc
+        .perform(
+            get("/posts")
+                .param("type", "NOT_A_TYPE")
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isBadRequest());
   }
 
   @Test
@@ -172,6 +218,8 @@ class PostControllerTest {
                 pathParameters(parameterWithName("postId").description("게시글 ID")),
                 responseFields(
                     fieldWithPath("id").description("게시글 ID"),
+                    fieldWithPath("postType")
+                        .description("글 종류: GENERAL(일반) / TRAVEL_REVIEW(여행후기)"),
                     fieldWithPath("petId").description("동행한 반려견 ID (null 가능)").optional(),
                     fieldWithPath("photoId").description("대표 사진 ID (null 가능)").optional(),
                     fieldWithPath("courseId").description("여행 코스 ID (null 가능)").optional(),
@@ -206,6 +254,7 @@ class PostControllerTest {
             new PostCreateRequest(
                 petId,
                 courseId,
+                PostType.GENERAL,
                 "첫 여행",
                 "즐거웠어요",
                 List.of(
@@ -223,6 +272,9 @@ class PostControllerTest {
             document(
                 "post-create",
                 requestFields(
+                    fieldWithPath("postType")
+                        .description("글 종류: GENERAL(일반) / TRAVEL_REVIEW(여행후기)" + " 생략하면 GENERAL")
+                        .optional(),
                     fieldWithPath("petId")
                         .description("동행한 반려견 ID (선택)")
                         .type(JsonFieldType.STRING)
@@ -243,7 +295,12 @@ class PostControllerTest {
     String body =
         objectMapper.writeValueAsString(
             new PostCreateRequest(
-                UUID.randomUUID(), UUID.randomUUID(), "가".repeat(101), "즐거웠어요", null));
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                PostType.GENERAL,
+                "가".repeat(101),
+                "즐거웠어요",
+                null));
 
     mockMvc
         .perform(
@@ -258,7 +315,8 @@ class PostControllerTest {
   void 게시글_작성_시_제목과_내용은_생략할_수_있다() throws Exception {
     String body =
         objectMapper.writeValueAsString(
-            new PostCreateRequest(UUID.randomUUID(), UUID.randomUUID(), null, null, null));
+            new PostCreateRequest(
+                UUID.randomUUID(), UUID.randomUUID(), PostType.GENERAL, null, null, null));
 
     mockMvc
         .perform(
@@ -284,7 +342,8 @@ class PostControllerTest {
   void 사진_없이_게시글을_작성할_수_있다() throws Exception {
     String body =
         objectMapper.writeValueAsString(
-            new PostCreateRequest(UUID.randomUUID(), UUID.randomUUID(), "사진 없는 글", "내용", null));
+            new PostCreateRequest(
+                UUID.randomUUID(), UUID.randomUUID(), PostType.GENERAL, "사진 없는 글", "내용", null));
 
     mockMvc
         .perform(
@@ -332,9 +391,11 @@ class PostControllerTest {
     UUID id = UUID.randomUUID();
     doThrow(new InvalidReferenceException("petId", "존재하지 않거나 본인의 반려동물이 아닙니다."))
         .when(postService)
-        .createPost(any(), any(), any(), any(), any(), any());
+        .createPost(any(), any(), any(), any(), any(), any(), any());
 
-    String body = objectMapper.writeValueAsString(new PostCreateRequest(id, id, "제목", "내용", null));
+    String body =
+        objectMapper.writeValueAsString(
+            new PostCreateRequest(id, id, PostType.GENERAL, "제목", "내용", null));
 
     mockMvc
         .perform(
@@ -351,7 +412,7 @@ class PostControllerTest {
   @Test
   void 게시글_수정_시_제목이_100자를_넘으면_400() throws Exception {
     String body =
-        objectMapper.writeValueAsString(new PostUpdateRequest("가".repeat(101), null, null));
+        objectMapper.writeValueAsString(new PostUpdateRequest(null, "가".repeat(101), null, null));
 
     mockMvc
         .perform(
@@ -366,10 +427,11 @@ class PostControllerTest {
   void 게시글을_수정한다() throws Exception {
     UUID postId = UUID.randomUUID();
     PostResponse response = samplePostResponse();
-    when(postService.updatePost(any(), eq(postId), eq("수정된 제목"), eq("수정된 내용"), any()))
+    when(postService.updatePost(any(), eq(postId), any(), eq("수정된 제목"), eq("수정된 내용"), any()))
         .thenReturn(response);
 
-    String body = objectMapper.writeValueAsString(new PostUpdateRequest("수정된 제목", "수정된 내용", null));
+    String body =
+        objectMapper.writeValueAsString(new PostUpdateRequest(null, "수정된 제목", "수정된 내용", null));
 
     mockMvc
         .perform(
@@ -383,6 +445,9 @@ class PostControllerTest {
                 "post-update",
                 pathParameters(parameterWithName("postId").description("게시글 ID")),
                 requestFields(
+                    fieldWithPath("postType")
+                        .description("글 종류: GENERAL(일반) / TRAVEL_REVIEW(여행후기)" + " 생략하면 기존 값을 유지")
+                        .optional(),
                     fieldWithPath("title").description("제목 (선택). 최대 100자").optional(),
                     fieldWithPath("content").description("내용 (선택)").optional(),
                     fieldWithPath("photos")
@@ -391,6 +456,8 @@ class PostControllerTest {
                         .optional()),
                 responseFields(
                     fieldWithPath("id").description("게시글 ID"),
+                    fieldWithPath("postType")
+                        .description("글 종류: GENERAL(일반) / TRAVEL_REVIEW(여행후기)"),
                     fieldWithPath("petId").description("동행한 반려견 ID (null 가능)").optional(),
                     fieldWithPath("photoId").description("대표 사진 ID (null 가능)").optional(),
                     fieldWithPath("courseId").description("여행 코스 ID (null 가능)").optional(),
@@ -418,12 +485,13 @@ class PostControllerTest {
   @Test
   void 게시글_수정으로_사진을_교체한다() throws Exception {
     UUID postId = UUID.randomUUID();
-    when(postService.updatePost(any(), eq(postId), any(), any(), any()))
+    when(postService.updatePost(any(), eq(postId), any(), any(), any(), any()))
         .thenReturn(samplePostResponse());
 
     String body =
         objectMapper.writeValueAsString(
             new PostUpdateRequest(
+                null,
                 "수정된 제목",
                 "수정된 내용",
                 List.of(
@@ -442,10 +510,11 @@ class PostControllerTest {
   @Test
   void 게시글_수정으로_사진을_전부_뺀다() throws Exception {
     UUID postId = UUID.randomUUID();
-    when(postService.updatePost(any(), eq(postId), any(), any(), any()))
+    when(postService.updatePost(any(), eq(postId), any(), any(), any(), any()))
         .thenReturn(samplePostResponse());
 
-    String body = objectMapper.writeValueAsString(new PostUpdateRequest(null, null, List.of()));
+    String body =
+        objectMapper.writeValueAsString(new PostUpdateRequest(null, null, null, List.of()));
 
     mockMvc
         .perform(
@@ -455,7 +524,7 @@ class PostControllerTest {
                 .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
         .andExpect(status().isOk());
 
-    verify(postService).updatePost(USER_ID, postId, null, null, List.of());
+    verify(postService).updatePost(USER_ID, postId, null, null, null, List.of());
   }
 
   @Test
