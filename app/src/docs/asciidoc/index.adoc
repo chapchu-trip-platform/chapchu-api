@@ -1384,6 +1384,9 @@ include::{snippets}/weather-record-list/response-fields.adoc[]
 사진이 `review_photos`에 연결돼 있으면 `isPublic=true`(공개), 아니면 개인(나만) 사진입니다.
 `downloadUrl`은 presigned GET URL(10분)이며, 코스는 `travel_courses.pet_id`로 펫과 연결됩니다.
 
+사진 정렬은 `createdAt`(업로드 시각, 초 단위)을 기준으로 하세요. `takenAt`은 촬영일이지만 DATE(일 단위)라
+같은 날 찍은 사진끼리는 순서를 가릴 수 없습니다. 서버도 `photos.created_at` 오름차순으로 내려줍니다.
+
 === 내 앨범 조회
 
 `GET /users/me/album`
