@@ -2,6 +2,7 @@ package com.pettrip.trip.service;
 
 import com.pettrip.photo.service.PhotoService;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -24,7 +25,8 @@ public class AlbumService {
   private static final String BASE_SQL =
       """
       SELECT tc.course_id, tc.travel_date, tc.pet_id,
-             p.photo_id, p.photo_url AS photo_key, p.taken_at, cp.external_place_id,
+             p.photo_id, p.photo_url AS photo_key, p.taken_at, p.created_at,
+             cp.external_place_id,
              EXISTS(SELECT 1 FROM review_photos rp WHERE rp.photo_id = p.photo_id) AS is_public
       FROM photos p
       JOIN course_places cp ON cp.course_place_id = p.course_place_id
@@ -44,6 +46,7 @@ public class AlbumService {
               rs.getObject("photo_id", UUID.class),
               rs.getString("photo_key"),
               rs.getObject("taken_at", LocalDate.class),
+              rs.getTimestamp("created_at").toLocalDateTime(),
               rs.getString("external_place_id"),
               rs.getBoolean("is_public"));
 
@@ -82,6 +85,7 @@ public class AlbumService {
                   row.photoId(),
                   photoService.issueDownloadUrl(row.photoKey()).toString(),
                   row.takenAt(),
+                  row.createdAt(),
                   row.externalPlaceId(),
                   row.isPublic()));
     }
@@ -99,6 +103,7 @@ public class AlbumService {
       UUID photoId,
       String photoKey,
       LocalDate takenAt,
+      LocalDateTime createdAt,
       String externalPlaceId,
       boolean isPublic) {}
 
@@ -108,11 +113,17 @@ public class AlbumService {
   public record CourseAlbum(
       UUID courseId, LocalDate travelDate, UUID petId, List<AlbumPhoto> photos) {}
 
-  /** 앨범 사진 1장. isPublic = 리뷰에 등록돼 공개된 사진인지. */
+  /**
+   * 앨범 사진 1장. isPublic = 리뷰에 등록돼 공개된 사진인지.
+   *
+   * <p>takenAt은 DATE(일 단위)라 같은 날 사진끼리 순서를 가릴 수 없다. createdAt(업로드 시각, 초 단위)을 함께 내려 FE가 시간순 정밀 정렬을 할
+   * 수 있게 한다. 서버 정렬 기준도 동일하게 created_at이다.
+   */
   public record AlbumPhoto(
       UUID photoId,
       String downloadUrl,
       LocalDate takenAt,
+      LocalDateTime createdAt,
       String externalPlaceId,
       boolean isPublic) {}
 }
