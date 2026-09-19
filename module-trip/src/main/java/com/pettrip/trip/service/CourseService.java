@@ -410,6 +410,14 @@ public class CourseService {
     return n;
   }
 
+  /**
+   * 코스를 완료 처리한다. 코스 완료로 가는 유일한 경로다.
+   *
+   * <p>정책: 전부 방문해야 완료. 전부 방문했는지는 FE가 보장하고 "완료 여부만" 보내므로 백엔드는 방문 검증을 하지 않는다. 미방문 장소를 제외한 부분 완료는 없다 —
+   * 완료하지 않은 코스는 삭제 대상이다(코스 삭제 API는 별도 PR).
+   *
+   * <p>과거에는 도착지 체크인과 전 스탑 리뷰 작성으로도 자동 완료됐지만, 세 경로가 서로 다른 시점에 완료를 만들어 충돌해 이 명시 호출 하나로 통일했다.
+   */
   @Transactional
   public void completeCourse(UUID userId, UUID courseId) {
     TravelCourse course =
@@ -601,9 +609,6 @@ public class CourseService {
       throw new TooFarFromPlaceException();
     }
     coursePlace.markVisited();
-    if (coursePlace.isFinalPlace()) {
-      coursePlace.getCourse().complete();
-    }
     stampService.grantForPlace(userId, coursePlace.getExternalPlaceId());
   }
 

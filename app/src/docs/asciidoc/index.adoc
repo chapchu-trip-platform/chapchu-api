@@ -1300,8 +1300,10 @@ include::{snippets}/my-course-list/response-fields.adoc[]
 `PATCH /course-places/{coursePlaceId}/visit`
 
 JWT 인증이 필요합니다. 이미 체크인된 장소는 멱등 처리(200 OK)됩니다.
-마지막 장소 체크인 시 코스 완료(isCompleted=true)로 변경됩니다.
 현재 위치(lat, lng)가 장소에서 500m 이상 떨어진 경우 400을 반환합니다.
+
+체크인은 방문 기록과 스탬프 발급만 합니다. **마지막 장소를 체크인해도 코스가 자동으로 완료되지 않습니다.**
+코스 완료는 `POST /courses/{courseId}/complete` 호출로만 이뤄집니다.
 
 [.request]
 ==== 요청
@@ -1321,6 +1323,13 @@ include::{snippets}/course-place-visit/http-response.adoc[]
 
 JWT 인증이 필요합니다. 코스 소유자만 호출할 수 있습니다 (타인 호출 시 403).
 이미 완료된 코스를 재호출해도 200 OK(멱등)를 반환합니다.
+
+**코스가 완료되는 유일한 경로입니다.** 정책상 코스는 모든 장소를 방문해야 완료되며, 전부 방문했는지는
+FE가 판단해 이 엔드포인트를 호출합니다(백엔드는 방문 여부를 검증하지 않습니다). 미방문 장소를 빼고
+완료하는 "부분 완료"는 없습니다 — 끝까지 돌지 않은 코스는 완료가 아니라 삭제(`DELETE /courses/{courseId}`) 대상입니다.
+
+체크인(`PATCH /course-places/{coursePlaceId}/visit`)과 리뷰 작성(`POST /reviews`)은 완료 상태를
+바꾸지 않습니다.
 
 [.request]
 ==== 요청

@@ -626,7 +626,7 @@ class CourseServiceTest {
   }
 
   @Test
-  void 마지막_장소_체크인시_코스완료처리된다() {
+  void 마지막_장소_체크인해도_코스가_자동완료되지_않는다() {
     UUID userId = UUID.randomUUID();
     UUID coursePlaceId = UUID.randomUUID();
     TravelCourse course = sampleCourse(userId);
@@ -637,7 +637,8 @@ class CourseServiceTest {
 
     courseService.visitPlace(userId, coursePlaceId, 37.5, 127.0);
 
-    assertThat(course.isCompleted()).isTrue();
+    assertThat(coursePlace.isVisited()).isTrue();
+    assertThat(course.isCompleted()).isFalse();
   }
 
   @Test
