@@ -740,6 +740,11 @@ presigned URL을 발급받습니다. 버킷은 비공개이며 서버가 소유�
 `upload-url`과 `POST /photos`는 모두 **배열**로 여러 장을 한 번에 처리합니다(리뷰·게시글에 사진 여러 장 첨부).
 발급 응답의 `fileName`으로 어느 URL이 어느 원본 파일인지 매칭하고, 저장은 한 트랜잭션으로 처리됩니다.
 
+발급 응답에는 `contentType`이 포함됩니다. presigned PUT에 Content-Type이 **바인딩**되어 있으므로,
+FE는 S3로 PUT할 때 `Content-Type` 헤더를 **응답의 `contentType`과 동일하게** 보내야 합니다.
+헤더가 다르면 S3가 서명 불일치로 403을 반환합니다. 이렇게 해야 저장된 오브젝트가 올바른 MIME 타입을 가져
+다운로드 시 이미지로 정상 렌더됩니다.
+
 === 사진 업로드 URL 발급 (여러 장)
 
 `POST /photos/upload-url`
