@@ -7,9 +7,11 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 
 /**
- * 도 하나에 스탬프 하나. 9개 도를 V34에서 미리 만들어 둔다.
+ * 시·도 하나에 스탬프 하나. 17개 광역자치단체를 V34·V36에서 미리 만들어 둔다.
  *
  * <p>지역 판정은 {@code stamp_area_codes}(TourAPI areaCode → 스탬프)로 한다. 스탬프 자체는 지역을 참조하지 않는다.
+ *
+ * <p>이미지는 프론트 저장소에서 관리한다. 서버는 {@code stampName}만 준다.
  */
 @Entity
 @Table(name = "stamps")
@@ -19,17 +21,9 @@ public class Stamp extends BaseEntity {
   @Column(name = "stamp_name", nullable = false, length = 30)
   private String stampName;
 
-  /** 지자체 마스코트 이미지. 준비되는 대로 채운다. */
-  @Column(name = "image_url", length = 500)
-  private String imageUrl;
-
   protected Stamp() {}
 
   public String getStampName() {
     return stampName;
-  }
-
-  public String getImageUrl() {
-    return imageUrl;
   }
 }
