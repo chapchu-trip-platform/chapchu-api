@@ -508,6 +508,41 @@ class CourseServiceTest {
   }
 
   @Test
+  void 코스를_삭제하면_리포지토리에서_제거된다() {
+    UUID userId = UUID.randomUUID();
+    UUID courseId = UUID.randomUUID();
+    TravelCourse course = sampleCourse(userId);
+    when(travelCourseRepository.findById(courseId)).thenReturn(Optional.of(course));
+
+    courseService.deleteCourse(userId, courseId);
+
+    verify(travelCourseRepository).delete(course);
+  }
+
+  @Test
+  void 타인_코스_삭제시_예외발생하고_삭제되지_않는다() {
+    UUID ownerId = UUID.randomUUID();
+    UUID otherId = UUID.randomUUID();
+    UUID courseId = UUID.randomUUID();
+    TravelCourse course = sampleCourse(ownerId);
+    when(travelCourseRepository.findById(courseId)).thenReturn(Optional.of(course));
+
+    assertThatThrownBy(() -> courseService.deleteCourse(otherId, courseId))
+        .isInstanceOf(CourseNotOwnerException.class);
+    verify(travelCourseRepository, never()).delete(any(TravelCourse.class));
+  }
+
+  @Test
+  void 존재하지_않는_코스_삭제시_예외가_발생한다() {
+    UUID courseId = UUID.randomUUID();
+    when(travelCourseRepository.findById(courseId)).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> courseService.deleteCourse(UUID.randomUUID(), courseId))
+        .isInstanceOf(CourseNotFoundException.class);
+    verify(travelCourseRepository, never()).delete(any(TravelCourse.class));
+  }
+
+  @Test
   void 존재하지_않는_코스_조회시_예외가_발생한다() {
     UUID courseId = UUID.randomUUID();
     when(travelCourseRepository.findById(courseId)).thenReturn(Optional.empty());

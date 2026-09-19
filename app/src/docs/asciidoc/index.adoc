@@ -1333,6 +1333,29 @@ include::{snippets}/course-complete/path-parameters.adoc[]
 
 include::{snippets}/course-complete/http-response.adoc[]
 
+=== 코스 삭제
+
+`DELETE /courses/{courseId}`
+
+여행을 중도 포기했을 때 코스를 **완전히 삭제**합니다(하드삭제). 상태 컬럼으로 숨기는 소프트삭제가 아니므로
+되돌릴 수 없습니다. JWT 인증이 필요하고 코스 소유자만 호출할 수 있습니다(타인 호출 시 403,
+없는 코스는 404). 성공하면 본문 없이 `204 No Content`를 반환합니다.
+
+코스에 딸린 스탑(`course_places`)과 날씨 기록(`course_weather_records`)은 FK가 `ON DELETE CASCADE`라
+함께 지워집니다. 반대로 리뷰·사진·게시글이 연결된 코스는 그쪽 FK가 CASCADE가 아니라 DB가 삭제를 막습니다.
+**완료한 코스는 삭제 대상이 아니므로, 미완료 코스에만 호출하세요.**
+
+[.request]
+==== 요청
+
+include::{snippets}/course-delete/http-request.adoc[]
+include::{snippets}/course-delete/path-parameters.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/course-delete/http-response.adoc[]
+
 == 날씨 기록 API
 
 === 날씨 기록 저장

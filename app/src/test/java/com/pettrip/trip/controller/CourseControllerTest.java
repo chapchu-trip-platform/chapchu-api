@@ -1,6 +1,7 @@
 package com.pettrip.trip.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.document;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
@@ -9,6 +10,7 @@ import static org.springframework.restdocs.payload.PayloadDocumentation.response
 import static org.springframework.restdocs.request.RequestDocumentation.parameterWithName;
 import static org.springframework.restdocs.request.RequestDocumentation.pathParameters;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -223,6 +225,22 @@ class CourseControllerTest {
                         .description("반려견 가능 여부(도착지 표시용). true/false, 정보 없으면 null")
                         .optional(),
                     fieldWithPath("places[].petPolicy").description("반려동물 정책").optional())));
+  }
+
+  @Test
+  void 코스를_삭제한다() throws Exception {
+    UUID courseId = UUID.randomUUID();
+    mockMvc
+        .perform(
+            delete("/courses/{courseId}", courseId)
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isNoContent())
+        .andDo(
+            document(
+                "course-delete",
+                pathParameters(parameterWithName("courseId").description("삭제할 코스 ID"))));
+
+    verify(courseService).deleteCourse(USER_ID, courseId);
   }
 
   @Test
