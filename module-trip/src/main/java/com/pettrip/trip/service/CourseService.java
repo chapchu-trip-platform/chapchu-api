@@ -423,6 +423,22 @@ public class CourseService {
     course.complete();
   }
 
+  /**
+   * 여행을 중도 포기한 코스를 완전히 삭제한다(하드삭제, 상태 컬럼 없음).
+   *
+   * <p>스탑(course_places)과 날씨 기록(course_weather_records)은 FK가 {@code ON DELETE CASCADE}라 함께 지워진다.
+   * 리뷰·사진·게시글이 붙은 코스는 그쪽 FK가 CASCADE가 아니라 DB가 삭제를 막는다 — 완료한 코스는 삭제 대상이 아니므로 그대로 둔다.
+   */
+  @Transactional
+  public void deleteCourse(UUID userId, UUID courseId) {
+    TravelCourse course =
+        travelCourseRepository.findById(courseId).orElseThrow(CourseNotFoundException::new);
+    if (!userId.equals(course.getUserId())) {
+      throw new CourseNotOwnerException();
+    }
+    travelCourseRepository.delete(course);
+  }
+
   private List<String> filterByPetSize(List<Place> places, PetSize petSize) {
     List<String> placeIds = places.stream().map(Place::getExternalPlaceId).toList();
     Map<String, PlacePetPolicy> policyMap =
