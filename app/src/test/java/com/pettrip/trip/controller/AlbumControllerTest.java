@@ -16,6 +16,7 @@ import com.pettrip.trip.service.AlbumService;
 import com.pettrip.trip.service.AlbumService.AlbumPhoto;
 import com.pettrip.trip.service.AlbumService.CourseAlbum;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -52,12 +53,14 @@ class AlbumControllerTest {
                 UUID.randomUUID(),
                 "https://bucket.s3.ap-northeast-2.amazonaws.com/review/u/1.jpg?sig",
                 LocalDate.of(2026, 8, 1),
+                LocalDateTime.of(2026, 8, 1, 10, 0, 0),
                 "ext-1",
                 true),
             new AlbumPhoto(
                 UUID.randomUUID(),
                 "https://bucket.s3.ap-northeast-2.amazonaws.com/review/u/2.jpg?sig",
                 null,
+                LocalDateTime.of(2026, 8, 1, 14, 30, 0),
                 "ext-1",
                 false)));
   }
@@ -80,6 +83,8 @@ class AlbumControllerTest {
                     fieldWithPath("[].photos[].photoId").description("사진 ID"),
                     fieldWithPath("[].photos[].downloadUrl").description("presigned GET URL (10분)"),
                     fieldWithPath("[].photos[].takenAt").description("촬영일 (null 가능)").optional(),
+                    fieldWithPath("[].photos[].createdAt")
+                        .description("업로드 시각 (초 단위, FE 시간순 정밀 정렬용)"),
                     fieldWithPath("[].photos[].externalPlaceId").description("찍은 장소 ID"),
                     fieldWithPath("[].photos[].isPublic")
                         .description("리뷰에 등록돼 공개된 사진인지 (false=개인)"))));
@@ -107,6 +112,8 @@ class AlbumControllerTest {
                     fieldWithPath("[].photos[].photoId").description("사진 ID"),
                     fieldWithPath("[].photos[].downloadUrl").description("presigned GET URL (10분)"),
                     fieldWithPath("[].photos[].takenAt").description("촬영일 (null 가능)").optional(),
+                    fieldWithPath("[].photos[].createdAt")
+                        .description("업로드 시각 (초 단위, FE 시간순 정밀 정렬용)"),
                     fieldWithPath("[].photos[].externalPlaceId").description("찍은 장소 ID"),
                     fieldWithPath("[].photos[].isPublic").description("공개 여부 (false=개인)"))));
   }
