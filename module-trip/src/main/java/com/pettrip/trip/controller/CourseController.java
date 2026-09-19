@@ -7,6 +7,7 @@ import com.pettrip.trip.service.DestinationInput;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -68,6 +69,13 @@ public class CourseController {
   public CourseReviewsResponse getCourseReviews(
       @CurrentUserId UUID userId, @PathVariable UUID courseId) {
     return CourseReviewsResponse.from(courseService.getCourseReviews(userId, courseId));
+  }
+
+  /** 여행 중도 포기 시 코스를 완전히 삭제한다. 완료한 코스는 삭제 대상이 아니다. */
+  @DeleteMapping("/{courseId}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  public void deleteCourse(@CurrentUserId UUID userId, @PathVariable UUID courseId) {
+    courseService.deleteCourse(userId, courseId);
   }
 
   @PostMapping("/{courseId}/complete")
