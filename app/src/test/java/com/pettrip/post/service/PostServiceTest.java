@@ -15,6 +15,7 @@ import com.pettrip.common.service.InvalidReferenceException;
 import com.pettrip.post.controller.PostCreateRequest;
 import com.pettrip.post.controller.PostResponse;
 import com.pettrip.post.model.Post;
+import com.pettrip.post.model.PostType;
 import com.pettrip.post.repository.PostBookmarkRepository;
 import com.pettrip.post.repository.PostRecommendationRepository;
 import com.pettrip.post.repository.PostReportRepository;
@@ -66,6 +67,7 @@ class PostServiceTest {
         UUID.randomUUID(),
         UUID.randomUUID(),
         UUID.randomUUID(),
+        PostType.GENERAL,
         "제목",
         "내용",
         0,
@@ -130,9 +132,89 @@ class PostServiceTest {
     when(postRepository.saveAndFlush(any(Post.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
 
-    postService.createPost(userId, petId, courseId, "제목", "내용", List.of());
+    postService.createPost(userId, petId, courseId, PostType.GENERAL, "제목", "내용", List.of());
 
     verify(postRepository).saveAndFlush(any(Post.class));
+  }
+
+  @Test
+  void createPost는_보낸_종류를_그대로_저장한다() {
+    UUID userId = UUID.randomUUID();
+    ArgumentCaptor<Post> captor = ArgumentCaptor.forClass(Post.class);
+    when(postRepository.saveAndFlush(any(Post.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    postService.createPost(userId, null, null, PostType.TRAVEL_REVIEW, "여행 다녀왔어요", "내용", List.of());
+
+    verify(postRepository).saveAndFlush(captor.capture());
+    assertThat(captor.getValue().getPostType()).isEqualTo(PostType.TRAVEL_REVIEW);
+  }
+
+  @Test
+  void createPost는_종류를_안_보내면_일반글로_저장한다() {
+    UUID userId = UUID.randomUUID();
+    ArgumentCaptor<Post> captor = ArgumentCaptor.forClass(Post.class);
+    when(postRepository.saveAndFlush(any(Post.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    postService.createPost(userId, null, null, null, "제목", "내용", List.of());
+
+    verify(postRepository).saveAndFlush(captor.capture());
+    assertThat(captor.getValue().getPostType()).isEqualTo(PostType.GENERAL);
+  }
+
+  @Test
+  void listPosts는_종류를_지정하면_타입_조건과_파라미터를_함께_넘긴다() {
+    when(jdbcTemplate.query(any(String.class), any(SqlParameterSource.class), any(RowMapper.class)))
+        .thenReturn(List.of());
+    ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+    ArgumentCaptor<SqlParameterSource> params = ArgumentCaptor.forClass(SqlParameterSource.class);
+
+    postService.listPosts(UUID.randomUUID(), "latest", PostType.TRAVEL_REVIEW, null, 20);
+
+    verify(jdbcTemplate).query(sql.capture(), params.capture(), any(RowMapper.class));
+    assertThat(sql.getValue()).contains("p.post_type = :postType");
+    assertThat(params.getValue().getValue("postType")).isEqualTo("TRAVEL_REVIEW");
+  }
+
+  @Test
+  void listPosts는_종류를_생략하면_타입_조건을_넣지_않는다() {
+    when(jdbcTemplate.query(any(String.class), any(SqlParameterSource.class), any(RowMapper.class)))
+        .thenReturn(List.of());
+    ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+
+    postService.listPosts(UUID.randomUUID(), "latest", null, null, 20);
+
+    verify(jdbcTemplate).query(sql.capture(), any(SqlParameterSource.class), any(RowMapper.class));
+    assertThat(sql.getValue()).doesNotContain("p.post_type = :postType");
+    assertThat(sql.getValue()).doesNotContain("WHERE p.");
+  }
+
+  @Test
+  void listPosts는_인기순에도_종류_필터를_함께_적용한다() {
+    when(jdbcTemplate.query(any(String.class), any(SqlParameterSource.class), any(RowMapper.class)))
+        .thenReturn(List.of());
+    ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+
+    postService.listPosts(UUID.randomUUID(), "popular", PostType.GENERAL, null, 20);
+
+    verify(jdbcTemplate).query(sql.capture(), any(SqlParameterSource.class), any(RowMapper.class));
+    assertThat(sql.getValue()).contains("INTERVAL '7 days'");
+    assertThat(sql.getValue()).contains("AND p.post_type = :postType");
+  }
+
+  @Test
+  void listPosts는_커서와_종류_필터를_함께_적용한다() {
+    when(jdbcTemplate.query(any(String.class), any(SqlParameterSource.class), any(RowMapper.class)))
+        .thenReturn(List.of());
+    ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+    String cursor = "2024-01-15T10:30:00~" + UUID.randomUUID();
+
+    postService.listPosts(UUID.randomUUID(), "latest", PostType.GENERAL, cursor, 20);
+
+    verify(jdbcTemplate).query(sql.capture(), any(SqlParameterSource.class), any(RowMapper.class));
+    assertThat(sql.getValue()).contains("p.post_type = :postType");
+    assertThat(sql.getValue()).contains("p.created_at < :cursorAt");
   }
 
   private void stubReferenceCheck(boolean petOk, boolean courseOk) {
@@ -149,7 +231,13 @@ class PostServiceTest {
         .thenAnswer(invocation -> invocation.getArgument(0));
 
     postService.createPost(
-        userId, null, null, "제목", "내용", List.of(new PostCreateRequest.PhotoEntry(photoKey, null)));
+        userId,
+        null,
+        null,
+        PostType.GENERAL,
+        "제목",
+        "내용",
+        List.of(new PostCreateRequest.PhotoEntry(photoKey, null)));
 
     verify(jdbcTemplate)
         .update(argThat(sql -> sql.contains("INSERT INTO photos")), any(SqlParameterSource.class));
@@ -168,6 +256,7 @@ class PostServiceTest {
                     userId,
                     null,
                     null,
+                    PostType.GENERAL,
                     "제목",
                     "내용",
                     List.of(new PostCreateRequest.PhotoEntry(othersKey, null))))
@@ -182,7 +271,7 @@ class PostServiceTest {
     when(postRepository.saveAndFlush(any(Post.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
 
-    postService.createPost(userId, null, null, "자유게시판 글", "내용", List.of());
+    postService.createPost(userId, null, null, PostType.GENERAL, "자유게시판 글", "내용", List.of());
 
     verify(jdbcTemplate, never())
         .queryForObject(any(String.class), any(SqlParameterSource.class), any(RowMapper.class));
@@ -196,7 +285,7 @@ class PostServiceTest {
     when(postRepository.saveAndFlush(any(Post.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
 
-    postService.createPost(userId, null, courseId, "제목", "내용", List.of());
+    postService.createPost(userId, null, courseId, PostType.GENERAL, "제목", "내용", List.of());
 
     ArgumentCaptor<SqlParameterSource> captor = ArgumentCaptor.forClass(SqlParameterSource.class);
     verify(jdbcTemplate).queryForObject(any(String.class), captor.capture(), any(RowMapper.class));
@@ -209,11 +298,18 @@ class PostServiceTest {
     UUID userId = UUID.randomUUID();
     UUID postId = UUID.randomUUID();
     Post post =
-        new Post(userId, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "제목", "내용");
+        new Post(
+            userId,
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            PostType.GENERAL,
+            "제목",
+            "내용");
     when(postRepository.findById(postId)).thenReturn(Optional.of(post));
     stubPostRead(samplePostResponse(userId));
 
-    postService.updatePost(userId, postId, "새 제목", "새 내용", null);
+    postService.updatePost(userId, postId, null, "새 제목", "새 내용", null);
 
     InOrder inOrder = inOrder(postRepository, jdbcTemplate);
     inOrder.verify(postRepository).saveAndFlush(post);
@@ -233,7 +329,13 @@ class PostServiceTest {
     assertThatThrownBy(
             () ->
                 postService.createPost(
-                    userId, UUID.randomUUID(), UUID.randomUUID(), "제목", "내용", List.of()))
+                    userId,
+                    UUID.randomUUID(),
+                    UUID.randomUUID(),
+                    PostType.GENERAL,
+                    "제목",
+                    "내용",
+                    List.of()))
         .isInstanceOf(InvalidReferenceException.class)
         .extracting("field")
         .isEqualTo("petId");
@@ -247,7 +349,13 @@ class PostServiceTest {
     assertThatThrownBy(
             () ->
                 postService.createPost(
-                    userId, UUID.randomUUID(), UUID.randomUUID(), "제목", "내용", List.of()))
+                    userId,
+                    UUID.randomUUID(),
+                    UUID.randomUUID(),
+                    PostType.GENERAL,
+                    "제목",
+                    "내용",
+                    List.of()))
         .isInstanceOf(InvalidReferenceException.class)
         .extracting("field")
         .isEqualTo("courseId");
@@ -258,11 +366,18 @@ class PostServiceTest {
     UUID userId = UUID.randomUUID();
     UUID postId = UUID.randomUUID();
     Post post =
-        new Post(userId, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "제목", "내용");
+        new Post(
+            userId,
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            PostType.GENERAL,
+            "제목",
+            "내용");
     when(postRepository.findById(postId)).thenReturn(Optional.of(post));
     stubPostRead(samplePostResponse(userId));
 
-    postService.updatePost(userId, postId, "새 제목", null, null);
+    postService.updatePost(userId, postId, null, "새 제목", null, null);
 
     verify(jdbcTemplate, never())
         .update(contains("DELETE FROM post_photos"), any(SqlParameterSource.class));
@@ -273,11 +388,18 @@ class PostServiceTest {
     UUID userId = UUID.randomUUID();
     UUID postId = UUID.randomUUID();
     Post post =
-        new Post(userId, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "제목", "내용");
+        new Post(
+            userId,
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            PostType.GENERAL,
+            "제목",
+            "내용");
     when(postRepository.findById(postId)).thenReturn(Optional.of(post));
     stubPostRead(samplePostResponse(userId));
 
-    postService.updatePost(userId, postId, null, null, List.of());
+    postService.updatePost(userId, postId, null, null, null, List.of());
 
     verify(jdbcTemplate).update(contains("DELETE FROM post_photos"), any(SqlParameterSource.class));
     assertThat(post.getPhotoId()).isNull();
@@ -289,10 +411,17 @@ class PostServiceTest {
     UUID otherId = UUID.randomUUID();
     UUID postId = UUID.randomUUID();
     Post post =
-        new Post(ownerId, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "제목", "내용");
+        new Post(
+            ownerId,
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            PostType.GENERAL,
+            "제목",
+            "내용");
     when(postRepository.findById(postId)).thenReturn(Optional.of(post));
 
-    assertThatThrownBy(() -> postService.updatePost(otherId, postId, "새 제목", null, null))
+    assertThatThrownBy(() -> postService.updatePost(otherId, postId, null, "새 제목", null, null))
         .isInstanceOf(PostNotFoundException.class);
   }
 
@@ -301,7 +430,14 @@ class PostServiceTest {
     UUID userId = UUID.randomUUID();
     UUID postId = UUID.randomUUID();
     Post post =
-        new Post(userId, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "제목", "내용");
+        new Post(
+            userId,
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            PostType.GENERAL,
+            "제목",
+            "내용");
     when(postRepository.findById(postId)).thenReturn(Optional.of(post));
 
     postService.deletePost(userId, postId);
@@ -315,7 +451,13 @@ class PostServiceTest {
     UUID postId = UUID.randomUUID();
     Post post =
         new Post(
-            UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "제목", "내용");
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            PostType.GENERAL,
+            "제목",
+            "내용");
     when(postRepository.findById(postId)).thenReturn(Optional.of(post));
     when(postRecommendationRepository.existsByPostIdAndUserId(postId, userId)).thenReturn(true);
 
@@ -329,7 +471,13 @@ class PostServiceTest {
     UUID postId = UUID.randomUUID();
     Post post =
         new Post(
-            UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "제목", "내용");
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            PostType.GENERAL,
+            "제목",
+            "내용");
     when(postRepository.findById(postId)).thenReturn(Optional.of(post));
     when(postRecommendationRepository.existsByPostIdAndUserId(postId, userId)).thenReturn(false);
 
@@ -345,7 +493,13 @@ class PostServiceTest {
     UUID postId = UUID.randomUUID();
     Post post =
         new Post(
-            UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "제목", "내용");
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            PostType.GENERAL,
+            "제목",
+            "내용");
     when(postRepository.findById(postId)).thenReturn(Optional.of(post));
     when(postRecommendationRepository.existsByPostIdAndUserId(postId, userId)).thenReturn(false);
 
@@ -359,7 +513,13 @@ class PostServiceTest {
     UUID postId = UUID.randomUUID();
     Post post =
         new Post(
-            UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "제목", "내용");
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            PostType.GENERAL,
+            "제목",
+            "내용");
     when(postRepository.findById(postId)).thenReturn(Optional.of(post));
     when(postBookmarkRepository.existsByUserIdAndPostId(userId, postId)).thenReturn(true);
 
@@ -373,7 +533,13 @@ class PostServiceTest {
     UUID postId = UUID.randomUUID();
     Post post =
         new Post(
-            UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "제목", "내용");
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            PostType.GENERAL,
+            "제목",
+            "내용");
     when(postRepository.findById(postId)).thenReturn(Optional.of(post));
     when(postBookmarkRepository.existsByUserIdAndPostId(userId, postId)).thenReturn(false);
 
@@ -388,7 +554,13 @@ class PostServiceTest {
     UUID postId = UUID.randomUUID();
     Post post =
         new Post(
-            UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "제목", "내용");
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            PostType.GENERAL,
+            "제목",
+            "내용");
     when(postRepository.findById(postId)).thenReturn(Optional.of(post));
     when(postBookmarkRepository.existsByUserIdAndPostId(userId, postId)).thenReturn(false);
 
@@ -402,7 +574,13 @@ class PostServiceTest {
     UUID postId = UUID.randomUUID();
     Post post =
         new Post(
-            UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "제목", "내용");
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            PostType.GENERAL,
+            "제목",
+            "내용");
     when(postRepository.findById(postId)).thenReturn(Optional.of(post));
     when(postBookmarkRepository.existsByUserIdAndPostId(userId, postId)).thenReturn(true);
 
@@ -435,7 +613,13 @@ class PostServiceTest {
     UUID postId = UUID.randomUUID();
     Post post =
         new Post(
-            UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "제목", "내용");
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            PostType.GENERAL,
+            "제목",
+            "내용");
     when(postRepository.findById(postId)).thenReturn(Optional.of(post));
     when(postReportRepository.existsByPostIdAndUserId(postId, userId)).thenReturn(true);
 
@@ -449,7 +633,13 @@ class PostServiceTest {
     UUID postId = UUID.randomUUID();
     Post post =
         new Post(
-            UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "제목", "내용");
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            UUID.randomUUID(),
+            PostType.GENERAL,
+            "제목",
+            "내용");
     when(postRepository.findById(postId)).thenReturn(Optional.of(post));
     when(postReportRepository.existsByPostIdAndUserId(postId, userId)).thenReturn(false);
 

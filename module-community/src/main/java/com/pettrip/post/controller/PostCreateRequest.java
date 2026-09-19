@@ -1,5 +1,6 @@
 package com.pettrip.post.controller;
 
+import com.pettrip.post.model.PostType;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -12,6 +13,7 @@ import java.util.UUID;
  *
  * @param petId 선택. 함께한 반려동물을 붙일 때만 보낸다
  * @param courseId 선택. 다녀온 여행 코스를 붙일 때만 보낸다
+ * @param postType 선택. 보내지 않으면 일반글(GENERAL)로 저장된다
  * @param title 선택. 컬럼이 VARCHAR(100)이라 길이를 넘기면 DB에서 터지므로 여기서 막는다
  * @param content 선택. 컬럼이 TEXT라 길이 제한이 없다
  * @param photos 선택. 사진 없이 글만 쓸 수 있다. 최대 10장. photoKey만 보내면 서버가 photo를 만든다
@@ -19,6 +21,7 @@ import java.util.UUID;
 public record PostCreateRequest(
     UUID petId,
     UUID courseId,
+    PostType postType,
     @Size(max = 100) String title,
     String content,
     @Size(max = 10) @Valid List<PhotoEntry> photos) {
