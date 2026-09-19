@@ -98,12 +98,12 @@ class ReviewServiceTest {
     ReviewDetail result = reviewService.createReview(userId, request);
 
     assertThat(result.review().getCoursePlaceId()).isEqualTo(coursePlaceId);
-    // 코스 스탑 리뷰 → 코스 완료 여부 갱신 시도(모든 스탑 리뷰 시 완료)
-    verify(jdbcTemplate).update(any(String.class), any(SqlParameterSource.class));
+    // 코스 완료는 POST /courses/{courseId}/complete 한 곳에서만 한다. 리뷰 작성은 완료를 건드리지 않는다.
+    verify(jdbcTemplate, never()).update(any(String.class), any(SqlParameterSource.class));
   }
 
   @Test
-  void 코스와_무관한_단독_리뷰는_코스완료를_건드리지_않는다() {
+  void 코스와_무관한_단독_리뷰도_코스완료를_건드리지_않는다() {
     UUID userId = UUID.randomUUID();
     UUID petId = UUID.randomUUID();
     ReviewCreateRequest request = request("place-1", petId, (short) 5, "좋아요", "SUNNY", null);

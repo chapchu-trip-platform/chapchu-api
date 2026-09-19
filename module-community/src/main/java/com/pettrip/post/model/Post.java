@@ -4,6 +4,8 @@ import com.github.f4b6a3.uuid.UuidCreator;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
@@ -33,6 +35,11 @@ public class Post {
   @Column(name = "course_id")
   private UUID courseId;
 
+  /** 글 종류. 보내지 않으면 일반글(GENERAL). 마이그레이션 V36 참고. */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "post_type", nullable = false)
+  private PostType postType = PostType.GENERAL;
+
   @Column(name = "title", length = 100)
   private String title;
 
@@ -54,16 +61,28 @@ public class Post {
 
   protected Post() {}
 
-  public Post(UUID userId, UUID petId, UUID photoId, UUID courseId, String title, String content) {
+  public Post(
+      UUID userId,
+      UUID petId,
+      UUID photoId,
+      UUID courseId,
+      PostType postType,
+      String title,
+      String content) {
     this.userId = userId;
     this.petId = petId;
     this.photoId = photoId;
     this.courseId = courseId;
+    this.postType = postType;
     this.title = title;
     this.content = content;
   }
 
-  public void update(String newTitle, String newContent) {
+  /** null인 값은 그대로 둔다(수정하지 않음). */
+  public void update(PostType newPostType, String newTitle, String newContent) {
+    if (newPostType != null) {
+      this.postType = newPostType;
+    }
     if (newTitle != null) {
       this.title = newTitle;
     }
@@ -107,6 +126,10 @@ public class Post {
 
   public UUID getCourseId() {
     return courseId;
+  }
+
+  public PostType getPostType() {
+    return postType;
   }
 
   public String getTitle() {

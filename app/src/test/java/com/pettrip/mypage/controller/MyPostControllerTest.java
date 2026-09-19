@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.pettrip.config.SecurityConfig;
 import com.pettrip.mypage.service.MyPostService;
 import com.pettrip.post.controller.PostResponse;
+import com.pettrip.post.model.PostType;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -44,6 +45,7 @@ class MyPostControllerTest {
             UUID.randomUUID(),
             UUID.randomUUID(),
             UUID.randomUUID(),
+            PostType.GENERAL,
             "제목",
             "내용",
             0,

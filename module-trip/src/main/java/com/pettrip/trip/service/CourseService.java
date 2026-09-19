@@ -410,6 +410,14 @@ public class CourseService {
     return n;
   }
 
+  /**
+   * 코스를 완료 처리한다. 코스 완료로 가는 유일한 경로다.
+   *
+   * <p>정책: 전부 방문해야 완료. 전부 방문했는지는 FE가 보장하고 "완료 여부만" 보내므로 백엔드는 방문 검증을 하지 않는다. 미방문 장소를 제외한 부분 완료는 없다 —
+   * 완료하지 않은 코스는 삭제 대상이다(코스 삭제 API는 별도 PR).
+   *
+   * <p>과거에는 도착지 체크인과 전 스탑 리뷰 작성으로도 자동 완료됐지만, 세 경로가 서로 다른 시점에 완료를 만들어 충돌해 이 명시 호출 하나로 통일했다.
+   */
   @Transactional
   public void completeCourse(UUID userId, UUID courseId) {
     TravelCourse course =
@@ -421,6 +429,22 @@ public class CourseService {
       return;
     }
     course.complete();
+  }
+
+  /**
+   * 여행을 중도 포기한 코스를 완전히 삭제한다(하드삭제, 상태 컬럼 없음).
+   *
+   * <p>스탑(course_places)과 날씨 기록(course_weather_records)은 FK가 {@code ON DELETE CASCADE}라 함께 지워진다.
+   * 리뷰·사진·게시글이 붙은 코스는 그쪽 FK가 CASCADE가 아니라 DB가 삭제를 막는다 — 완료한 코스는 삭제 대상이 아니므로 그대로 둔다.
+   */
+  @Transactional
+  public void deleteCourse(UUID userId, UUID courseId) {
+    TravelCourse course =
+        travelCourseRepository.findById(courseId).orElseThrow(CourseNotFoundException::new);
+    if (!userId.equals(course.getUserId())) {
+      throw new CourseNotOwnerException();
+    }
+    travelCourseRepository.delete(course);
   }
 
   private List<String> filterByPetSize(List<Place> places, PetSize petSize) {
@@ -601,9 +625,6 @@ public class CourseService {
       throw new TooFarFromPlaceException();
     }
     coursePlace.markVisited();
-    if (coursePlace.isFinalPlace()) {
-      coursePlace.getCourse().complete();
-    }
     stampService.grantForPlace(userId, coursePlace.getExternalPlaceId());
   }
 
