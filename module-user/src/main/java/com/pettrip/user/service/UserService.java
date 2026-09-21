@@ -47,10 +47,10 @@ public class UserService {
   }
 
   /**
-   * 계정이 ACTIVE인지. 토큰 발급 가능 여부 판단에 쓴다.
+   * 계정이 ACTIVE인지. 토큰 발급 가능 여부(decisions/048)와 매 요청 차단(decisions/049)이 같이 쓴다.
    *
-   * <p>ACTIVE가 아니면(탈퇴 등) false. 유저 행이 없거나 {@code account_status}가 NULL이어도 false다 — 컬럼이 NOT NULL이
-   * 아니라 NULL이 들어갈 수 있는데, 상태를 확인할 수 없는 계정은 통과시키지 않는다(fail-closed).
+   * <p>ACTIVE가 아니면(탈퇴 등) false. 유저 행이 없거나 {@code account_status}가 NULL이어도 false다 — 상태를 확인할 수 없는 계정은
+   * 통과시키지 않는다(fail-closed). V38에서 컬럼에 NOT NULL을 걸었지만, 발급은 드문 경로라 방어를 그대로 둔다.
    */
   public boolean isActive(UUID userId) {
     if (userId == null) {

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import com.fasterxml.jackson.databind.exc.MismatchedInputException;
 import com.pettrip.common.model.ErrorResponse;
+import com.pettrip.common.service.AccountWithdrawnException;
 import com.pettrip.common.service.BadRequestException;
 import com.pettrip.common.service.ConflictException;
 import com.pettrip.common.service.ExternalApiException;
@@ -55,6 +56,16 @@ public class GlobalExceptionHandler {
   public ResponseEntity<ErrorResponse> handleUnauthorized(UnauthorizedException e) {
     return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
         .body(new ErrorResponse("UNAUTHORIZED", e.getMessage()));
+  }
+
+  /**
+   * 탈퇴 계정. 401이지만 코드를 따로 준다 — FE가 "토큰 만료라 갱신해 보면 되는 상황"과 "다시 들어올 수 없는 계정"을 구분해야 하기 때문이다. 갱신을 시도해도
+   * 발급 단계에서 막힌다(docs/decisions/048).
+   */
+  @ExceptionHandler(AccountWithdrawnException.class)
+  public ResponseEntity<ErrorResponse> handleAccountWithdrawn(AccountWithdrawnException e) {
+    return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+        .body(new ErrorResponse("WITHDRAWN_ACCOUNT", e.getMessage()));
   }
 
   /** 바깥 서비스 장애를 500으로 흘리지 않는다. 프론트가 "잠시 후 다시 시도"를 안내할 수 있어야 한다. */

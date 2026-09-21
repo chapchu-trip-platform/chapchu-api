@@ -84,7 +84,7 @@ class UserServiceTest {
 
   @Test
   void isActive는_account_status가_null이면_false다() throws Exception {
-    // account_status는 NOT NULL이 아니라 예전 행에 NULL이 들어가 있을 수 있다. 상태를 모르면 막는다.
+    // V38로 NOT NULL을 걸기 전 행에는 NULL이 있을 수 있다. 상태를 모르면 막는다.
     UUID userId = UUID.randomUUID();
     User user = new User("a@b.c", "google-1");
     java.lang.reflect.Field field = User.class.getDeclaredField("accountStatus");

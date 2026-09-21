@@ -28,9 +28,11 @@ import com.pettrip.pet.model.PetSize;
 import com.pettrip.pet.service.PetDetail;
 import com.pettrip.pet.service.PetPhotoView;
 import com.pettrip.pet.service.PetService;
+import com.pettrip.user.service.UserService;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -55,7 +57,14 @@ class PetControllerTest {
   @Autowired private ObjectMapper objectMapper;
 
   @MockitoBean private PetService petService;
+  @MockitoBean private UserService userService;
   @MockitoBean private JwtDecoder jwtDecoder;
+
+  @BeforeEach
+  void 계정은_ACTIVE_상태다() {
+    // 리졸버가 @CurrentUserId를 만들 때 계정 상태를 확인한다(docs/decisions/049).
+    when(userService.isActive(any())).thenReturn(true);
+  }
 
   /**
    * docs/decisions/026 참고: 고정 상수(TempAuthContext) 제거 후, JWT {@code sub} 클레임의 유저 ID가 실제로 서비스까지 전달되는지

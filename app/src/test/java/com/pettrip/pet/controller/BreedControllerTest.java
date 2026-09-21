@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.pettrip.config.SecurityConfig;
 import com.pettrip.pet.model.Breed;
 import com.pettrip.pet.service.BreedService;
+import com.pettrip.user.service.UserService;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,6 +34,7 @@ class BreedControllerTest {
   @Autowired private MockMvc mockMvc;
 
   @MockitoBean private BreedService breedService;
+  @MockitoBean private UserService userService;
   @MockitoBean private JwtDecoder jwtDecoder;
 
   private static Breed breed(int id, String name) {

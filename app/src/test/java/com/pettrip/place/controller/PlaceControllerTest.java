@@ -19,11 +19,13 @@ import com.pettrip.config.SecurityConfig;
 import com.pettrip.place.model.Place;
 import com.pettrip.place.service.PlaceNotFoundException;
 import com.pettrip.place.service.PlaceService;
+import com.pettrip.user.service.UserService;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,7 +50,14 @@ class PlaceControllerTest {
   @Autowired private MockMvc mockMvc;
 
   @MockitoBean private PlaceService placeService;
+  @MockitoBean private UserService userService;
   @MockitoBean private JwtDecoder jwtDecoder;
+
+  @BeforeEach
+  void 계정은_ACTIVE_상태다() {
+    // 리졸버가 @CurrentUserId를 만들 때 계정 상태를 확인한다(docs/decisions/049).
+    when(userService.isActive(any())).thenReturn(true);
+  }
 
   private Place samplePlace() {
     return new Place(
