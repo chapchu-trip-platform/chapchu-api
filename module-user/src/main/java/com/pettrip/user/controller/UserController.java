@@ -33,8 +33,7 @@ public class UserController {
 
   @PatchMapping
   public UserResponse updateMe(@CurrentUserId UUID userId, @RequestBody UserUpdateRequest request) {
-    return UserResponse.of(
-        userService.updateMe(userId, request.nickname(), request.accountStatus()));
+    return UserResponse.of(userService.updateMe(userId, request.nickname(), request.isWithdrawn()));
   }
 
   @PatchMapping("/photo")

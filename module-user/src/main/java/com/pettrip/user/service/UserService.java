@@ -3,7 +3,6 @@ package com.pettrip.user.service;
 import com.pettrip.photo.model.Photo;
 import com.pettrip.photo.repository.PhotoRepository;
 import com.pettrip.photo.service.PhotoService;
-import com.pettrip.user.model.AccountStatus;
 import com.pettrip.user.model.Region;
 import com.pettrip.user.model.Theme;
 import com.pettrip.user.model.TransportMethod;
@@ -81,10 +80,10 @@ public class UserService {
     return !userRepository.existsByNickname(nickname);
   }
 
-  public MeDetail updateMe(UUID userId, String nickname, AccountStatus accountStatus) {
+  public MeDetail updateMe(UUID userId, String nickname, Boolean isWithdrawn) {
     User user = findUser(userId);
     validateNicknameNotTaken(user, nickname);
-    user.update(nickname, accountStatus);
+    user.update(nickname, isWithdrawn);
     return assemble(userRepository.save(user));
   }
 

@@ -33,9 +33,9 @@ public class User extends BaseEntity {
   @Column(length = 20)
   private Role role;
 
-  @Enumerated(EnumType.STRING)
-  @Column(name = "account_status", length = 20)
-  private AccountStatus accountStatus;
+  /** 탈퇴 여부. true면 토큰이 발급되지 않는다(차단은 chapchu-auth에서 한다). */
+  @Column(name = "is_withdrawn", nullable = false)
+  private boolean isWithdrawn = false;
 
   @Column(name = "location_consent", nullable = false)
   private boolean locationConsent = true;
@@ -70,7 +70,6 @@ public class User extends BaseEntity {
     this.email = email;
     this.googleUserId = googleUserId;
     this.role = Role.USER;
-    this.accountStatus = AccountStatus.ACTIVE;
   }
 
   public boolean hasNickname() {
@@ -81,12 +80,12 @@ public class User extends BaseEntity {
     this.nickname = newNickname;
   }
 
-  public void update(String newNickname, AccountStatus newAccountStatus) {
+  public void update(String newNickname, Boolean newIsWithdrawn) {
     if (newNickname != null) {
       this.nickname = newNickname;
     }
-    if (newAccountStatus != null) {
-      this.accountStatus = newAccountStatus;
+    if (newIsWithdrawn != null) {
+      this.isWithdrawn = newIsWithdrawn;
     }
   }
 
@@ -106,8 +105,8 @@ public class User extends BaseEntity {
     return role;
   }
 
-  public AccountStatus getAccountStatus() {
-    return accountStatus;
+  public boolean isWithdrawn() {
+    return isWithdrawn;
   }
 
   public boolean isLocationConsent() {

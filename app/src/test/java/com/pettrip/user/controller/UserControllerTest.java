@@ -15,7 +15,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pettrip.config.SecurityConfig;
-import com.pettrip.user.model.AccountStatus;
 import com.pettrip.user.model.User;
 import com.pettrip.user.service.MeDetail;
 import com.pettrip.user.service.NicknameAlreadyInUseException;
@@ -63,7 +62,7 @@ class UserControllerTest {
       fieldWithPath("email").description("이메일"),
       fieldWithPath("nickname").description("닉네임").optional(),
       fieldWithPath("role").description("권한"),
-      fieldWithPath("accountStatus").description("계정 상태"),
+      fieldWithPath("isWithdrawn").description("탈퇴 여부. true면 토큰이 발급되지 않는다"),
       fieldWithPath("createdAt").description("생성일시"),
       fieldWithPath("updatedAt").description("수정일시"),
       fieldWithPath("profilePhoto").description("프로필 사진 (미설정 시 기본 이미지)"),
@@ -110,11 +109,9 @@ class UserControllerTest {
   @Test
   void 내_정보를_수정한다() throws Exception {
     User user = new User("test@example.com", "google-1");
-    when(userService.updateMe(any(), eq("새닉네임"), eq(AccountStatus.ACTIVE)))
-        .thenReturn(meWithPhoto(user));
+    when(userService.updateMe(any(), eq("새닉네임"), eq(false))).thenReturn(meWithPhoto(user));
 
-    String body =
-        objectMapper.writeValueAsString(new UserUpdateRequest("새닉네임", AccountStatus.ACTIVE));
+    String body = objectMapper.writeValueAsString(new UserUpdateRequest("새닉네임", false));
 
     mockMvc
         .perform(
@@ -128,7 +125,7 @@ class UserControllerTest {
                 "user-update-me",
                 requestFields(
                     fieldWithPath("nickname").description("변경할 닉네임 (선택)"),
-                    fieldWithPath("accountStatus").description("계정 상태 (선택, 예: WITHDRAWN=탈퇴)")),
+                    fieldWithPath("isWithdrawn").description("탈퇴 여부 (선택). true면 이후 토큰이 발급되지 않는다")),
                 responseFields(userResponseFields())));
   }
 
@@ -171,12 +168,12 @@ class UserControllerTest {
   }
 
   @Test
-  void 잘못된_enum_값이면_400과_INVALID_REQUEST를_반환한다() throws Exception {
+  void 잘못된_타입_값이면_400과_INVALID_REQUEST를_반환한다() throws Exception {
     mockMvc
         .perform(
             patch("/users/me")
                 .contentType("application/json")
-                .content("{\"nickname\": \"테스트\", \"accountStatus\": \"INVALID_VALUE\"}")
+                .content("{\"nickname\": \"테스트\", \"isWithdrawn\": \"INVALID_VALUE\"}")
                 .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));

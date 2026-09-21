@@ -3,7 +3,6 @@ package com.pettrip.user.repository;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.pettrip.user.model.AccountStatus;
 import com.pettrip.user.model.Region;
 import com.pettrip.user.model.Role;
 import com.pettrip.user.model.Theme;
@@ -31,7 +30,7 @@ class UserRepositoryTest {
 
     assertThat(found.getEmail()).isEqualTo("test@example.com");
     assertThat(found.getRole()).isEqualTo(Role.USER);
-    assertThat(found.getAccountStatus()).isEqualTo(AccountStatus.ACTIVE);
+    assertThat(found.isWithdrawn()).isFalse();
   }
 
   @Test

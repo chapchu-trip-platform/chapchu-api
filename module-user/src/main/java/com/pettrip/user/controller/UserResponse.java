@@ -1,6 +1,5 @@
 package com.pettrip.user.controller;
 
-import com.pettrip.user.model.AccountStatus;
 import com.pettrip.user.model.Role;
 import com.pettrip.user.model.User;
 import com.pettrip.user.service.MeDetail;
@@ -13,7 +12,7 @@ public record UserResponse(
     String email,
     String nickname,
     Role role,
-    AccountStatus accountStatus,
+    boolean isWithdrawn,
     LocalDateTime createdAt,
     LocalDateTime updatedAt,
     ProfilePhotoView profilePhoto) {
@@ -25,7 +24,7 @@ public record UserResponse(
         user.getEmail(),
         user.getNickname(),
         user.getRole(),
-        user.getAccountStatus(),
+        user.isWithdrawn(),
         user.getCreatedAt(),
         user.getUpdatedAt(),
         detail.profilePhoto());

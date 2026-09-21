@@ -9,7 +9,6 @@ import com.pettrip.photo.model.Photo;
 import com.pettrip.photo.repository.PhotoRepository;
 import com.pettrip.photo.service.PhotoNotFoundException;
 import com.pettrip.photo.service.PhotoService;
-import com.pettrip.user.model.AccountStatus;
 import com.pettrip.user.model.Region;
 import com.pettrip.user.model.Theme;
 import com.pettrip.user.model.TransportMethod;
@@ -154,9 +153,9 @@ class UserServiceTest {
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-    MeDetail result = userService.updateMe(userId, null, AccountStatus.WITHDRAWN);
+    MeDetail result = userService.updateMe(userId, null, true);
 
-    assertThat(result.user().getAccountStatus()).isEqualTo(AccountStatus.WITHDRAWN);
+    assertThat(result.user().isWithdrawn()).isTrue();
   }
 
   @Test
@@ -259,5 +258,26 @@ class UserServiceTest {
     MeDetail result = userService.updateMe(userId, "내닉네임", null);
 
     assertThat(result.user().getNickname()).isEqualTo("내닉네임");
+  }
+
+  @Test
+  void 신규_유저는_탈퇴_상태가_아니다() {
+    User user = new User("test@example.com", "google-1");
+
+    assertThat(user.isWithdrawn()).isFalse();
+  }
+
+  @Test
+  void updateMe는_isWithdrawn이_null이면_탈퇴_상태를_건드리지_않는다() {
+    UUID userId = UUID.randomUUID();
+    User user = new User("test@example.com", "google-1");
+    user.update(null, true);
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+    MeDetail result = userService.updateMe(userId, "새닉네임", null);
+
+    assertThat(result.user().isWithdrawn()).isTrue();
+    assertThat(result.user().getNickname()).isEqualTo("새닉네임");
   }
 }
