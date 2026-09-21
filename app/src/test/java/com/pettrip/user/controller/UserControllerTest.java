@@ -3,11 +3,13 @@ package com.pettrip.user.controller;
 import static com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper.document;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
 import static org.springframework.restdocs.payload.PayloadDocumentation.requestFields;
 import static org.springframework.restdocs.payload.PayloadDocumentation.responseFields;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -239,5 +241,15 @@ class UserControllerTest {
                 .content(body)
                 .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
         .andExpect(status().isConflict());
+  }
+
+  @Test
+  void 회원_탈퇴하면_204를_반환하고_탈퇴_처리한다() throws Exception {
+    mockMvc
+        .perform(delete("/users/me").with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isNoContent())
+        .andDo(document("user-withdraw"));
+
+    verify(userService).withdraw(USER_ID);
   }
 }
