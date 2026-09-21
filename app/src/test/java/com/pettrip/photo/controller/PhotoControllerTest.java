@@ -62,7 +62,8 @@ class PhotoControllerTest {
     String photoKey = "review/user-1/uuid-초코.jpg";
     when(photoService.buildPhotoKey(any(), eq(PhotoType.REVIEW), eq("초코.jpg")))
         .thenReturn(photoKey);
-    when(photoService.issueUploadUrl(photoKey))
+    when(photoService.contentTypeFor("초코.jpg")).thenReturn("image/jpeg");
+    when(photoService.issueUploadUrl(eq(photoKey), eq("image/jpeg")))
         .thenReturn(
             URI.create("https://bucket.s3.ap-northeast-2.amazonaws.com/" + photoKey).toURL());
 
@@ -87,7 +88,9 @@ class PhotoControllerTest {
                 responseFields(
                     fieldWithPath("[].uploadUrl").description("S3 Presigned PUT URL (10분 유효)"),
                     fieldWithPath("[].photoKey").description("사진 저장 시 참조할 S3 경로"),
-                    fieldWithPath("[].fileName").description("요청한 원본 파일명 (URL 매칭용)"))));
+                    fieldWithPath("[].fileName").description("요청한 원본 파일명 (URL 매칭용)"),
+                    fieldWithPath("[].contentType")
+                        .description("PUT 시 반드시 이 값으로 Content-Type 헤더를 보내야 함 (presign에 바인딩됨)"))));
   }
 
   @Test
