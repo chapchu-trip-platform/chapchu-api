@@ -13,6 +13,7 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -33,6 +34,10 @@ public class StampService {
       JOIN stamp_area_codes sac ON sac.area_code = p.area_code
       WHERE p.external_place_id = :placeId
       """;
+
+  /** areaCode로 바로 시·도 스탬프를 찾는다. 코스 완료 시 도착지 areaCode로 발급할 때 쓴다. */
+  private static final String FIND_STAMP_BY_AREA_SQL =
+      "SELECT stamp_id FROM stamp_area_codes WHERE area_code = :areaCode";
 
   /** 도감은 미획득 지역도 보여준다. 그래서 stamps를 기준으로 LEFT JOIN 한다. */
   private static final String COLLECTION_SQL =
@@ -81,8 +86,29 @@ public class StampService {
     if (stampIds.isEmpty()) {
       return;
     }
-    UUID stampId = stampIds.get(0);
+    grantStamp(userId, stampIds.get(0));
+  }
 
+  /**
+   * 완료한 코스의 도착지 시·도 스탬프를 발급한다. 이미 가진 지역이면 횟수만 올린다.
+   *
+   * <p>{@code areaCode}가 null이거나 매핑이 없으면 조용히 넘어간다. 스탬프 발급이 코스 완료를 막으면 안 되므로 별도 트랜잭션(REQUIRES_NEW)에서
+   * 처리한다 — 여기서 실패해도 호출부의 완료 트랜잭션은 커밋된다.
+   */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void grantForArea(UUID userId, Short areaCode) {
+    if (areaCode == null) {
+      return;
+    }
+    MapSqlParameterSource params = new MapSqlParameterSource().addValue("areaCode", areaCode);
+    List<UUID> stampIds = jdbcTemplate.queryForList(FIND_STAMP_BY_AREA_SQL, params, UUID.class);
+    if (stampIds.isEmpty()) {
+      return;
+    }
+    grantStamp(userId, stampIds.get(0));
+  }
+
+  private void grantStamp(UUID userId, UUID stampId) {
     Optional<UserStamp> owned = userStampRepository.findByUserIdAndStampId(userId, stampId);
     if (owned.isPresent()) {
       UserStamp userStamp = owned.get();

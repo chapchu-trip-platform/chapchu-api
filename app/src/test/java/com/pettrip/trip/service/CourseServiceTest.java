@@ -483,6 +483,55 @@ class CourseServiceTest {
   }
 
   @Test
+  void 코스_완료시_도착지_지역_스탬프를_발급한다() {
+    UUID userId = UUID.randomUUID();
+    UUID courseId = UUID.randomUUID();
+    TravelCourse course = sampleCourse(userId);
+    CoursePlace destination =
+        CoursePlace.destination(
+            course,
+            (short) 2,
+            "안동 월영교",
+            new BigDecimal("36.55"),
+            new BigDecimal("128.77"),
+            null,
+            "사용자가 선택한 도착지");
+    when(travelCourseRepository.findById(courseId)).thenReturn(Optional.of(course));
+    when(coursePlaceRepository.findByCourseIdOrderByVisitOrderAsc(courseId))
+        .thenReturn(List.of(destination));
+    when(placeService.resolveAreaCode(any(), any())).thenReturn((short) 35);
+
+    courseService.completeCourse(userId, courseId);
+
+    assertThat(course.isCompleted()).isTrue();
+    verify(stampService).grantForArea(userId, (short) 35);
+  }
+
+  @Test
+  void 스탬프_발급이_실패해도_완료는_성공한다() {
+    UUID userId = UUID.randomUUID();
+    UUID courseId = UUID.randomUUID();
+    TravelCourse course = sampleCourse(userId);
+    CoursePlace destination =
+        CoursePlace.destination(
+            course,
+            (short) 2,
+            "안동 월영교",
+            new BigDecimal("36.55"),
+            new BigDecimal("128.77"),
+            null,
+            "사용자가 선택한 도착지");
+    when(travelCourseRepository.findById(courseId)).thenReturn(Optional.of(course));
+    when(coursePlaceRepository.findByCourseIdOrderByVisitOrderAsc(courseId))
+        .thenReturn(List.of(destination));
+    when(placeService.resolveAreaCode(any(), any())).thenThrow(new RuntimeException("TourAPI 다운"));
+
+    courseService.completeCourse(userId, courseId);
+
+    assertThat(course.isCompleted()).isTrue();
+  }
+
+  @Test
   void 이미_완료된_코스_재완료시_멱등처리된다() {
     UUID userId = UUID.randomUUID();
     UUID courseId = UUID.randomUUID();
@@ -631,7 +680,7 @@ class CourseServiceTest {
   }
 
   @Test
-  void 방문_체크인시_해당_지역_스탬프를_발급한다() {
+  void 방문_체크인은_더는_스탬프를_발급하지_않는다() {
     UUID userId = UUID.randomUUID();
     UUID coursePlaceId = UUID.randomUUID();
     TravelCourse course = sampleCourse(userId);
@@ -642,7 +691,7 @@ class CourseServiceTest {
 
     courseService.visitPlace(userId, coursePlaceId, 37.5, 127.0);
 
-    verify(stampService).grantForPlace(userId, "place-1");
+    verify(stampService, never()).grantForPlace(any(), any());
   }
 
   @Test

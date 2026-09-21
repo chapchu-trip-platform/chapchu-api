@@ -99,6 +99,26 @@ public class PlaceService {
     }
   }
 
+  /** 도착지 시·도 판정용 반경(m). areaCode는 시·도 단위라 넉넉히 잡아도 된다. */
+  private static final int AREA_LOOKUP_RADIUS_METERS = 20_000;
+
+  /**
+   * 좌표가 속한 시·도의 TourAPI areaCode를 돌려준다. 좌표→지역을 직접 계산하지 않고, 주변 장소가 이미 가진 areaCode를 빌린다. 주변에 장소가 없거나
+   * 호출이 실패하면 {@code null}(지역 미상)을 돌려준다. 동기화(save)는 하지 않는다 — 조회만 한다.
+   */
+  public Short resolveAreaCode(BigDecimal lat, BigDecimal lng) {
+    try {
+      return tourApiClient.fetchNearby(lat, lng, AREA_LOOKUP_RADIUS_METERS).stream()
+          .map(item -> toShort(item.areaCode()))
+          .filter(code -> code != null)
+          .findFirst()
+          .orElse(null);
+    } catch (Exception e) {
+      log.error("resolveAreaCode 실패 {}: {}", e.getClass().getSimpleName(), e.getMessage());
+      return null;
+    }
+  }
+
   private static Short toShort(String value) {
     if (value == null || value.isBlank()) {
       return null;

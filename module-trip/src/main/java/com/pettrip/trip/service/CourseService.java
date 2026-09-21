@@ -34,6 +34,8 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -42,6 +44,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class CourseService {
+
+  private static final Logger log = LoggerFactory.getLogger(CourseService.class);
 
   private final PlaceService placeService;
   private final PlaceRepository placeRepository;
@@ -429,6 +433,34 @@ public class CourseService {
       return;
     }
     course.complete();
+    grantArrivalStamp(userId, courseId);
+  }
+
+  /**
+   * 완료한 코스의 도착지 시·도 스탬프를 발급한다(도착지 완료 기준). 도착지 좌표로 지역을 판정한다. 스탬프 발급이 코스 완료를 막으면 안 되므로 예외를
+   * 삼킨다(best-effort) — 지역 판정 실패/미상이면 스탬프 없이 완료만 유지된다.
+   */
+  private void grantArrivalStamp(UUID userId, UUID courseId) {
+    try {
+      CoursePlace destination = findDestination(courseId);
+      if (destination == null
+          || destination.getLatitude() == null
+          || destination.getLongitude() == null) {
+        return;
+      }
+      Short areaCode =
+          placeService.resolveAreaCode(destination.getLatitude(), destination.getLongitude());
+      stampService.grantForArea(userId, areaCode);
+    } catch (Exception e) {
+      log.warn("도착지 스탬프 발급 실패(완료는 정상 처리됨): course={}, {}", courseId, e.getMessage());
+    }
+  }
+
+  private CoursePlace findDestination(UUID courseId) {
+    return coursePlaceRepository.findByCourseIdOrderByVisitOrderAsc(courseId).stream()
+        .filter(CoursePlace::isFinalPlace)
+        .findFirst()
+        .orElse(null);
   }
 
   /**
@@ -625,7 +657,6 @@ public class CourseService {
       throw new TooFarFromPlaceException();
     }
     coursePlace.markVisited();
-    stampService.grantForPlace(userId, coursePlace.getExternalPlaceId());
   }
 
   private static double haversineMeters(double lat1, double lng1, double lat2, double lng2) {
