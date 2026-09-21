@@ -36,9 +36,8 @@ public class PhotoController {
 
   private PhotoUploadUrlResponse toUploadUrl(UUID userId, PhotoUploadUrlRequest.FileRequest file) {
     String photoKey = photoService.buildPhotoKey(userId, file.type(), file.fileName());
-    String contentType = photoService.contentTypeFor(file.fileName());
-    URL uploadUrl = photoService.issueUploadUrl(photoKey, contentType);
-    return new PhotoUploadUrlResponse(uploadUrl.toString(), photoKey, file.fileName(), contentType);
+    URL uploadUrl = photoService.issueUploadUrl(photoKey);
+    return new PhotoUploadUrlResponse(uploadUrl.toString(), photoKey, file.fileName());
   }
 
   @PostMapping
