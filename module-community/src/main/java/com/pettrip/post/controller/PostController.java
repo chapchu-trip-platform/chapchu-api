@@ -53,7 +53,8 @@ public class PostController {
         request.postType(),
         request.title(),
         request.content(),
-        request.photos());
+        request.photos(),
+        request.photoIds());
   }
 
   @PatchMapping("/{postId}")

@@ -25,6 +25,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -106,6 +107,10 @@ public class PostService {
       INSERT INTO post_photos (post_id, photo_id, photo_order)
       VALUES (:postId, :photoId, :photoOrder)
       """;
+
+  /** 이미 있는 사진을 붙일 때, 그 photoId들이 존재하고 본인 것인지 확인한다. */
+  private static final String OWNED_PHOTOS_SQL =
+      "SELECT photo_id FROM photos WHERE photo_id IN (:photoIds) AND user_id = :userId";
 
   /**
    * 글이 가리키는 반려동물·사진·코스가 실제로 있고 작성자 것인지 한 번에 확인한다.
@@ -246,13 +251,16 @@ public class PostService {
       PostType postType,
       String title,
       String content,
-      List<PostCreateRequest.PhotoEntry> photos) {
+      List<PostCreateRequest.PhotoEntry> photos,
+      List<UUID> existingPhotoIds) {
     verifyReferences(userId, petId, courseId);
     List<PostCreateRequest.PhotoEntry> entries = photos;
     if (entries == null) {
       entries = List.of();
     }
-    List<UUID> photoIds = createPhotos(userId, entries);
+    // 앨범 등 이미 있는 사진(photoId)을 먼저 붙이고, 새로 올린 사진(photoKey)을 뒤에 잇는다.
+    List<UUID> photoIds = new ArrayList<>(verifyOwnedPhotos(userId, existingPhotoIds));
+    photoIds.addAll(createPhotos(userId, entries));
     Post post =
         postRepository.saveAndFlush(
             new Post(
@@ -264,6 +272,21 @@ public class PostService {
                 title,
                 content));
     linkPostPhotos(post.getId(), photoIds);
+  }
+
+  /** 이미 있는 사진(photoId)들이 모두 존재하고 작성자 본인 것인지 확인한 뒤 중복을 제거해 순서대로 돌려준다. 하나라도 남의 사진이거나 없는 id면 거절한다. */
+  private List<UUID> verifyOwnedPhotos(UUID userId, List<UUID> photoIds) {
+    if (photoIds == null || photoIds.isEmpty()) {
+      return List.of();
+    }
+    List<UUID> distinct = new ArrayList<>(new LinkedHashSet<>(photoIds));
+    MapSqlParameterSource params =
+        new MapSqlParameterSource().addValue("photoIds", distinct).addValue("userId", userId);
+    List<UUID> found = jdbcTemplate.queryForList(OWNED_PHOTOS_SQL, params, UUID.class);
+    if (found.size() != distinct.size()) {
+      throw new InvalidReferenceException("photoIds", "본인의 사진이 아니거나 존재하지 않습니다.");
+    }
+    return distinct;
   }
 
   /** photoKey들로 photos row를 만들고 생성된 photoId를 순서대로 돌려준다. */

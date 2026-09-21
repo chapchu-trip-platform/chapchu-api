@@ -16,7 +16,8 @@ import java.util.UUID;
  * @param postType 선택. 보내지 않으면 일반글(GENERAL)로 저장된다
  * @param title 선택. 컬럼이 VARCHAR(100)이라 길이를 넘기면 DB에서 터지므로 여기서 막는다
  * @param content 선택. 컬럼이 TEXT라 길이 제한이 없다
- * @param photos 선택. 사진 없이 글만 쓸 수 있다. 최대 10장. photoKey만 보내면 서버가 photo를 만든다
+ * @param photos 선택. 새로 올리는 사진. 최대 10장. photoKey만 보내면 서버가 photo를 만든다
+ * @param photoIds 선택. 앨범 등 이미 있는 사진을 그대로 붙일 때 그 photoId 목록. 본인 사진만 허용된다. photos와 함께 보낼 수도 있다
  */
 public record PostCreateRequest(
     UUID petId,
@@ -24,7 +25,8 @@ public record PostCreateRequest(
     PostType postType,
     @Size(max = 100) String title,
     String content,
-    @Size(max = 10) @Valid List<PhotoEntry> photos) {
+    @Size(max = 10) @Valid List<PhotoEntry> photos,
+    @Size(max = 10) List<UUID> photoIds) {
 
   /** 첨부 사진 1장. photoKey는 upload-url로 발급받은 S3 경로. photoId는 서버가 생성한다. */
   public record PhotoEntry(@NotBlank String photoKey, LocalDate takenAt) {}

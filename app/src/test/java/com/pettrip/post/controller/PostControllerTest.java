@@ -259,7 +259,8 @@ class PostControllerTest {
                 "즐거웠어요",
                 List.of(
                     new PostCreateRequest.PhotoEntry(
-                        "post/" + USER_ID + "/x-강아지.jpg", LocalDate.of(2024, 1, 15)))));
+                        "post/" + USER_ID + "/x-강아지.jpg", LocalDate.of(2024, 1, 15))),
+                null));
 
     mockMvc
         .perform(
@@ -285,9 +286,13 @@ class PostControllerTest {
                         .optional(),
                     fieldWithPath("title").description("제목 (선택). 최대 100자").optional(),
                     fieldWithPath("content").description("내용 (선택)").optional(),
-                    fieldWithPath("photos[]").description("첨부 사진 목록 (선택). 최대 10장").optional(),
+                    fieldWithPath("photos[]").description("새로 올리는 사진 목록 (선택). 최대 10장").optional(),
                     fieldWithPath("photos[].photoKey").description("upload-url로 발급받은 S3 경로"),
-                    fieldWithPath("photos[].takenAt").description("촬영일 (선택)").optional())));
+                    fieldWithPath("photos[].takenAt").description("촬영일 (선택)").optional(),
+                    fieldWithPath("photoIds")
+                        .description("기존 사진 id 목록 (선택). 앨범 사진을 그대로 붙일 때 사용. 최대 10장")
+                        .type(JsonFieldType.ARRAY)
+                        .optional())));
   }
 
   @Test
@@ -300,6 +305,7 @@ class PostControllerTest {
                 PostType.GENERAL,
                 "가".repeat(101),
                 "즐거웠어요",
+                null,
                 null));
 
     mockMvc
@@ -316,7 +322,7 @@ class PostControllerTest {
     String body =
         objectMapper.writeValueAsString(
             new PostCreateRequest(
-                UUID.randomUUID(), UUID.randomUUID(), PostType.GENERAL, null, null, null));
+                UUID.randomUUID(), UUID.randomUUID(), PostType.GENERAL, null, null, null, null));
 
     mockMvc
         .perform(
@@ -343,7 +349,13 @@ class PostControllerTest {
     String body =
         objectMapper.writeValueAsString(
             new PostCreateRequest(
-                UUID.randomUUID(), UUID.randomUUID(), PostType.GENERAL, "사진 없는 글", "내용", null));
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                PostType.GENERAL,
+                "사진 없는 글",
+                "내용",
+                null,
+                null));
 
     mockMvc
         .perform(
@@ -391,11 +403,11 @@ class PostControllerTest {
     UUID id = UUID.randomUUID();
     doThrow(new InvalidReferenceException("petId", "존재하지 않거나 본인의 반려동물이 아닙니다."))
         .when(postService)
-        .createPost(any(), any(), any(), any(), any(), any(), any());
+        .createPost(any(), any(), any(), any(), any(), any(), any(), any());
 
     String body =
         objectMapper.writeValueAsString(
-            new PostCreateRequest(id, id, PostType.GENERAL, "제목", "내용", null));
+            new PostCreateRequest(id, id, PostType.GENERAL, "제목", "내용", null, null));
 
     mockMvc
         .perform(

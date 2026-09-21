@@ -132,7 +132,8 @@ class PostServiceTest {
     when(postRepository.saveAndFlush(any(Post.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
 
-    postService.createPost(userId, petId, courseId, PostType.GENERAL, "제목", "내용", List.of());
+    postService.createPost(
+        userId, petId, courseId, PostType.GENERAL, "제목", "내용", List.of(), List.of());
 
     verify(postRepository).saveAndFlush(any(Post.class));
   }
@@ -144,7 +145,8 @@ class PostServiceTest {
     when(postRepository.saveAndFlush(any(Post.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
 
-    postService.createPost(userId, null, null, PostType.TRAVEL_REVIEW, "여행 다녀왔어요", "내용", List.of());
+    postService.createPost(
+        userId, null, null, PostType.TRAVEL_REVIEW, "여행 다녀왔어요", "내용", List.of(), List.of());
 
     verify(postRepository).saveAndFlush(captor.capture());
     assertThat(captor.getValue().getPostType()).isEqualTo(PostType.TRAVEL_REVIEW);
@@ -157,7 +159,7 @@ class PostServiceTest {
     when(postRepository.saveAndFlush(any(Post.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
 
-    postService.createPost(userId, null, null, null, "제목", "내용", List.of());
+    postService.createPost(userId, null, null, null, "제목", "내용", List.of(), List.of());
 
     verify(postRepository).saveAndFlush(captor.capture());
     assertThat(captor.getValue().getPostType()).isEqualTo(PostType.GENERAL);
@@ -237,7 +239,8 @@ class PostServiceTest {
         PostType.GENERAL,
         "제목",
         "내용",
-        List.of(new PostCreateRequest.PhotoEntry(photoKey, null)));
+        List.of(new PostCreateRequest.PhotoEntry(photoKey, null)),
+        List.of());
 
     verify(jdbcTemplate)
         .update(argThat(sql -> sql.contains("INSERT INTO photos")), any(SqlParameterSource.class));
@@ -259,10 +262,45 @@ class PostServiceTest {
                     PostType.GENERAL,
                     "제목",
                     "내용",
-                    List.of(new PostCreateRequest.PhotoEntry(othersKey, null))))
+                    List.of(new PostCreateRequest.PhotoEntry(othersKey, null)),
+                    List.of()))
         .isInstanceOf(InvalidReferenceException.class)
         .extracting("field")
         .isEqualTo("photoKey");
+  }
+
+  @Test
+  void createPost는_기존_photoId를_새로_만들지_않고_그대로_붙인다() {
+    UUID userId = UUID.randomUUID();
+    UUID photoId = UUID.randomUUID();
+    when(jdbcTemplate.queryForList(any(String.class), any(SqlParameterSource.class), any()))
+        .thenReturn(List.of(photoId));
+    when(postRepository.saveAndFlush(any(Post.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    postService.createPost(
+        userId, null, null, PostType.GENERAL, "앨범에서 게시", "내용", List.of(), List.of(photoId));
+
+    verify(jdbcTemplate, never())
+        .update(argThat(sql -> sql.contains("INSERT INTO photos")), any(SqlParameterSource.class));
+    verify(jdbcTemplate)
+        .update(argThat(sql -> sql.contains("post_photos")), any(SqlParameterSource.class));
+  }
+
+  @Test
+  void createPost는_남의_photoId면_예외를_던진다() {
+    UUID userId = UUID.randomUUID();
+    UUID photoId = UUID.randomUUID();
+    when(jdbcTemplate.queryForList(any(String.class), any(SqlParameterSource.class), any()))
+        .thenReturn(List.of());
+
+    assertThatThrownBy(
+            () ->
+                postService.createPost(
+                    userId, null, null, PostType.GENERAL, "제목", "내용", List.of(), List.of(photoId)))
+        .isInstanceOf(InvalidReferenceException.class)
+        .extracting("field")
+        .isEqualTo("photoIds");
   }
 
   @Test
@@ -271,7 +309,8 @@ class PostServiceTest {
     when(postRepository.saveAndFlush(any(Post.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
 
-    postService.createPost(userId, null, null, PostType.GENERAL, "자유게시판 글", "내용", List.of());
+    postService.createPost(
+        userId, null, null, PostType.GENERAL, "자유게시판 글", "내용", List.of(), List.of());
 
     verify(jdbcTemplate, never())
         .queryForObject(any(String.class), any(SqlParameterSource.class), any(RowMapper.class));
@@ -285,7 +324,8 @@ class PostServiceTest {
     when(postRepository.saveAndFlush(any(Post.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
 
-    postService.createPost(userId, null, courseId, PostType.GENERAL, "제목", "내용", List.of());
+    postService.createPost(
+        userId, null, courseId, PostType.GENERAL, "제목", "내용", List.of(), List.of());
 
     ArgumentCaptor<SqlParameterSource> captor = ArgumentCaptor.forClass(SqlParameterSource.class);
     verify(jdbcTemplate).queryForObject(any(String.class), captor.capture(), any(RowMapper.class));
@@ -335,6 +375,7 @@ class PostServiceTest {
                     PostType.GENERAL,
                     "제목",
                     "내용",
+                    List.of(),
                     List.of()))
         .isInstanceOf(InvalidReferenceException.class)
         .extracting("field")
@@ -355,6 +396,7 @@ class PostServiceTest {
                     PostType.GENERAL,
                     "제목",
                     "내용",
+                    List.of(),
                     List.of()))
         .isInstanceOf(InvalidReferenceException.class)
         .extracting("field")
