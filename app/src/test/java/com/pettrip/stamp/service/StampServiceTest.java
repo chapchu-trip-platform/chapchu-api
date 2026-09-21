@@ -81,6 +81,41 @@ class StampServiceTest {
   }
 
   @Test
+  void grantForArea는_areaCode가_null이면_아무것도_하지_않는다() {
+    UUID userId = UUID.randomUUID();
+
+    stampService.grantForArea(userId, null);
+
+    verify(userStampRepository, never()).save(any());
+  }
+
+  @Test
+  void grantForArea는_매핑이_없으면_아무것도_하지_않는다() {
+    UUID userId = UUID.randomUUID();
+    when(jdbcTemplate.queryForList(any(String.class), any(SqlParameterSource.class), any()))
+        .thenReturn(List.of());
+
+    stampService.grantForArea(userId, (short) 99);
+
+    verify(userStampRepository, never()).save(any());
+  }
+
+  @Test
+  void grantForArea는_처음이면_발급하고_있으면_횟수만_올린다() {
+    UUID userId = UUID.randomUUID();
+    UUID stampId = UUID.randomUUID();
+    when(jdbcTemplate.queryForList(any(String.class), any(SqlParameterSource.class), any()))
+        .thenReturn(List.of(stampId));
+    when(userStampRepository.findByUserIdAndStampId(userId, stampId)).thenReturn(Optional.empty());
+
+    stampService.grantForArea(userId, (short) 35);
+
+    ArgumentCaptor<UserStamp> captor = ArgumentCaptor.forClass(UserStamp.class);
+    verify(userStampRepository).save(captor.capture());
+    assertThat(captor.getValue().getStampCount()).isEqualTo(1);
+  }
+
+  @Test
   void listMyStamps는_미획득_지역도_포함해_돌려준다() {
     UUID userId = UUID.randomUUID();
     List<StampResponse> rows =
