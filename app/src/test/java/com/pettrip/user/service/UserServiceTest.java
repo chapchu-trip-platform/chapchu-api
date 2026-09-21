@@ -181,6 +181,19 @@ class UserServiceTest {
   }
 
   @Test
+  void withdraw는_account_status를_WITHDRAWN으로_바꾼다() {
+    UUID userId = UUID.randomUUID();
+    User user = new User("test@example.com", "google-1");
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+
+    userService.withdraw(userId);
+
+    assertThat(user.getAccountStatus()).isEqualTo(AccountStatus.WITHDRAWN);
+    verify(userRepository).save(user);
+  }
+
+  @Test
   void updateProfilePhoto는_null이면_프사를_지우고_기본이미지로_되돌린다() throws Exception {
     UUID userId = UUID.randomUUID();
     User user = new User("test@example.com", "google-1");

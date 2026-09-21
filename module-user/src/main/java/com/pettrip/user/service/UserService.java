@@ -104,6 +104,13 @@ public class UserService {
     return assemble(userRepository.save(user));
   }
 
+  /** 회원 탈퇴. 본인 계정을 WITHDRAWN으로 바꾼다(소프트 탈퇴). 이미 탈퇴 상태여도 멱등하게 통과한다. */
+  public void withdraw(UUID userId) {
+    User user = findUser(userId);
+    user.withdraw();
+    userRepository.save(user);
+  }
+
   /** 본인이 이미 쓰던 닉네임을 그대로 보낸 경우는 중복으로 보지 않는다. */
   private void validateNicknameNotTaken(User user, String nickname) {
     if (nickname == null || nickname.equals(user.getNickname())) {

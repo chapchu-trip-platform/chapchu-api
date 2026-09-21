@@ -90,6 +90,11 @@ public class User extends BaseEntity {
     }
   }
 
+  /** 회원 탈퇴. 계정을 WITHDRAWN으로 바꾼다(소프트 탈퇴). 이미 탈퇴 상태면 그대로다. */
+  public void withdraw() {
+    this.accountStatus = AccountStatus.WITHDRAWN;
+  }
+
   public String getGoogleUserId() {
     return googleUserId;
   }
