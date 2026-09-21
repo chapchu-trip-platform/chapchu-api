@@ -1,5 +1,6 @@
 package com.pettrip.auth;
 
+import com.pettrip.user.service.UserService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -21,6 +22,8 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtException;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.CookieValue;
@@ -42,6 +45,8 @@ public class AuthController {
   private static final String REFRESH_TOKEN_COOKIE = "refresh_token";
 
   private final ClientRegistrationRepository clientRegistrationRepository;
+  private final JwtDecoder jwtDecoder;
+  private final UserService userService;
   private final RestClient restClient = RestClient.create();
 
   @Value("${chapchu-api.auth.fe-redirect-url}")
@@ -56,8 +61,13 @@ public class AuthController {
   @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}")
   private String authServerUrl;
 
-  public AuthController(ClientRegistrationRepository clientRegistrationRepository) {
+  public AuthController(
+      ClientRegistrationRepository clientRegistrationRepository,
+      JwtDecoder jwtDecoder,
+      UserService userService) {
     this.clientRegistrationRepository = clientRegistrationRepository;
+    this.jwtDecoder = jwtDecoder;
+    this.userService = userService;
   }
 
   /** FE 로그인 진입점. redirect 파라미터로 환경별 콜백 URL 지정 가능. 허용된 CORS origin 기준으로 검증하여 open redirect를 차단한다. */
@@ -141,6 +151,11 @@ public class AuthController {
     clearCookie(response, STATE_COOKIE, "/");
 
     TokenResponse tokens = exchangeCode(code, buildRedirectUri(request));
+    if (!isActiveAccount(tokens.accessToken())) {
+      revokeToken(tokens.refreshToken());
+      response.sendError(HttpStatus.FORBIDDEN.value(), "사용할 수 없는 계정입니다.");
+      return;
+    }
     setRefreshTokenCookie(response, tokens.refreshToken());
     response.sendRedirect(targetRedirect + "#access_token=" + tokens.accessToken());
   }
@@ -230,12 +245,48 @@ public class AuthController {
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
     }
 
+    String newAccessToken = (String) tokenResponse.get("access_token");
     String newRefreshToken = (String) tokenResponse.get("refresh_token");
+
+    if (!isActiveAccount(newAccessToken)) {
+      revokeToken(latestRefreshToken(newRefreshToken, refreshToken));
+      clearRefreshTokenCookie(response);
+      return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+    }
+
     if (newRefreshToken != null) {
       setRefreshTokenCookie(response, newRefreshToken);
     }
 
-    return ResponseEntity.ok(Map.of("access_token", (String) tokenResponse.get("access_token")));
+    return ResponseEntity.ok(Map.of("access_token", newAccessToken));
+  }
+
+  /**
+   * ACTIVE 계정에만 토큰을 넘긴다.
+   *
+   * <p>토큰 발급 자체는 chapchu-auth 소관이라(decisions/008) 여기서 만드는 걸 막을 수는 없다. 인가 코드만으로는 누구인지 알 수 없어 교환이 끝난
+   * 뒤에야 판단이 가능하므로, 받은 토큰을 폐기하고 FE로 넘기지 않는 방식으로 막는다. client_secret을 서버가 쥐고 있어(BFF, decisions/033)
+   * 브라우저가 직접 토큰을 받아갈 수는 없다.
+   */
+  private boolean isActiveAccount(String accessToken) {
+    return userService.isActive(subjectOf(accessToken));
+  }
+
+  /** access_token의 sub 클레임이 users.user_id다(decisions/016). 디코드·파싱에 실패하면 null을 돌려 발급을 막는다. */
+  private UUID subjectOf(String accessToken) {
+    try {
+      return UUID.fromString(jwtDecoder.decode(accessToken).getSubject());
+    } catch (JwtException | IllegalArgumentException e) {
+      return null;
+    }
+  }
+
+  /** 토큰 회전이 일어났으면 새 refresh_token을, 아니면 원래 것을 폐기 대상으로 삼는다. */
+  private String latestRefreshToken(String rotated, String original) {
+    if (rotated == null) {
+      return original;
+    }
+    return rotated;
   }
 
   /** redirect 파라미터가 허용된 origin 기준으로 유효하면 그대로, 아니면 기본 URL 반환. */

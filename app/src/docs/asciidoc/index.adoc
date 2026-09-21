@@ -216,6 +216,27 @@ include::{snippets}/auth-refresh-no-cookie/http-request.adoc[]
 include::{snippets}/auth-refresh-no-cookie/http-response.adoc[]
 
 * `401 Unauthorized` — refresh_token 없음 또는 만료 → FE에서 `/auth/login`으로 이동
+* `403 Forbidden` — 계정이 `ACTIVE`가 아님(탈퇴 등). refresh_token이 폐기되고 쿠키도 지워집니다
+
+=== 계정 상태에 따른 토큰 발급 차단
+
+`users.account_status`가 **`ACTIVE`인 계정에만** 토큰을 넘깁니다. 아니면 **403**입니다.
+
+|===
+| 엔드포인트 | 비ACTIVE일 때
+
+| `GET /auth/callback`
+| 받은 refresh_token을 폐기하고 `403`. FE 리다이렉트를 하지 않습니다
+
+| `POST /auth/refresh`
+| refresh_token을 폐기하고 쿠키를 지운 뒤 `403`
+|===
+
+유저 행이 없거나 `account_status`가 NULL이어도 차단합니다(상태를 확인할 수 없으면 막는 fail-closed).
+
+NOTE: 토큰을 실제로 만드는 곳은 chapchu-auth입니다(decisions/008). chapchu-api는 BFF로서
+받은 토큰을 폐기하고 넘기지 않는 방식으로 막습니다. **이미 발급된 access_token은 만료될 때까지
+그대로 동작합니다** — 리소스 서버 계층에서는 계정 상태를 검사하지 않습니다(decisions/048).
 
 === 로그아웃
 
