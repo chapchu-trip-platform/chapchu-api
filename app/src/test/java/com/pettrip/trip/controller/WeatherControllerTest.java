@@ -18,9 +18,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pettrip.config.SecurityConfig;
 import com.pettrip.trip.model.CourseWeatherRecord;
 import com.pettrip.trip.service.WeatherService;
+import com.pettrip.user.service.UserService;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,7 +47,14 @@ class WeatherControllerTest {
   @Autowired private ObjectMapper objectMapper;
 
   @MockitoBean private WeatherService weatherService;
+  @MockitoBean private UserService userService;
   @MockitoBean private JwtDecoder jwtDecoder;
+
+  @BeforeEach
+  void 계정은_ACTIVE_상태다() {
+    // 리졸버가 @CurrentUserId를 만들 때 계정 상태를 확인한다(docs/decisions/049).
+    when(userService.isActive(any())).thenReturn(true);
+  }
 
   private CourseWeatherRecord sampleRecord() {
     return new CourseWeatherRecord(

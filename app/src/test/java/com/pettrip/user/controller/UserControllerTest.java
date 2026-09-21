@@ -24,6 +24,7 @@ import com.pettrip.user.service.NicknameAlreadyInUseException;
 import com.pettrip.user.service.ProfilePhotoView;
 import com.pettrip.user.service.UserService;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -51,6 +52,12 @@ class UserControllerTest {
 
   @MockitoBean private UserService userService;
   @MockitoBean private JwtDecoder jwtDecoder;
+
+  @BeforeEach
+  void 계정은_ACTIVE_상태다() {
+    // 리졸버가 @CurrentUserId를 만들 때 계정 상태를 확인한다(docs/decisions/049).
+    when(userService.isActive(any())).thenReturn(true);
+  }
 
   private MeDetail meWithPhoto(User user) {
     return new MeDetail(

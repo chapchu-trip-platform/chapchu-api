@@ -36,9 +36,9 @@ FE 경로에 대해서는 실효성이 있다.
 **완전한 차단은 `chapchu-auth`에서 해야 한다.** 여기서 막는 것은 "만들어진 토큰을 넘기지 않는 것"이지
 "만들지 않는 것"이 아니다. chapchu-auth를 직접 호출할 수 있는 경로가 생기면 이 게이트는 우회된다.
 
-**이미 발급된 access_token은 막지 못한다.** 리소스 서버 계층에서 `account_status`를 보지 않으므로,
-탈퇴 직전에 받은 access_token은 만료될 때까지 그대로 동작한다. 이 구멍을 닫으려면 인증 필터나
-`@CurrentUserId` 리졸버 단계에서 계정 상태를 확인해야 한다 — 매 요청 DB 조회가 늘어나므로 별도 결정이 필요하다.
+~~**이미 발급된 access_token은 막지 못한다.**~~ → **decisions/049에서 닫았다.**
+`CurrentUserIdArgumentResolver`가 유저 id를 만들 때 여기와 **같은 `isActive`** 로 계정 상태를
+확인해, 비ACTIVE 계정의 토큰은 서명이 유효해도 401(`WITHDRAWN_ACCOUNT`)이다.
 
 ## account_status 컬럼
 
@@ -52,7 +52,8 @@ DEFAULT는 `ACTIVE`가 맞지만 **`NOT NULL`이 아니다.** DEFAULT는 INSERT�
 적용되므로 명시적으로 NULL을 넣으면 NULL이 저장된다. 스키마를 바꾸는 대신 코드에서 fail-closed로
 처리했다 — 상태를 확인할 수 없는 계정은 통과시키지 않는다.
 
-`NOT NULL` 부여가 필요하다고 판단되면 별도 마이그레이션으로 진행한다.
+→ **V38에서 `NOT NULL`을 부여했다**(NULL은 `ACTIVE`로 백필). 매 요청 계정 상태를 보게 되면서
+값이 항상 있어야 했기 때문이다(decisions/049). `isActive`의 fail-closed 방어는 그대로 둔다.
 
 ## 에이전트 행동 지침
 

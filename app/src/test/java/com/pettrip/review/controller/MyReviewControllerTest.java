@@ -14,9 +14,11 @@ import com.pettrip.review.model.Review;
 import com.pettrip.review.service.ReviewDetail;
 import com.pettrip.review.service.ReviewPhotoView;
 import com.pettrip.review.service.ReviewService;
+import com.pettrip.user.service.UserService;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,7 +42,14 @@ class MyReviewControllerTest {
   @Autowired private MockMvc mockMvc;
 
   @MockitoBean private ReviewService reviewService;
+  @MockitoBean private UserService userService;
   @MockitoBean private JwtDecoder jwtDecoder;
+
+  @BeforeEach
+  void 계정은_ACTIVE_상태다() {
+    // 리졸버가 @CurrentUserId를 만들 때 계정 상태를 확인한다(docs/decisions/049).
+    when(userService.isActive(any())).thenReturn(true);
+  }
 
   @Test
   void 작성한_리뷰_목록을_조회한다() throws Exception {

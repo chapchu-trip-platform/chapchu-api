@@ -110,6 +110,10 @@
 - **파일 저장**: 사진 URL은 S3 경로로 DB에 저장하라. 로컬 파일 경로를 저장하지 마라.
 - **벡터 임베딩**: Spring AI `EmbeddingModel` 인터페이스를 사용하라. 임베딩 차원은 상수 `EMBEDDING_DIMENSION = 3072`로 관리하라. pgvector 컬럼은 `vector(3072)`으로 선언하라.
 - **인증**: chapchu는 OAuth2 Resource Server 전용이다. 토큰 발급 로직을 이 레포에 추가하지 마라. 토큰 발급은 `chapchu-auth`(별도 레포) 전담이다.
+- **계정 상태**: 발급(decisions/048)과 매 요청 차단(decisions/049) 모두 `UserService.isActive`로 판정하라. `account_status`를 컨트롤러·리졸버에서 직접 비교하지 마라.
+- **인증 필요한 새 엔드포인트**: 반드시 `@CurrentUserId`를 파라미터로 받아라. 탈퇴 계정 차단이 `CurrentUserIdArgumentResolver`에서 일어나므로, 안 받으면 차단을 비껴간다(decisions/049).
+- **새 `@WebMvcTest`**: `UserService` 목과 `isActive` → `true` 스텁을 함께 넣어라. 빠뜨리면 인증 요청이 전부 401이 된다.
+- **시큐리티 필터 체인**: 단일 체인을 유지하라. 경로별로 체인을 쪼개는 시도는 이미 실패했다(failures/028).
 - **Spring AI**: `module-recommendation/build.gradle`에 주석으로 보존된 Spring AI 의존성은 RAG 구현 착수 전 Maven Central에서 최신 GA 버전을 확인한 뒤 활성화하라. 지금 당장 활성화하지 마라.
 
 ## 11. 멀티모듈 의존성 제약

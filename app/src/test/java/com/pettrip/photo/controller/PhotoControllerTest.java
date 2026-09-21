@@ -19,10 +19,12 @@ import com.pettrip.config.SecurityConfig;
 import com.pettrip.photo.model.Photo;
 import com.pettrip.photo.model.PhotoType;
 import com.pettrip.photo.service.PhotoService;
+import com.pettrip.user.service.UserService;
 import java.net.URI;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,7 +48,14 @@ class PhotoControllerTest {
   @Autowired private ObjectMapper objectMapper;
 
   @MockitoBean private PhotoService photoService;
+  @MockitoBean private UserService userService;
   @MockitoBean private JwtDecoder jwtDecoder;
+
+  @BeforeEach
+  void 계정은_ACTIVE_상태다() {
+    // 리졸버가 @CurrentUserId를 만들 때 계정 상태를 확인한다(docs/decisions/049).
+    when(userService.isActive(any())).thenReturn(true);
+  }
 
   @Test
   void 사진_업로드_URL을_여러장_발급한다() throws Exception {

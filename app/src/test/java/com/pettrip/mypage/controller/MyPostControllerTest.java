@@ -1,5 +1,6 @@
 package com.pettrip.mypage.controller;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.document;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
@@ -10,9 +11,11 @@ import com.pettrip.config.SecurityConfig;
 import com.pettrip.mypage.service.MyPostService;
 import com.pettrip.post.controller.PostResponse;
 import com.pettrip.post.model.PostType;
+import com.pettrip.user.service.UserService;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,7 +38,14 @@ class MyPostControllerTest {
   @Autowired private MockMvc mockMvc;
 
   @MockitoBean private MyPostService myPostService;
+  @MockitoBean private UserService userService;
   @MockitoBean private JwtDecoder jwtDecoder;
+
+  @BeforeEach
+  void 계정은_ACTIVE_상태다() {
+    // 리졸버가 @CurrentUserId를 만들 때 계정 상태를 확인한다(docs/decisions/049).
+    when(userService.isActive(any())).thenReturn(true);
+  }
 
   @Test
   void 작성한_게시글_목록을_조회한다() throws Exception {

@@ -34,7 +34,7 @@ public class User extends BaseEntity {
   private Role role;
 
   @Enumerated(EnumType.STRING)
-  @Column(name = "account_status", length = 20)
+  @Column(name = "account_status", length = 20, nullable = false)
   private AccountStatus accountStatus;
 
   @Column(name = "location_consent", nullable = false)

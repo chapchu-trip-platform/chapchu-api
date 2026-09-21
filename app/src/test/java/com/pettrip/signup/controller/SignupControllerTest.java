@@ -23,6 +23,7 @@ import com.pettrip.signup.service.SignupService;
 import com.pettrip.signup.service.SignupService.SignupResult;
 import com.pettrip.user.model.User;
 import com.pettrip.user.service.NicknameAlreadyInUseException;
+import com.pettrip.user.service.UserService;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -49,6 +50,7 @@ class SignupControllerTest {
   @Autowired private ObjectMapper objectMapper;
 
   @MockitoBean private SignupService signupService;
+  @MockitoBean private UserService userService;
   @MockitoBean private JwtDecoder jwtDecoder;
 
   private String requestBody() throws Exception {

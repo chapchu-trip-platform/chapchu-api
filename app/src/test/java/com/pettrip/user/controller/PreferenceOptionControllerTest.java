@@ -1,6 +1,8 @@
 package com.pettrip.user.controller;
 
 import static com.epages.restdocs.apispec.MockMvcRestDocumentationWrapper.document;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
 import static org.springframework.restdocs.payload.PayloadDocumentation.responseFields;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
@@ -13,7 +15,9 @@ import com.pettrip.user.model.Region;
 import com.pettrip.user.model.Theme;
 import com.pettrip.user.model.TransportMethod;
 import com.pettrip.user.service.PreferenceOptionService;
+import com.pettrip.user.service.UserService;
 import java.util.List;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mockito;
@@ -37,7 +41,14 @@ class PreferenceOptionControllerTest {
   @Autowired private MockMvc mockMvc;
 
   @MockitoBean private PreferenceOptionService preferenceOptionService;
+  @MockitoBean private UserService userService;
   @MockitoBean private JwtDecoder jwtDecoder;
+
+  @BeforeEach
+  void 계정은_ACTIVE_상태다() {
+    // 리졸버가 @CurrentUserId를 만들 때 계정 상태를 확인한다(docs/decisions/049).
+    when(userService.isActive(any())).thenReturn(true);
+  }
 
   @Test
   void 선호_사항_선택지를_조회한다() throws Exception {

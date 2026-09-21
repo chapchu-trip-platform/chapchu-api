@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.when;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.document;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
 import static org.springframework.restdocs.payload.PayloadDocumentation.requestFields;
@@ -17,7 +18,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pettrip.config.SecurityConfig;
 import com.pettrip.trip.service.CourseService;
 import com.pettrip.trip.service.TooFarFromPlaceException;
+import com.pettrip.user.service.UserService;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,7 +45,14 @@ class CoursePlaceControllerTest {
   @Autowired private ObjectMapper objectMapper;
 
   @MockitoBean private CourseService courseService;
+  @MockitoBean private UserService userService;
   @MockitoBean private JwtDecoder jwtDecoder;
+
+  @BeforeEach
+  void 계정은_ACTIVE_상태다() {
+    // 리졸버가 @CurrentUserId를 만들 때 계정 상태를 확인한다(docs/decisions/049).
+    when(userService.isActive(any())).thenReturn(true);
+  }
 
   @Test
   void 코스_장소를_방문_체크인한다() throws Exception {

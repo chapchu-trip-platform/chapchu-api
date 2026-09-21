@@ -2,18 +2,22 @@ package com.pettrip.config;
 
 import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.pettrip.pet.controller.PetController;
 import com.pettrip.pet.service.PetService;
+import com.pettrip.user.service.UserService;
 import jakarta.servlet.DispatcherType;
 import java.util.List;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -32,7 +36,14 @@ class SecurityConfigTest {
   @Autowired private MockMvc mockMvc;
 
   @MockitoBean private PetService petService;
+  @MockitoBean private UserService userService;
   @MockitoBean private JwtDecoder jwtDecoder;
+
+  @BeforeEach
+  void 계정은_ACTIVE_상태다() {
+    // 리졸버가 @CurrentUserId를 만들 때 계정 상태를 확인한다(docs/decisions/049).
+    when(userService.isActive(any())).thenReturn(true);
+  }
 
   @Test
   void 인증이_필요한_엔드포인트는_토큰이_없으면_401을_반환한다() throws Exception {
@@ -46,6 +57,22 @@ class SecurityConfigTest {
     mockMvc
         .perform(get("/pets").with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
         .andExpect(status().isOk());
+  }
+
+  /**
+   * docs/decisions/049 참고: 탈퇴한 계정의 토큰은 서명이 유효해도 유저 id가 주입되지 않는다. chapchu-auth가 서명한 JWT를 이 저장소에서
+   * 만료시킬 수 없어, 받아 주지 않는 방식으로 사실상 만료시킨다.
+   */
+  @Test
+  void 탈퇴한_계정의_토큰은_서명이_유효해도_401을_반환한다() throws Exception {
+    when(userService.isActive(USER_ID)).thenReturn(false);
+
+    mockMvc
+        .perform(get("/pets").with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.code").value("WITHDRAWN_ACCOUNT"));
+
+    verifyNoInteractions(petService);
   }
 
   /**

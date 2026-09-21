@@ -14,6 +14,7 @@ import com.pettrip.review.model.Review;
 import com.pettrip.review.service.ReviewDetail;
 import com.pettrip.review.service.ReviewPhotoView;
 import com.pettrip.review.service.ReviewService;
+import com.pettrip.user.service.UserService;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -38,6 +39,7 @@ class PlaceReviewControllerTest {
   @Autowired private MockMvc mockMvc;
 
   @MockitoBean private ReviewService reviewService;
+  @MockitoBean private UserService userService;
   @MockitoBean private JwtDecoder jwtDecoder;
 
   @Test
