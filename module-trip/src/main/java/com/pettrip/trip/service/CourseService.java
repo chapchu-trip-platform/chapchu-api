@@ -100,7 +100,7 @@ public class CourseService {
           new CourseReviewRow(
               rs.getObject("course_place_id", UUID.class),
               rs.getObject("review_id", UUID.class),
-              (Short) rs.getObject("rating"),
+              rs.getObject("rating", Short.class),
               rs.getString("contents"),
               rs.getString("weather"),
               rs.getTimestamp("created_at").toLocalDateTime(),
