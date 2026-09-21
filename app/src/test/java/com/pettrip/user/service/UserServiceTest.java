@@ -3,6 +3,8 @@ package com.pettrip.user.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.pettrip.photo.model.Photo;
@@ -60,6 +62,52 @@ class UserServiceTest {
             photoService,
             DEFAULT_KEY);
     when(photoService.issueDownloadUrl(DEFAULT_KEY)).thenReturn(URI.create(DEFAULT_URL).toURL());
+  }
+
+  @Test
+  void isActive는_ACTIVE_계정이면_true다() {
+    UUID userId = UUID.randomUUID();
+    when(userRepository.findById(userId)).thenReturn(Optional.of(new User("a@b.c", "google-1")));
+
+    assertThat(userService.isActive(userId)).isTrue();
+  }
+
+  @Test
+  void isActive는_탈퇴한_계정이면_false다() {
+    UUID userId = UUID.randomUUID();
+    User user = new User("a@b.c", "google-1");
+    user.update(null, AccountStatus.WITHDRAWN);
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+    assertThat(userService.isActive(userId)).isFalse();
+  }
+
+  @Test
+  void isActive는_account_status가_null이면_false다() throws Exception {
+    // account_status는 NOT NULL이 아니라 예전 행에 NULL이 들어가 있을 수 있다. 상태를 모르면 막는다.
+    UUID userId = UUID.randomUUID();
+    User user = new User("a@b.c", "google-1");
+    java.lang.reflect.Field field = User.class.getDeclaredField("accountStatus");
+    field.setAccessible(true);
+    field.set(user, null);
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+    assertThat(userService.isActive(userId)).isFalse();
+  }
+
+  @Test
+  void isActive는_유저가_없으면_false다() {
+    UUID userId = UUID.randomUUID();
+    when(userRepository.findById(userId)).thenReturn(Optional.empty());
+
+    assertThat(userService.isActive(userId)).isFalse();
+  }
+
+  @Test
+  void isActive는_userId가_null이면_조회하지_않고_false다() {
+    // findById(null)은 IllegalArgumentException을 던지므로 조회 전에 걸러야 한다.
+    assertThat(userService.isActive(null)).isFalse();
+    verify(userRepository, never()).findById(any());
   }
 
   @Test

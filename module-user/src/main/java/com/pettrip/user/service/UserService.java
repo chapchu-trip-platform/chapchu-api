@@ -46,6 +46,22 @@ public class UserService {
     this.defaultProfileImageKey = defaultProfileImageKey;
   }
 
+  /**
+   * 계정이 ACTIVE인지. 토큰 발급 가능 여부 판단에 쓴다.
+   *
+   * <p>ACTIVE가 아니면(탈퇴 등) false. 유저 행이 없거나 {@code account_status}가 NULL이어도 false다 — 컬럼이 NOT NULL이
+   * 아니라 NULL이 들어갈 수 있는데, 상태를 확인할 수 없는 계정은 통과시키지 않는다(fail-closed).
+   */
+  public boolean isActive(UUID userId) {
+    if (userId == null) {
+      return false;
+    }
+    return userRepository
+        .findById(userId)
+        .map(user -> AccountStatus.ACTIVE.equals(user.getAccountStatus()))
+        .orElse(false);
+  }
+
   public MeDetail getMe(UUID userId) {
     return assemble(findUser(userId));
   }

@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.pettrip.config.SecurityConfig;
+import com.pettrip.user.service.UserService;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -42,6 +43,7 @@ class AuthControllerTest {
 
   @MockitoBean private ClientRegistrationRepository clientRegistrationRepository;
   @MockitoBean private JwtDecoder jwtDecoder;
+  @MockitoBean private UserService userService;
 
   @Test
   void 로그아웃하면_refresh_token_쿠키가_만료된다() throws Exception {
