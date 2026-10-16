@@ -2,6 +2,7 @@ package com.pettrip.place.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.document;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
@@ -9,34 +10,54 @@ import static org.springframework.restdocs.payload.PayloadDocumentation.response
 import static org.springframework.restdocs.request.RequestDocumentation.parameterWithName;
 import static org.springframework.restdocs.request.RequestDocumentation.pathParameters;
 import static org.springframework.restdocs.request.RequestDocumentation.queryParameters;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.pettrip.config.SecurityConfig;
 import com.pettrip.place.model.Place;
 import com.pettrip.place.service.PlaceNotFoundException;
 import com.pettrip.place.service.PlaceService;
+import com.pettrip.user.service.UserService;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.restdocs.AutoConfigureRestDocs;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.restdocs.RestDocumentationExtension;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 @ExtendWith(RestDocumentationExtension.class)
+/**
+ * addFilters=false 대신 실제 {@link SecurityConfig}를 올린다. 토큰 없이 200이 나오는 것으로 장소 조회가 정말 공개 엔드포인트임을 증명하기
+ * 위해서다 (docs/decisions/025). 필터를 끄면 시큐리티 설정이 잘못돼도 테스트는 통과한다.
+ */
 @WebMvcTest(PlaceController.class)
-@AutoConfigureMockMvc(addFilters = false)
+@Import(SecurityConfig.class)
 @AutoConfigureRestDocs(outputDir = "app/build/generated-snippets")
 class PlaceControllerTest {
 
   @Autowired private MockMvc mockMvc;
 
   @MockitoBean private PlaceService placeService;
+  @MockitoBean private UserService userService;
+  @MockitoBean private JwtDecoder jwtDecoder;
+
+  @BeforeEach
+  void 계정은_ACTIVE_상태다() {
+    // 리졸버가 @CurrentUserId를 만들 때 계정 상태를 확인한다(docs/decisions/049).
+    when(userService.isActive(any())).thenReturn(true);
+  }
 
   private Place samplePlace() {
     return new Place(
@@ -79,9 +100,36 @@ class PlaceControllerTest {
                     fieldWithPath("rating").description("평균 평점"),
                     fieldWithPath("reviewNum").description("리뷰 수"),
                     fieldWithPath("visitNum").description("방문 인증 수"),
+                    fieldWithPath("wishlisted").description("요청한 사용자가 찜했는지. 비로그인이면 false"),
                     fieldWithPath("petPolicy").description("반려동물 정책 (없으면 null)").optional(),
                     fieldWithPath("createdAt").description("등록일시"),
                     fieldWithPath("updatedAt").description("수정일시"))));
+  }
+
+  @Test
+  void 비로그인_장소_조회는_wishlisted가_false다() throws Exception {
+    when(placeService.getPlace("12345678")).thenReturn(samplePlace());
+    when(placeService.findWishlistedPlaceIds(eq(Optional.empty()), any())).thenReturn(Set.of());
+
+    mockMvc
+        .perform(get("/places/{externalPlaceId}", "12345678"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.wishlisted").value(false));
+  }
+
+  @Test
+  void 로그인_사용자가_찜한_장소는_wishlisted가_true다() throws Exception {
+    UUID userId = UUID.fromString("0198f3a0-1234-7000-8000-000000000001");
+    when(placeService.getPlace("12345678")).thenReturn(samplePlace());
+    when(placeService.findWishlistedPlaceIds(eq(Optional.of(userId)), any()))
+        .thenReturn(Set.of("12345678"));
+
+    mockMvc
+        .perform(
+            get("/places/{externalPlaceId}", "12345678")
+                .with(jwt().jwt(j -> j.subject(userId.toString()))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.wishlisted").value(true));
   }
 
   @Test
@@ -125,6 +173,7 @@ class PlaceControllerTest {
                     fieldWithPath("[].rating").description("평균 평점"),
                     fieldWithPath("[].reviewNum").description("리뷰 수"),
                     fieldWithPath("[].visitNum").description("방문 인증 수"),
+                    fieldWithPath("[].wishlisted").description("요청한 사용자가 찜했는지. 비로그인이면 false"),
                     fieldWithPath("[].petPolicy").description("반려동물 정책").optional(),
                     fieldWithPath("[].createdAt").description("등록일시"),
                     fieldWithPath("[].updatedAt").description("수정일시"))));

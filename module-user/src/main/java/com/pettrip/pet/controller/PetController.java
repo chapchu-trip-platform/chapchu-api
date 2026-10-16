@@ -1,7 +1,6 @@
 package com.pettrip.pet.controller;
 
-import com.pettrip.common.service.TempAuthContext;
-import com.pettrip.pet.model.Pet;
+import com.pettrip.common.service.CurrentUserId;
 import com.pettrip.pet.service.PetService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -28,42 +27,62 @@ public class PetController {
   }
 
   @GetMapping
-  public List<PetResponse> listPets() {
-    return petService.listPets(TempAuthContext.TEMP_USER_ID).stream()
-        .map(PetResponse::from)
-        .toList();
+  public List<PetResponse> listPets(@CurrentUserId UUID userId) {
+    return petService.listPets(userId).stream().map(PetResponse::of).toList();
   }
 
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  public PetResponse createPet(@RequestBody @Valid PetCreateRequest request) {
-    Pet pet =
+  public PetResponse createPet(
+      @CurrentUserId UUID userId, @RequestBody @Valid PetCreateRequest request) {
+    return PetResponse.of(
         petService.createPet(
-            TempAuthContext.TEMP_USER_ID,
+            userId,
             request.breedId(),
             request.petName(),
             request.size(),
-            request.age());
-    return PetResponse.from(pet);
+            request.age(),
+            request.activityIds()));
   }
 
   @PatchMapping("/{petId}")
   public PetResponse updatePet(
-      @PathVariable UUID petId, @RequestBody @Valid PetUpdateRequest request) {
-    Pet pet =
+      @CurrentUserId UUID userId,
+      @PathVariable UUID petId,
+      @RequestBody @Valid PetUpdateRequest request) {
+    return PetResponse.of(
         petService.updatePet(
-            TempAuthContext.TEMP_USER_ID,
+            userId,
             petId,
             request.breedId(),
             request.petName(),
             request.size(),
-            request.age());
-    return PetResponse.from(pet);
+            request.age(),
+            request.isDie(),
+            request.activityIds()));
+  }
+
+  /** 프로필 사진 연결·해제. {@code photoId}를 null로 보내면 사진을 뗀다. */
+  @PatchMapping("/{petId}/photo")
+  public PetResponse updateProfilePhoto(
+      @CurrentUserId UUID userId,
+      @PathVariable UUID petId,
+      @RequestBody PetPhotoUpdateRequest request) {
+    return PetResponse.of(petService.updateProfilePhoto(userId, petId, request.photoId()));
+  }
+
+  /** 프로필 배경화면 연결·해제. 사진은 프로필과 같은 경로(type=PROFILE)에 올린다. */
+  @PatchMapping("/{petId}/background")
+  public PetResponse updateBackgroundPhoto(
+      @CurrentUserId UUID userId,
+      @PathVariable UUID petId,
+      @RequestBody PetPhotoUpdateRequest request) {
+    return PetResponse.of(petService.updateBackgroundPhoto(userId, petId, request.photoId()));
   }
 
   @DeleteMapping("/{petId}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  public void deletePet(@PathVariable UUID petId) {
-    petService.deletePet(TempAuthContext.TEMP_USER_ID, petId);
+  public void deletePet(@CurrentUserId UUID userId, @PathVariable UUID petId) {
+    petService.deletePet(userId, petId);
   }
 }

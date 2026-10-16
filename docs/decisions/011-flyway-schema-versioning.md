@@ -27,5 +27,18 @@ db/migration/
 
 ## 에이전트 행동 지침
 - 스키마 변경 시 항상 새 `V{n}__` 파일 생성. 기존 파일 절대 수정 금지.
-- `docs/schema/init.sql`도 함께 최신화하라.
+- `docs/schema/init.sql`도 반드시 함께 최신화하라 (스키마 스냅샷 파일).
 - `ddl-auto: create` 또는 `update`로 변경하지 마라.
+
+## 예외: 미적용 마이그레이션 직접 수정
+기존 파일 수정 금지 규칙은 **Flyway 체크섬 충돌 방지**가 목적이다.
+해당 파일이 `flyway_schema_history`에 한 번도 기록된 적 없는 경우(= 성공 적용 이력 없음),
+체크섬 레코드가 없으므로 충돌이 발생하지 않는다. 이 경우에 한해 직접 수정 허용.
+
+**적용 전 반드시 확인:**
+```sql
+-- DB에 접속하여 해당 버전 레코드 없음을 확인 후 수정
+SELECT * FROM flyway_schema_history WHERE version IN ('2', '3');
+-- 결과가 없으면 직접 수정 가능
+```
+결과가 있으면 새 `V{n}__` 파일로 처리. (failures/016 참조)

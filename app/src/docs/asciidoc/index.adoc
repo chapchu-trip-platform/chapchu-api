@@ -3,9 +3,30 @@
 :icons: font
 :source-highlighter: highlightjs
 :toc: left
-:toclevels: 2
+:toclevels: 3
 :sectlinks:
 :snippets: ../../../build/generated-snippets
+
+++++
+<style>
+.sect4.request > h4 {
+  background: #e6f3ea;
+  color: #1a5928;
+  padding: 6px 14px;
+  border-left: 5px solid #2e7d32;
+  border-radius: 0 4px 4px 0;
+  margin-top: 1.4em;
+}
+.sect4.response > h4 {
+  background: #e3edf7;
+  color: #0d3a6e;
+  padding: 6px 14px;
+  border-left: 5px solid #1565c0;
+  border-radius: 0 4px 4px 0;
+  margin-top: 1.4em;
+}
+</style>
+++++
 
 == 개요
 
@@ -35,112 +56,1508 @@ Content-Type: application/json
 | `500 Internal Server Error` | 서버 오류
 |===
 
+=== 오류 응답 형식
+
+모든 오류는 같은 형태로 내려간다.
+
+[source,json]
+----
+{
+  "code": "INVALID_REQUEST",
+  "message": "photoId: 필수 값입니다."
+}
+----
+
+어느 필드가 잘못됐는지 특정할 수 있으면 `fieldErrors`가 함께 내려간다. 여러 필드가 동시에
+틀렸으면 전부 담긴다. `message`는 그중 첫 번째를 사람이 읽기 좋게 옮긴 요약이다.
+
+[source,json]
+----
+{
+  "code": "INVALID_REQUEST",
+  "message": "petId: 필수 값입니다.",
+  "fieldErrors": [
+    { "field": "petId", "message": "필수 값입니다." },
+    { "field": "photoId", "message": "필수 값입니다." },
+    { "field": "courseId", "message": "UUID 형식이 아닙니다." }
+  ]
+}
+----
+
+`fieldErrors`가 붙는 경우는 셋이다.
+
+* 요청 본문 검증 위반 (`@NotNull`, `@Size` 등)
+* UUID·숫자·enum 역직렬화 실패 — 값 형식이 틀려 검증까지 가지 못한 경우
+* 요청이 가리키는 자원이 없거나 본인 것이 아닌 경우
+
+마지막 경우 "없음"과 "남의 것"을 구분하지 않는다. 구분하면 남의 자원 ID가 존재하는지
+확인해 주는 셈이 되기 때문이다.
+
+필드를 특정할 수 없는 오류(본문 자체가 깨진 JSON 등)에서는 `fieldErrors`가 생략된다.
+
+== 인증 API (BFF)
+
+chapchu-api가 OAuth2 Confidential Client로서 구글 로그인 흐름 전체를 대리 처리합니다.
+FE는 `/auth/login` 만 알면 되고, 코드 교환·토큰 저장·갱신은 서버가 처리합니다.
+
+=== 로그인 시작
+
+`GET /auth/login`
+
+FE가 *브라우저를* 이 URL로 이동시킵니다. 이후 흐름은 서버가 자동 처리합니다.
+
+[.request]
+==== 요청 파라미터 (선택)
+
+|===
+| 파라미터 | 필수 | 설명
+
+| `redirect`
+| 아니오
+| 로그인 완료 후 리다이렉트할 FE 콜백 URL. 생략 시 서버 기본값(`FE_REDIRECT_URL`) 사용. 허용된 CORS origin 이외의 값은 무시됩니다.
+|===
+
+[source,js]
+----
+// 배포 환경 (파라미터 생략)
+window.location.href = 'https://api.chapchu.site/auth/login';
+
+// 로컬 개발
+const redirect = encodeURIComponent(window.location.origin + '/auth/callback');
+window.location.href = `https://api.chapchu.site/auth/login?redirect=${redirect}`;
+----
+
+[.response]
+==== 응답
+
+로그인 완료 후 `{redirect}` 경로로 리다이렉트합니다.
+
+* *기존 유저*: `{redirect}#access_token={JWT}`
+* *신규 유저*: `{redirect}?registration_token={token}`
+
+NOTE: access_token은 URL fragment(`#`)로 전달됩니다. 서버 로그에 남지 않으며 FE 스크립트에서만 읽을 수 있습니다.
+
+=== OAuth 콜백
+
+`GET /auth/callback`
+
+구글 로그인 완료 후 chapchu-auth가 인가 코드를 이 엔드포인트로 리다이렉트합니다.
+서버가 코드를 토큰으로 교환하고, 결과에 따라 FE 콜백으로 다시 리다이렉트합니다.
+
+* *기존 유저*: `code`·`state`를 검증하고 access_token을 발급해 `{redirect}#access_token={JWT}`로 리다이렉트합니다.
+* *신규 유저*: `registration_token`을 담아 `{redirect}?registration_token={token}`로 리다이렉트합니다.
+
+쿼리 파라미터: `code`, `state`(기존 유저 흐름), `registration_token`(신규 유저 흐름).
+`code`가 비었거나 `state`가 쿠키와 불일치하면 `400 Bad Request`.
+
+=== 통합 회원가입
+
+`POST /auth/signup`
+
+닉네임·선호 사항·반려동물을 **한 번에** 등록합니다.
+성공 후 FE에서 다시 `/auth/login`으로 이동해 토큰을 발급받습니다.
+
+이전에는 반려동물 두 마리를 등록하려면 다섯 번을 호출해야 했습니다.
+
+[source]
+----
+POST /auth/register → (구글 재로그인) → POST /users/me/preferences → POST /pets → POST /pets
+----
+
+중간에 하나라도 실패하면 절반만 만들어진 계정이 남았습니다.
+지금은 전부 한 트랜잭션이라 도중에 실패하면 아무것도 남지 않고, **같은 토큰으로 그대로 재시도**할 수 있습니다.
+
+**인증이 필요 없습니다.** 이 시점에 사용자가 가진 것은 `registration_token`뿐입니다.
+선택지를 받는 `GET /breeds`, `GET /activities`, `GET /preferences/options`도 같은 이유로 열려 있습니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/auth-signup/http-request.adoc[]
+include::{snippets}/auth-signup/request-fields.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/auth-signup/http-response.adoc[]
+include::{snippets}/auth-signup/response-fields.adoc[]
+
+==== 오류
+
+|===
+| 상태 코드 | `code` | 언제
+
+| `400 Bad Request` | `INVALID_REQUEST` | 닉네임이 비었거나 30자 초과, 반려동물 필수값 누락
+| `401 Unauthorized` | `UNAUTHORIZED` | 가입 토큰 형식 오류 · 서명 불일치 · 10분 만료
+| `404 Not Found` | `NOT_FOUND` | 없는 견종·활동·지역·테마·이동수단 ID
+| `409 Conflict` | `CONFLICT` | 이미 가입된 계정이거나 닉네임이 이미 사용 중
+| `502 Bad Gateway` | `EXTERNAL_API_ERROR` | 인증 서버에 연결 실패. 잠시 후 재시도 안내
+|===
+
+=== access_token 갱신
+
+`POST /auth/refresh`
+
+refresh_token 쿠키가 자동으로 포함되므로 FE는 별도 헤더 없이 호출합니다.
+반드시 `credentials: 'include'` (fetch) 또는 `withCredentials: true` (axios) 설정이 필요합니다.
+요청은 `refresh_token` HttpOnly 쿠키만 필요하고 본문은 없습니다.
+
+[.response]
+==== 응답 (성공)
+
+`200 OK` — 새 access_token을 발급합니다. (refresh_token 회전)
+
+[.response]
+==== 응답 (쿠키 없음)
+
+refresh_token 쿠키가 없으면 `401 Unauthorized`를 반환합니다. FE는 `/auth/login`으로 이동시킵니다.
+
+include::{snippets}/auth-refresh-no-cookie/http-request.adoc[]
+include::{snippets}/auth-refresh-no-cookie/http-response.adoc[]
+
+* `401 Unauthorized` — refresh_token 없음 또는 만료 → FE에서 `/auth/login`으로 이동
+* `403 Forbidden` — 계정이 `ACTIVE`가 아님(탈퇴 등). refresh_token이 폐기되고 쿠키도 지워집니다
+
+=== 계정 상태에 따른 토큰 발급 차단
+
+`users.account_status`가 **`ACTIVE`인 계정에만** 토큰을 넘깁니다. 아니면 **403**입니다.
+
+|===
+| 엔드포인트 | 비ACTIVE일 때
+
+| `GET /auth/callback`
+| 받은 refresh_token을 폐기하고 `403`. FE 리다이렉트를 하지 않습니다
+
+| `POST /auth/refresh`
+| refresh_token을 폐기하고 쿠키를 지운 뒤 `403`
+|===
+
+유저 행이 없거나 `account_status`가 NULL이어도 차단합니다(상태를 확인할 수 없으면 막는 fail-closed).
+
+NOTE: 토큰을 실제로 만드는 곳은 chapchu-auth입니다(decisions/008). chapchu-api는 BFF로서
+받은 토큰을 폐기하고 넘기지 않는 방식으로 막습니다(decisions/048).
+
+=== 탈퇴 계정의 토큰 차단
+
+`account_status`가 `ACTIVE`가 아닌 계정의 access_token은 **서명이 유효하고 만료 전이어도**
+인증이 필요한 모든 엔드포인트에서 `401`입니다(decisions/049).
+
+[source,json]
+----
+{ "code": "WITHDRAWN_ACCOUNT", "message": "사용할 수 없는 계정입니다." }
+----
+
+FE는 이 응답을 받으면 저장해 둔 access_token을 버리고 `/auth/login`으로 보내면 됩니다.
+재로그인해도 발급 단계에서 `403`이라 로그인되지 않습니다.
+
+IMPORTANT: 일반적인 `401`(토큰 만료)처럼 `/auth/refresh`를 시도해도 소용이 없습니다. 갱신도
+`403`으로 막힙니다. `code`가 `WITHDRAWN_ACCOUNT`면 **갱신을 건너뛰고 바로 로그아웃 처리**하세요.
+
+NOTE: access_token은 chapchu-auth가 서명한 JWT라 chapchu-api가 만료시킬 수 없습니다. 그래서
+"만료시키는" 대신 **받아 주지 않는** 방식으로 막습니다. chapchu-auth를 직접 호출할 수 있는 다른
+클라이언트가 생기면 그쪽은 이 차단에 걸리지 않습니다.
+
+공개 엔드포인트(예: `GET /places/{externalPlaceId}`)는 탈퇴 계정 토큰을 보내도 막히지 않고,
+**비로그인 상태로 취급**해 응답합니다(찜 여부 등 개인화 정보만 빠집니다).
+
+=== 로그아웃
+
+`POST /auth/logout`
+
+refresh_token 쿠키를 만료시킵니다. FE는 로컬에 저장된 access_token도 함께 삭제해야 합니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/auth-logout/http-request.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/auth-logout/http-response.adoc[]
+
+== 공통 API
+
+=== 홈 통합 데이터 조회
+
+`GET /home`
+
+[.request]
+==== 요청
+
+include::{snippets}/main-page/http-request.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/main-page/http-response.adoc[]
+include::{snippets}/main-page/response-fields.adoc[]
+
+=== 마이페이지 요약 조회
+
+`GET /users/me/mypage`
+
+[.request]
+==== 요청
+
+include::{snippets}/mypage-summary/http-request.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/mypage-summary/http-response.adoc[]
+include::{snippets}/mypage-summary/response-fields.adoc[]
+
 == 유저 API
 
 === 내 정보 조회
 
+`GET /users/me`
+
+[.request]
+==== 요청
+
 include::{snippets}/user-get-me/http-request.adoc[]
+
+[.response]
+==== 응답
+
 include::{snippets}/user-get-me/http-response.adoc[]
 include::{snippets}/user-get-me/response-fields.adoc[]
 
-=== 닉네임 등록
+=== 닉네임 중복 확인
 
-include::{snippets}/user-register-nickname/http-request.adoc[]
-include::{snippets}/user-register-nickname/request-fields.adoc[]
-include::{snippets}/user-register-nickname/http-response.adoc[]
-include::{snippets}/user-register-nickname/response-fields.adoc[]
+`GET /users/nickname/availability?nickname={nickname}`
 
-=== 내 정보 수정 (닉네임 변경 / 회원 탈퇴)
+닉네임은 유저 간 중복될 수 없습니다. 이 API는 조회 시점 기준의 사전 안내이며 **예약 효과가 없습니다**.
+확인과 등록 사이에 다른 유저가 선점할 수 있으므로, 최종 판정은 닉네임 등록/수정 요청의 `409 Conflict` 응답으로 처리하세요.
+
+[.request]
+==== 요청
+
+include::{snippets}/nickname-availability/http-request.adoc[]
+include::{snippets}/nickname-availability/query-parameters.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/nickname-availability/http-response.adoc[]
+include::{snippets}/nickname-availability/response-fields.adoc[]
+
+=== 내 정보 수정
+
+`PATCH /users/me`
+
+다른 유저가 사용 중인 닉네임으로 변경하면 `409 Conflict`를 반환합니다.
+본인이 쓰던 닉네임을 그대로 보내는 것은 중복으로 보지 않습니다.
+
+[.request]
+==== 요청
 
 include::{snippets}/user-update-me/http-request.adoc[]
 include::{snippets}/user-update-me/request-fields.adoc[]
+
+[.response]
+==== 응답
+
 include::{snippets}/user-update-me/http-response.adoc[]
 include::{snippets}/user-update-me/response-fields.adoc[]
 
+=== 회원 탈퇴
+
+`DELETE /users/me`
+
+JWT 인증한 본인 계정을 탈퇴 처리합니다(소프트 탈퇴 — `account_status`를 `WITHDRAWN`으로 변경).
+요청 본문은 없고, 성공 시 `204 No Content`를 반환합니다.
+
+탈퇴 직후부터 **갖고 있던 access_token은 더 이상 동작하지 않습니다** — 인증이 필요한 모든 요청이
+`401 WITHDRAWN_ACCOUNT`입니다(decisions/049). 이 엔드포인트도 예외가 아니라 두 번째 호출은
+`204`가 아니라 `401`입니다. 재로그인·토큰 갱신은 `403`으로 막힙니다(decisions/048).
+
+FE는 탈퇴 성공 후 `POST /auth/logout`을 호출해 refresh_token까지 폐기하고 저장해 둔
+access_token을 지우는 것을 권장합니다. 호출하지 않아도 남은 refresh_token은 다음 갱신 시도에서
+폐기되고 `403`을 받습니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/user-withdraw/http-request.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/user-withdraw/http-response.adoc[]
+
+=== 닉네임 변경
+
+`PATCH /users/me/nickname`
+
+닉네임만 변경합니다. 이미 다른 유저가 사용 중인 닉네임이면 `409 Conflict`를 반환합니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/user-change-nickname/http-request.adoc[]
+include::{snippets}/user-change-nickname/request-fields.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/user-change-nickname/http-response.adoc[]
+include::{snippets}/user-change-nickname/response-fields.adoc[]
+
+=== 프로필 사진 설정
+
+`PATCH /users/me/photo`
+
+프로필 사진을 설정합니다. `photoId`는 `POST /photos/upload-url`(type=`PROFILE`) → S3 업로드 → `POST /photos`로
+발급받은 사진 ID입니다. 본인 소유가 아닌 사진이면 `404 NOT_FOUND`. `photoId`를 `null`로 보내면 프사를 지우고
+기본 이미지로 되돌립니다.
+
+NOTE: 모든 `/users/me` 응답의 `profilePhoto.downloadUrl`은 항상 값이 있습니다. 프사가 있으면 그 사진의,
+없으면 서버 기본 이미지의 presigned GET URL(10분)이 내려갑니다. (버킷이 비공개라 기본 이미지도 서명해서 제공)
+
+[.request]
+==== 요청
+
+include::{snippets}/user-update-photo/http-request.adoc[]
+include::{snippets}/user-update-photo/request-fields.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/user-update-photo/http-response.adoc[]
+include::{snippets}/user-update-photo/response-fields.adoc[]
+
+=== 선호 사항 선택지 조회
+
+`GET /preferences/options`
+
+선호 사항 등록/수정은 지역·테마·이동수단을 **UUID로** 받습니다.
+코드값은 DB 시딩 시 생성되므로 하드코딩할 수 없고, 이 API로 받아서 써야 합니다.
+
+|===
+| 항목 | 값
+
+| `regions`
+| 광역시·자치도 17개 (서울·부산·대구·인천·광주·대전·울산·세종·경기·강원·충북·충남·전북·전남·경북·경남·제주)
+
+| `themes`
+| TourAPI 대분류 8종 (관광지·문화시설·축제공연행사·여행코스·레포츠·숙박·쇼핑·음식점)
+
+| `transportMethods`
+| 자가용·대중교통·도보·자전거
+|===
+
+NOTE: 테마는 TourAPI의 `contentTypeId`와 1:1로 맞춰져 있습니다. 유저 선호와 장소 분류가 같은 축을 쓰기 위해서입니다.
+
+**인증이 필요 없습니다.** 신규 유저는 회원가입 화면에서 선호 사항을 고르는데,
+그 시점에는 아직 access token이 없기 때문입니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/preference-options/http-request.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/preference-options/http-response.adoc[]
+include::{snippets}/preference-options/response-fields.adoc[]
+
 === 선호 사항 조회
 
+`GET /users/me/preferences`
+
+[.request]
+==== 요청
+
 include::{snippets}/user-preferences-get/http-request.adoc[]
+
+[.response]
+==== 응답
+
 include::{snippets}/user-preferences-get/http-response.adoc[]
 include::{snippets}/user-preferences-get/response-fields.adoc[]
 
-=== 선호 사항 등록
+=== 선호 사항 등록/수정
 
-include::{snippets}/user-preferences-register/http-request.adoc[]
-include::{snippets}/user-preferences-register/request-fields.adoc[]
-include::{snippets}/user-preferences-register/http-response.adoc[]
-include::{snippets}/user-preferences-register/response-fields.adoc[]
+`PATCH /users/me/preferences`
 
-=== 선호 사항 수정
+최초 등록과 이후 수정을 나누지 않습니다. 선호 사항은 유저에 종속된 단일 값이라
+따로 생성되는 리소스가 아니고, 서버가 두 경우를 구분하지 않습니다.
+
+보내지 않은 항목은 **그대로 유지**됩니다. 세 항목을 모두 보내면 전부 설정되고,
+`regionIds`만 보내면 테마·이동수단은 건드리지 않습니다.
+
+[.request]
+==== 요청
 
 include::{snippets}/user-preferences-update/http-request.adoc[]
 include::{snippets}/user-preferences-update/request-fields.adoc[]
+
+[.response]
+==== 응답
+
 include::{snippets}/user-preferences-update/http-response.adoc[]
 include::{snippets}/user-preferences-update/response-fields.adoc[]
 
+NOTE: 회원가입 시점의 최초 등록은 `POST /auth/signup`이 함께 처리합니다.
+
+=== 작성한 게시글 조회
+
+`GET /users/me/posts`
+
+[.request]
+==== 요청
+
+include::{snippets}/my-post-list/http-request.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/my-post-list/http-response.adoc[]
+
+=== 북마크한 게시글 조회
+
+`GET /users/me/bookmarks`
+
+[.request]
+==== 요청
+
+include::{snippets}/my-bookmark-list/http-request.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/my-bookmark-list/http-response.adoc[]
+
+=== 위시리스트 조회
+
+`GET /users/me/wishlist`
+
+찜한 순서의 역순(최신 먼저)으로 돌려준다. 목록 화면을 바로 그릴 수 있게 장소 이름·이미지·주소·좌표·평점을
+함께 담는다. 항목마다 `GET /places/{id}`를 다시 부를 필요가 없다.
+
+[.request]
+==== 요청
+
+include::{snippets}/wishlist-list/http-request.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/wishlist-list/http-response.adoc[]
+include::{snippets}/wishlist-list/response-fields.adoc[]
+
+=== 위시리스트 장소 추가
+
+`POST /users/me/wishlist/{placeId}`
+
+`placeId`는 한국관광공사 contentId(`places.external_place_id`)다.
+
+아직 서버에 동기화되지 않은 장소는 404다. `GET /places/nearby`가 응답에 담긴 장소를 모두 저장하므로,
+목록에서 본 장소는 찜할 수 있다.
+
+|===
+| 상태 코드 | 설명
+
+| `201 Created` | 찜 완료
+| `404 Not Found` | 서버에 없는 장소
+| `409 Conflict` | 이미 찜한 장소
+|===
+
+[.request]
+==== 요청
+
+include::{snippets}/wishlist-create/http-request.adoc[]
+include::{snippets}/wishlist-create/path-parameters.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/wishlist-create/http-response.adoc[]
+
+=== 위시리스트 장소 제거
+
+`DELETE /users/me/wishlist/{placeId}`
+
+[.request]
+==== 요청
+
+include::{snippets}/wishlist-delete/http-request.adoc[]
+include::{snippets}/wishlist-delete/path-parameters.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/wishlist-delete/http-response.adoc[]
+
+=== 스탬프 도감 조회
+
+`GET /users/me/stamps`
+
+스탬프는 **17개 광역자치단체(시·도)** 단위입니다. 코스에 담긴 장소를 방문 인증하면 그 장소가
+속한 시·도의 스탬프가 발급되고, 같은 지역을 다시 방문하면 `stampCount`만 올라갑니다.
+
+[cols="1,3"]
+|===
+| 구분 | 지역
+
+| 특별시·광역시
+| 서울 · 부산 · 대구 · 인천 · 광주 · 대전 · 울산 · 세종
+
+| 도
+| 경기 · 강원 · 충북 · 충남 · 전북 · 전남 · 경북 · 경남 · 제주
+|===
+
+**미획득 지역도 함께 내려갑니다.** `acquired`가 `false`인 항목을 회색으로 그리면 됩니다.
+
+지역 판정은 TourAPI `areaCode`로 합니다. 아직 동기화되지 않아 `places.area_code`가 비어 있는
+장소는 스탬프가 발급되지 않습니다. 이 경우에도 방문 인증 자체는 정상 처리됩니다.
+
+NOTE: 스탬프 이미지는 **프론트 저장소에서 관리**합니다. 서버는 이미지 URL을 내려주지 않습니다.
+프론트는 `stampName`(시·도 이름)을 키로 자체 이미지를 매핑하면 됩니다. `stampName`은 유니크하고
+바뀌지 않습니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/stamp-collection/http-request.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/stamp-collection/http-response.adoc[]
+include::{snippets}/stamp-collection/response-fields.adoc[]
+
+=== 내가 작성한 리뷰 목록
+
+`GET /users/me/reviews`
+
+[.request]
+==== 요청
+
+include::{snippets}/my-review-list/http-request.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/my-review-list/http-response.adoc[]
+include::{snippets}/my-review-list/response-fields.adoc[]
+
+
+
 == 반려동물 API
+
+=== 견종 목록 조회
+
+`GET /breeds`
+
+반려견 등록은 견종을 **정수 ID로** 받습니다 (`breedId`).
+견종 코드는 DB 시딩 시 생성되므로 하드코딩하지 말고 이 API로 받아서 쓰세요.
+
+**인증이 필요 없습니다.** 신규 유저는 온보딩 화면에서 반려동물을 등록하는데,
+그 시점에는 아직 access token이 없기 때문입니다.
+
+순종이 아닌 경우를 위해 `믹스견`이 목록에 포함되어 있습니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/breeds/http-request.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/breeds/http-response.adoc[]
+include::{snippets}/breeds/response-fields.adoc[]
+
+=== 활동 유형 목록 조회
+
+`GET /activities`
+
+반려견 등록/수정은 선호 활동을 **UUID로** 받습니다.
+활동 코드는 DB 시딩 시 생성되므로 하드코딩할 수 없고, 이 API로 받아서 써야 합니다.
+
+**인증이 필요 없습니다.** 견종 목록과 같은 이유입니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/pet-activities/http-request.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/pet-activities/http-response.adoc[]
+include::{snippets}/pet-activities/response-fields.adoc[]
 
 === 반려견 목록 조회
 
+`GET /pets`
+
+[.request]
+==== 요청
+
 include::{snippets}/pet-list/http-request.adoc[]
+
+[.response]
+==== 응답
+
 include::{snippets}/pet-list/http-response.adoc[]
 
 === 반려견 등록
 
+`POST /pets`
+
+[.request]
+==== 요청
+
 include::{snippets}/pet-create/http-request.adoc[]
 include::{snippets}/pet-create/request-fields.adoc[]
+
+[.response]
+==== 응답
+
 include::{snippets}/pet-create/http-response.adoc[]
 include::{snippets}/pet-create/response-fields.adoc[]
 
 === 반려견 정보 수정
 
+`PATCH /pets/{petId}`
+
+[.request]
+==== 요청
+
 include::{snippets}/pet-update/http-request.adoc[]
 include::{snippets}/pet-update/path-parameters.adoc[]
 include::{snippets}/pet-update/request-fields.adoc[]
+
+[.response]
+==== 응답
+
 include::{snippets}/pet-update/http-response.adoc[]
 include::{snippets}/pet-update/response-fields.adoc[]
 
+=== 반려견 프로필 사진 설정
+
+`PATCH /pets/{petId}/photo`
+
+`POST /photos/upload-url` → S3 업로드 → `POST /photos`로 사진을 등록한 뒤, 그 `photoId`를 보냅니다.
+본인 사진이 아니면 404입니다. `photoId`를 `null`로 보내면 사진을 뗍니다.
+
+업로드할 때 `type`은 **`PROFILE`**을 씁니다. 배경화면도 같은 경로에 올립니다.
+
+NOTE: 사진이 없으면 응답의 `profilePhoto`가 `null`입니다. **기본 이미지는 프론트에서 처리합니다.**
+서버는 기본 이미지를 내려주지 않습니다.
+
+[source,json]
+----
+{ "photoId": "0198f3a0-1234-7000-8000-000000000001" }
+----
+
+[.request]
+==== 요청
+
+include::{snippets}/pet-photo-update/http-request.adoc[]
+include::{snippets}/pet-photo-update/path-parameters.adoc[]
+include::{snippets}/pet-photo-update/request-fields.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/pet-photo-update/http-response.adoc[]
+
+=== 반려견 프로필 배경화면 설정
+
+`PATCH /pets/{petId}/background`
+
+프로필 사진과 동작이 같습니다. 사진도 **같은 경로**(`type=PROFILE`)에 올리면 됩니다.
+프로필 사진과 배경화면은 서로 독립이라 한쪽을 바꿔도 다른 쪽은 그대로입니다.
+
+`photoId`를 `null`로 보내면 배경을 뗍니다. 없으면 응답의 `backgroundPhoto`가 `null`입니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/pet-background-update/http-request.adoc[]
+include::{snippets}/pet-background-update/path-parameters.adoc[]
+include::{snippets}/pet-background-update/request-fields.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/pet-background-update/http-response.adoc[]
+
 === 반려견 삭제
+
+`DELETE /pets/{petId}`
+
+[.request]
+==== 요청
 
 include::{snippets}/pet-delete/http-request.adoc[]
 include::{snippets}/pet-delete/path-parameters.adoc[]
+
+[.response]
+==== 응답
+
 include::{snippets}/pet-delete/http-response.adoc[]
 
 == 사진 API
 
-=== 사진 업로드 URL 발급
+사진은 S3 presigned URL 방식으로 다룹니다. 업로드는 `upload-url`로 발급받은 URL에 FE가 직접 PUT하고,
+저장(`POST /photos`)으로 메타데이터를 기록합니다. 조회는 `GET /photos/{photoId}`로 다운로드용
+presigned URL을 발급받습니다. 버킷은 비공개이며 서버가 소유권 검증 후 URL을 발급합니다.
+`type`으로 사진 용도(PROFILE/POST/REVIEW)를 지정하면 S3 키가 `{소문자 type}/{userId}/...`(예: `review/...`)로 정리됩니다.
+
+`upload-url`과 `POST /photos`는 모두 **배열**로 여러 장을 한 번에 처리합니다(리뷰·게시글에 사진 여러 장 첨부).
+발급 응답의 `fileName`으로 어느 URL이 어느 원본 파일인지 매칭하고, 저장은 한 트랜잭션으로 처리됩니다.
+
+=== 사진 업로드 URL 발급 (여러 장)
+
+`POST /photos/upload-url`
+
+`files` 배열의 항목마다 `type`을 지정합니다. 응답은 요청 순서대로 URL 목록을 돌려줍니다.
+
+[.request]
+==== 요청
 
 include::{snippets}/photo-upload-url/http-request.adoc[]
 include::{snippets}/photo-upload-url/request-fields.adoc[]
+
+[.response]
+==== 응답
+
 include::{snippets}/photo-upload-url/http-response.adoc[]
 include::{snippets}/photo-upload-url/response-fields.adoc[]
 
-=== 사진 저장
+=== 사진 저장 (여러 장)
+
+`POST /photos`
+
+`photos` 배열로 여러 장을 한 번에 저장합니다. 항목의 `coursePlaceId`는 방문 인증 사진일 때만 넣습니다(게시글·앨범 사진 등은 생략).
+
+[.request]
+==== 요청
 
 include::{snippets}/photo-create/http-request.adoc[]
 include::{snippets}/photo-create/request-fields.adoc[]
+
+[.response]
+==== 응답
+
 include::{snippets}/photo-create/http-response.adoc[]
 include::{snippets}/photo-create/response-fields.adoc[]
 
+=== 사진 조회
+
+`GET /photos/{photoId}`
+
+본인 사진만 조회할 수 있으며, 다운로드용 presigned URL(10분 유효)을 반환합니다.
+없거나 본인 것이 아니면 `404 NOT_FOUND`.
+
+[.request]
+==== 요청
+
+include::{snippets}/photo-get/http-request.adoc[]
+include::{snippets}/photo-get/path-parameters.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/photo-get/http-response.adoc[]
+include::{snippets}/photo-get/response-fields.adoc[]
+
 == 장소 API
 
-=== 장소 상세 조회
+NOTE: 장소 데이터는 TourAPI에서 가져와 채웁니다 (`docs/decisions/030` 참고). 조회 전용 API입니다.
+
+=== 장소 조회
+
+`GET /places/{externalPlaceId}`
+
+`externalPlaceId`는 한국관광공사 TourAPI의 `contentId`입니다.
+
+[.request]
+==== 요청
 
 include::{snippets}/place-get/http-request.adoc[]
 include::{snippets}/place-get/path-parameters.adoc[]
+
+[.response]
+==== 응답
+
 include::{snippets}/place-get/http-response.adoc[]
 include::{snippets}/place-get/response-fields.adoc[]
 
-=== 주변 장소 검색 (TourAPI 실시간 조회 + 캐시)
+=== 근처 장소 조회
+
+`GET /places/nearby?lat={lat}&lng={lng}&radiusMeters={radiusMeters}`
+
+[.request]
+==== 요청
 
 include::{snippets}/place-nearby/http-request.adoc[]
 include::{snippets}/place-nearby/query-parameters.adoc[]
+
+[.response]
+==== 응답
+
 include::{snippets}/place-nearby/http-response.adoc[]
 include::{snippets}/place-nearby/response-fields.adoc[]
 
-== 여행 API
+== 커뮤니티 API
 
-== 앨범 API
+=== 게시글 목록 조회
+
+`GET /posts?sort={sort}&type={type}&cursor={cursor}&size={size}`
+
+목록은 카드용 **요약**(제목·닉네임·대표사진·추천수·댓글수·작성일)만 내려갑니다. 본문·참조·사진 전체는 상세 `GET /posts/{id}`에서 가져옵니다.
+`thumbnail`은 대표 사진(첫 장)이며 사진 없는 글이면 null입니다. 작성자 프로필 사진(`authorProfilePhotoUrl`)과 대표 사진(`thumbnail.downloadUrl`)은 서버가 **presigned URL(10분)** 로 함께 내려주므로, FE는 별도 호출 없이 바로 표시합니다. 비공개 버킷이라 이 URL로만 열람할 수 있고 10분 뒤 만료되니, 목록을 새로 부를 때 받은 값을 그대로 사용합니다.
+
+cursor 값은 이전 응답의 `nextCursor` 필드를 그대로 전달합니다. 첫 페이지는 생략합니다. `nextCursor`가 null이면 마지막 페이지입니다.
+
+==== 글 종류 필터
+
+글은 **일반(`GENERAL`)** 과 **여행후기(`TRAVEL_REVIEW`)** 두 종류입니다. `type`으로 한 종류만 걸러 볼 수 있고,
+생략하면 종류를 가리지 않고 전부 내려갑니다. 정렬(`sort`)·커서와 함께 쓸 수 있어 `?type=TRAVEL_REVIEW&sort=popular`처럼
+조합해도 됩니다. 정의되지 않은 값을 보내면 400입니다.
+
+각 글의 종류는 목록·상세 응답의 `postType`으로 내려갑니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/post-list/http-request.adoc[]
+include::{snippets}/post-list/query-parameters.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/post-list/http-response.adoc[]
+include::{snippets}/post-list/response-fields.adoc[]
+
+=== 게시글 상세 조회
+
+`GET /posts/{postId}`
+
+작성자 프로필 사진(`authorProfilePhotoUrl`)과 첨부 사진(`photos[].downloadUrl`)은 서버가 **presigned URL(10분)** 로 내려줍니다. FE는 이 URL을 그대로 `<img>`에 사용하며, 별도의 `GET /photos` 호출이 필요 없습니다. `photoKey`는 원본 식별용으로 유지됩니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/post-detail/http-request.adoc[]
+include::{snippets}/post-detail/path-parameters.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/post-detail/http-response.adoc[]
+include::{snippets}/post-detail/response-fields.adoc[]
+
+=== 게시글 작성
+
+`POST /posts`
+
+`posts`는 자유게시판이다. 리뷰 게시판은 review 도메인에서 따로 가져온다.
+
+`postType`, `petId`, `courseId`, `photos`가 **모두 선택**이다. 본문만 보내도 글이 등록된다.
+`postType`을 보내지 않으면 일반글(`GENERAL`)로 저장된다. 여행후기는 `TRAVEL_REVIEW`로 보낸다.
+사진은 `photos` 배열에 upload-url로 받은 `photoKey`만 담아 보내면 서버가 photo를 만들어 글에 연결한다(최대 10장).
+photoKey는 `{type}/{userId}/...` 형식이라 본인 업로드 경로가 아니면 400(`fieldErrors`의 `photoKey`)이다.
+값을 보낸 `petId`/`courseId`도 **본인 것**이어야 하고, 아니면 400에 어느 필드인지 담긴다.
+
+**응답 본문은 없다(201).** 작성 후 FE는 목록으로 이동한다. 첨부한 사진은 목록·상세 응답의 `photos[]`로 확인한다.
+
+[.request]
+==== 요청
+
+include::{snippets}/post-create/http-request.adoc[]
+include::{snippets}/post-create/request-fields.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/post-create/http-response.adoc[]
+
+=== 게시글 수정
+
+`PATCH /posts/{postId}`
+
+보내지 않은 필드는 그대로 둔다. `postType`을 보내면 글 종류를 바꿀 수 있고, 생략하면 기존 종류를 유지한다.
+
+`photos`는 **목록을 통째로 교체**한다. 남길 사진도 함께 보내야 하고, 순서는 배열 순서를 따른다.
+
+* `photos`를 **생략하거나 `null`** → 사진을 손대지 않는다
+* `photos: []` → 사진을 전부 뗀다
+* `photos: [...]` → 보낸 목록으로 교체한다. 첫 장이 대표 사진이 된다
+
+NOTE: `post_photos` 연결만 지운다. 사진 레코드와 S3 객체는 남는다. 같은 사진을 다른 글이나 리뷰가
+참조할 수 있기 때문이다.
+
+[.request]
+==== 요청
+
+include::{snippets}/post-update/http-request.adoc[]
+include::{snippets}/post-update/path-parameters.adoc[]
+include::{snippets}/post-update/request-fields.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/post-update/http-response.adoc[]
+include::{snippets}/post-update/response-fields.adoc[]
+
+=== 게시글 삭제
+
+`DELETE /posts/{postId}`
+
+[.request]
+==== 요청
+
+include::{snippets}/post-delete/http-request.adoc[]
+include::{snippets}/post-delete/path-parameters.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/post-delete/http-response.adoc[]
+
+=== 게시글 추천
+
+`POST /posts/{postId}/recommendations`
+
+[.request]
+==== 요청
+
+include::{snippets}/post-recommendation-create/http-request.adoc[]
+include::{snippets}/post-recommendation-create/path-parameters.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/post-recommendation-create/http-response.adoc[]
+
+=== 게시글 추천 취소
+
+`DELETE /posts/{postId}/recommendations`
+
+[.request]
+==== 요청
+
+include::{snippets}/post-recommendation-delete/http-request.adoc[]
+include::{snippets}/post-recommendation-delete/path-parameters.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/post-recommendation-delete/http-response.adoc[]
+
+=== 게시글 북마크
+
+`POST /posts/{postId}/bookmarks`
+
+[.request]
+==== 요청
+
+include::{snippets}/post-bookmark-create/http-request.adoc[]
+include::{snippets}/post-bookmark-create/path-parameters.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/post-bookmark-create/http-response.adoc[]
+
+=== 게시글 북마크 취소
+
+`DELETE /posts/{postId}/bookmarks`
+
+[.request]
+==== 요청
+
+include::{snippets}/post-bookmark-delete/http-request.adoc[]
+include::{snippets}/post-bookmark-delete/path-parameters.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/post-bookmark-delete/http-response.adoc[]
+
+=== 게시글 신고
+
+`POST /posts/{postId}/reports`
+
+[.request]
+==== 요청
+
+include::{snippets}/post-report-create/http-request.adoc[]
+include::{snippets}/post-report-create/path-parameters.adoc[]
+include::{snippets}/post-report-create/request-fields.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/post-report-create/http-response.adoc[]
+
+=== 댓글 목록 조회
+
+`GET /posts/{postId}/comments`
+
+`comment_order` 오름차순으로 돌려준다. 탈퇴한 사용자의 댓글은 `nickname`이 `(탈퇴한 사용자)`다.
+
+삭제된 댓글도 목록에 남는다. 대댓글이 달려 있으면 부모를 지웠을 때 스레드가 통째로 사라지기
+때문이다. 이 경우 `deleted`가 `true`, `content`는 `"삭제된 댓글입니다"`, `nickname`은 `null`이다.
+
+[.request]
+==== 요청
+
+include::{snippets}/comment-list/http-request.adoc[]
+include::{snippets}/comment-list/path-parameters.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/comment-list/http-response.adoc[]
+include::{snippets}/comment-list/response-fields.adoc[]
+
+=== 댓글 작성
+
+`POST /posts/{postId}/comments`
+
+[.request]
+==== 요청
+
+include::{snippets}/comment-create/http-request.adoc[]
+include::{snippets}/comment-create/path-parameters.adoc[]
+include::{snippets}/comment-create/request-fields.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/comment-create/http-response.adoc[]
+include::{snippets}/comment-create/response-fields.adoc[]
+
+=== 댓글 수정
+
+`PATCH /comments/{commentId}`
+
+본인이 쓴 댓글만 수정할 수 있다. 남의 댓글이면 404다.
+
+[.request]
+==== 요청
+
+include::{snippets}/comment-update/http-request.adoc[]
+include::{snippets}/comment-update/path-parameters.adoc[]
+include::{snippets}/comment-update/request-fields.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/comment-update/http-response.adoc[]
+include::{snippets}/comment-update/response-fields.adoc[]
+
+=== 댓글 삭제
+
+`DELETE /comments/{commentId}`
+
+행을 지우지 않고 삭제 표시만 남긴다(소프트 삭제). 이미 삭제된 댓글을 다시 지우거나 수정하면 404다.
+
+[.request]
+==== 요청
+
+include::{snippets}/comment-delete/http-request.adoc[]
+include::{snippets}/comment-delete/path-parameters.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/comment-delete/http-response.adoc[]
 
 == 리뷰 API
 
+=== 리뷰 작성
+
+`POST /reviews`
+
+JWT 인증이 필요합니다. `petId`는 본인 반려동물이어야 하며, 타인의 반려동물 ID를 사용하면 403이 반환됩니다.
+코스 여행 중 작성하는 경우 `coursePlaceId`를 함께 전달하면 해당 방문 장소와 연결됩니다.
+
+사진을 첨부하려면 먼저 `POST /photos/upload-url`(type=`REVIEW`) → S3 업로드 → `POST /photos`로 사진을 만들어
+얻은 `photoId`들을 `photoIds`에 순서대로 담아 보냅니다(리뷰 1개에 여러 장, 최대 10장). 본인 소유가 아닌
+사진 ID면 `404 NOT_FOUND`. 응답·조회 시 각 사진의 다운로드 URL(presigned GET, 10분)이 `photos[]`로 내려갑니다.
+코스엔 리뷰가 여러 개 달리므로 코스당 사진이 여러 장 쌓이며, 앨범·추천장소는 이 리뷰 사진을 가져다 씁니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/review-create/http-request.adoc[]
+include::{snippets}/review-create/request-fields.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/review-create/http-response.adoc[]
+include::{snippets}/review-create/response-fields.adoc[]
+
+=== 리뷰 단건 상세 조회
+
+`GET /reviews/{reviewId}`
+
+JWT 인증이 필요합니다. 본인 리뷰가 아니어도 조회할 수 있습니다.
+
+목록 API(`GET /users/me/reviews`, `GET /places/{placeId}/reviews`)는 `placeId`·`petId`를 ID 그대로
+내려주지만, 이 API는 **작성자 닉네임·반려동물 이름·견종·장소 이름·주소까지 채워서** 줍니다.
+SNS 카드처럼 사람이 읽는 화면을 그릴 때 씁니다.
+
+`author`·`pet`·`course`는 각각 `null`일 수 있습니다.
+
+* `author` — 작성자가 탈퇴한 경우
+* `pet` — 반려동물이 삭제된 경우
+* `course` — 코스를 통하지 않고 장소에 바로 쓴 리뷰인 경우
+
+`place.placeName`·`place.address`는 해당 장소가 `places`에 적재돼 있지 않으면 `null`이고,
+`place.externalPlaceId`는 항상 채워집니다.
+
+NOTE: 프로필 사진과 리뷰 사진의 `downloadUrl`은 모두 presigned GET URL이며 **10분 후 만료**됩니다.
+카드를 이미지로 만들어 보관할 경우 만료 전에 렌더링해야 합니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/review-get/http-request.adoc[]
+include::{snippets}/review-get/path-parameters.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/review-get/http-response.adoc[]
+include::{snippets}/review-get/response-fields.adoc[]
+
+=== 리뷰 삭제
+
+`DELETE /reviews/{reviewId}`
+
+JWT 인증이 필요합니다. 본인이 작성한 리뷰만 삭제할 수 있습니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/review-delete/http-request.adoc[]
+include::{snippets}/review-delete/path-parameters.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/review-delete/http-response.adoc[]
+
+=== 장소별 리뷰 목록
+
+`GET /places/{placeId}/reviews`
+
+인증이 필요 없습니다. 최신순으로 반환됩니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/place-review-list/http-request.adoc[]
+include::{snippets}/place-review-list/path-parameters.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/place-review-list/http-response.adoc[]
+include::{snippets}/place-review-list/response-fields.adoc[]
+
+=== 리뷰 추천
+
+`POST /reviews/{reviewId}/recommendations`
+
+[.request]
+==== 요청
+
+include::{snippets}/review-recommendation-create/http-request.adoc[]
+include::{snippets}/review-recommendation-create/path-parameters.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/review-recommendation-create/http-response.adoc[]
+
+=== 리뷰 추천 취소
+
+`DELETE /reviews/{reviewId}/recommendations`
+
+[.request]
+==== 요청
+
+include::{snippets}/review-recommendation-delete/http-request.adoc[]
+include::{snippets}/review-recommendation-delete/path-parameters.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/review-recommendation-delete/http-response.adoc[]
+
+== 여행 API
+
+=== 코스 생성
+
+`POST /courses`
+
+JWT 인증이 필요합니다. `petId`(본인 반려동물)가 필수이며, FE가 수집한 날씨 정보(temperature, humidity, weatherStatus)를 함께 전달합니다.
+**중간 개수(`intermediateStopCount`)는 없어졌습니다. 출발지·도착지는 고정 양 끝점이고, 시스템은 중간 스탑만 큐레이션합니다.**
+도착지는 **사용자가 임의로 고른 최종 지점**(우리 펫장소 DB와 무관)을 `destination` 객체로 보냅니다. 서버는 저장용으로 `destination`의 **`placeName`·`latitude`·`longitude`만 사용**하고, `allowedPetSize`는 **반려견 가능여부(`petAllowed`) 계산에만** 씁니다(그 외 `externalPlaceId`·정책 필드는 무시). **도착지는 `places`/RAG에 저장하지 않고** 고정 도착 스탑으로만 둡니다(decisions/045). 출발~도착 사이 후보를 모아 **AI가 취향(선호 활동)·거리·날씨를 보고 중간 스탑을 최대 3개까지 큐레이션**합니다. (중간 개수 N은 거리·반려동물 체력·날씨로 산정 — docs/decisions/043)
+따라서 응답 `places`는 **큐레이션 중간(0~3) + 고정 도착지 1** 로 구성되며(최대 4곳), 각 스탑에 `reason`(왜 이 곳)이 담깁니다. 후보가 없어도 도착지만으로 코스가 생성됩니다(404 아님).
+중간 스탑은 위경도·이미지·반려동물 정책이 채워지지만, **도착지 스탑은 임의 지점이라 `externalPlaceId`가 null이고 이름·좌표만** 있으며 정책·이미지는 비어 있을 수 있습니다.
+각 스탑의 `petAllowed`는 반려견 가능 여부를 나타냅니다(`true`/`false`, 정보 없으면 `null`). **반려견 불가여도 코스 생성을 막지 않고 표시만** 합니다 — 도착지 선택은 사용자가 보장하고, FE가 경고로 안내하면 됩니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/course-create/http-request.adoc[]
+include::{snippets}/course-create/request-fields.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/course-create/http-response.adoc[]
+include::{snippets}/course-create/response-fields.adoc[]
+
+=== 코스 조회
+
+`GET /courses/{courseId}`
+
+JWT 인증이 필요합니다. 본인의 코스만 조회할 수 있습니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/course-get/http-request.adoc[]
+include::{snippets}/course-get/path-parameters.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/course-get/http-response.adoc[]
+include::{snippets}/course-get/response-fields.adoc[]
+
+=== 코스 단위 리뷰·사진 조회
+
+`GET /courses/{courseId}/reviews`
+
+JWT 인증이 필요하며 **코스 주인만** 조회할 수 있습니다. 코스의 각 스탑(방문 순서대로)에 주인이 쓴 리뷰와 사진을 묶어 반환합니다.
+아직 리뷰가 없는 스탑은 `review`가 `null`입니다. 리뷰 사진의 `downloadUrl`은 presigned GET URL(10분)입니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/course-reviews/http-request.adoc[]
+include::{snippets}/course-reviews/path-parameters.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/course-reviews/http-response.adoc[]
+include::{snippets}/course-reviews/response-fields.adoc[]
+
+=== 내 코스 목록 조회
+
+`GET /users/me/courses`
+
+JWT 인증이 필요합니다. 최신순으로 반환됩니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/my-course-list/http-request.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/my-course-list/http-response.adoc[]
+include::{snippets}/my-course-list/response-fields.adoc[]
+
+=== 코스 장소 방문 체크인
+
+`PATCH /course-places/{coursePlaceId}/visit`
+
+JWT 인증이 필요합니다. 이미 체크인된 장소는 멱등 처리(200 OK)됩니다.
+현재 위치(lat, lng)가 장소에서 500m 이상 떨어진 경우 400을 반환합니다.
+
+체크인은 방문 기록과 스탬프 발급만 합니다. **마지막 장소를 체크인해도 코스가 자동으로 완료되지 않습니다.**
+코스 완료는 `POST /courses/{courseId}/complete` 호출로만 이뤄집니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/course-place-visit/http-request.adoc[]
+include::{snippets}/course-place-visit/path-parameters.adoc[]
+include::{snippets}/course-place-visit/request-fields.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/course-place-visit/http-response.adoc[]
+
+=== 코스 완료
+
+`POST /courses/{courseId}/complete`
+
+JWT 인증이 필요합니다. 코스 소유자만 호출할 수 있습니다 (타인 호출 시 403).
+이미 완료된 코스를 재호출해도 200 OK(멱등)를 반환합니다.
+
+**코스가 완료되는 유일한 경로입니다.** 정책상 코스는 모든 장소를 방문해야 완료되며, 전부 방문했는지는
+FE가 판단해 이 엔드포인트를 호출합니다(백엔드는 방문 여부를 검증하지 않습니다). 미방문 장소를 빼고
+완료하는 "부분 완료"는 없습니다 — 끝까지 돌지 않은 코스는 완료가 아니라 삭제(`DELETE /courses/{courseId}`) 대상입니다.
+
+체크인(`PATCH /course-places/{coursePlaceId}/visit`)과 리뷰 작성(`POST /reviews`)은 완료 상태를
+바꾸지 않습니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/course-complete/http-request.adoc[]
+include::{snippets}/course-complete/path-parameters.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/course-complete/http-response.adoc[]
+
+=== 코스 삭제
+
+`DELETE /courses/{courseId}`
+
+여행을 중도 포기했을 때 코스를 **완전히 삭제**합니다(하드삭제). 상태 컬럼으로 숨기는 소프트삭제가 아니므로
+되돌릴 수 없습니다. JWT 인증이 필요하고 코스 소유자만 호출할 수 있습니다(타인 호출 시 403,
+없는 코스는 404). 성공하면 본문 없이 `204 No Content`를 반환합니다.
+
+코스에 딸린 스탑(`course_places`)과 날씨 기록(`course_weather_records`)은 FK가 `ON DELETE CASCADE`라
+함께 지워집니다. 반대로 리뷰·사진·게시글이 연결된 코스는 그쪽 FK가 CASCADE가 아니라 DB가 삭제를 막습니다.
+**완료한 코스는 삭제 대상이 아니므로, 미완료 코스에만 호출하세요.**
+
+[.request]
+==== 요청
+
+include::{snippets}/course-delete/http-request.adoc[]
+include::{snippets}/course-delete/path-parameters.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/course-delete/http-response.adoc[]
+
+== 날씨 기록 API
+
+=== 날씨 기록 저장
+
+`POST /courses/{courseId}/weather`
+
+코스 소유자가 해당 날짜의 날씨를 기록합니다. FE가 외부 날씨 API에서 가져온 데이터를 전달합니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/weather-record-create/http-request.adoc[]
+
+include::{snippets}/weather-record-create/path-parameters.adoc[]
+
+include::{snippets}/weather-record-create/request-fields.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/weather-record-create/http-response.adoc[]
+
+include::{snippets}/weather-record-create/response-fields.adoc[]
+
+=== 날씨 기록 목록 조회
+
+`GET /courses/{courseId}/weather`
+
+코스에 저장된 날씨 기록 목록을 날짜 내림차순으로 반환합니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/weather-record-list/http-request.adoc[]
+
+include::{snippets}/weather-record-list/path-parameters.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/weather-record-list/http-response.adoc[]
+
+include::{snippets}/weather-record-list/response-fields.adoc[]
+
+== 앨범 API
+
+앨범은 별도 저장 없이 **여행 사진을 코스 단위로 묶어 보여주는** 파생 조회입니다.
+`photos.course_place_id → course_places → travel_courses` 경로로 코스에 연결된 내 사진을 모으고,
+사진이 `review_photos`에 연결돼 있으면 `isPublic=true`(공개), 아니면 개인(나만) 사진입니다.
+`downloadUrl`은 presigned GET URL(10분)이며, 코스는 `travel_courses.pet_id`로 펫과 연결됩니다.
+
+사진 정렬은 `createdAt`(업로드 시각, 초 단위)을 기준으로 하세요. `takenAt`은 촬영일이지만 DATE(일 단위)라
+같은 날 찍은 사진끼리는 순서를 가릴 수 없습니다. 서버도 `photos.created_at` 오름차순으로 내려줍니다.
+
+=== 내 앨범 조회
+
+`GET /users/me/album`
+
+JWT 인증 필요. 코스에 연결된 내 사진을 **코스 단위로 그룹**해 최신 여행일 순으로 반환합니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/album-my/http-request.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/album-my/http-response.adoc[]
+include::{snippets}/album-my/response-fields.adoc[]
+
+=== 펫별 앨범 조회
+
+`GET /users/me/pets/{petId}/album`
+
+특정 펫과 함께한 코스의 사진만 코스 단위로 모아 반환합니다(펫 사망 후 추모용으로도 사용). 응답 형태는 내 앨범과 동일합니다.
+
+[.request]
+==== 요청
+
+include::{snippets}/album-pet/http-request.adoc[]
+include::{snippets}/album-pet/path-parameters.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/album-pet/http-response.adoc[]
+include::{snippets}/album-pet/response-fields.adoc[]
+
 == 추천 API
+
+=== 장소 추천
+
+`POST /recommended-places`
+
+JWT 인증이 필요합니다. 기준 좌표를 기반으로 반려동물 동반 가능 장소를 추천합니다.
+DB에 저장되지 않습니다. 코스 생성 전 미리보기, 단독 탐색, **코스 도착지 후보 선택**(도착지 좌표로 호출) 용도로 사용합니다.
+반려동물 크기 하드 필터 → 리뷰 임베딩 RAG 랭킹 순서로 결과를 반환합니다.
+RAG 쿼리에는 날씨·기온·반려동물 크기/나이뿐 아니라 **선호 활동(예: 수영)** 이 반영돼, 취향에 맞는 장소가 상위로 올라옵니다.
+`limit`을 주면 상위 N개만 반환합니다(도착지 후보는 5). 없거나 0 이하면 제한 없음.
+
+[.request]
+==== 요청
+
+include::{snippets}/recommended-places/http-request.adoc[]
+include::{snippets}/recommended-places/request-fields.adoc[]
+
+[.response]
+==== 응답
+
+include::{snippets}/recommended-places/http-response.adoc[]
+include::{snippets}/recommended-places/response-fields.adoc[]

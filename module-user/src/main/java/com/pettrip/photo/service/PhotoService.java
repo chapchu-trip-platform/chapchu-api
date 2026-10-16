@@ -1,19 +1,22 @@
 package com.pettrip.photo.service;
 
 import com.pettrip.photo.model.Photo;
+import com.pettrip.photo.model.PhotoType;
 import com.pettrip.photo.repository.PhotoRepository;
 import io.awspring.cloud.s3.S3Operations;
 import java.net.URL;
 import java.time.Duration;
-import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class PhotoService {
 
   private static final Duration UPLOAD_URL_DURATION = Duration.ofMinutes(10);
+  private static final Duration DOWNLOAD_URL_DURATION = Duration.ofMinutes(10);
 
   private final PhotoRepository photoRepository;
   private final S3Operations s3Operations;
@@ -32,11 +35,29 @@ public class PhotoService {
     return s3Operations.createSignedPutURL(bucket, photoKey, UPLOAD_URL_DURATION);
   }
 
-  public String buildPhotoKey(UUID userId, String fileName) {
-    return "photos/%s/%s-%s".formatted(userId, UUID.randomUUID(), fileName);
+  public String buildPhotoKey(UUID userId, PhotoType type, String fileName) {
+    return "%s/%s/%s-%s".formatted(type.folder(), userId, UUID.randomUUID(), fileName);
   }
 
-  public Photo savePhoto(UUID userId, UUID coursePlaceId, String photoKey, LocalDate takenAt) {
-    return photoRepository.save(new Photo(userId, coursePlaceId, photoKey, takenAt));
+  @Transactional
+  public List<Photo> savePhotos(UUID userId, List<PhotoSaveCommand> commands) {
+    return commands.stream().map(c -> saveOne(userId, c)).toList();
+  }
+
+  private Photo saveOne(UUID userId, PhotoSaveCommand command) {
+    return photoRepository.save(
+        new Photo(userId, command.coursePlaceId(), command.photoKey(), command.takenAt()));
+  }
+
+  public Photo getOwnedPhoto(UUID userId, UUID photoId) {
+    Photo photo = photoRepository.findById(photoId).orElseThrow(PhotoNotFoundException::new);
+    if (!userId.equals(photo.getUserId())) {
+      throw new PhotoNotFoundException();
+    }
+    return photo;
+  }
+
+  public URL issueDownloadUrl(String photoKey) {
+    return s3Operations.createSignedGetURL(bucket, photoKey, DOWNLOAD_URL_DURATION);
   }
 }

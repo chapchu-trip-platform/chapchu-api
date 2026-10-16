@@ -49,6 +49,9 @@ public class Place {
 
   @Column private Short rating;
 
+  @Column(name = "content_type_id")
+  private Short contentTypeId;
+
   @Column(name = "review_num")
   private Integer reviewNum = 0;
 
@@ -67,6 +70,10 @@ public class Place {
   private LocalDateTime updatedAt;
 
   protected Place() {}
+
+  /** 스탬프 지역 판정에 쓰는 TourAPI areaCode(1=서울 … 39=제주). 동기화 때 채운다. */
+  @Column(name = "area_code")
+  private Short areaCode;
 
   public Place(
       String externalPlaceId,
@@ -100,7 +107,10 @@ public class Place {
       BigDecimal longitude,
       String businessHours,
       String phoneNumber,
-      Short rating) {
+      Short rating,
+      Short contentTypeId,
+      Short areaCode) {
+    if (areaCode != null) this.areaCode = areaCode;
     if (themeId != null) this.themeId = themeId;
     if (placeName != null) this.placeName = placeName;
     if (placeImageUrl != null) this.placeImageUrl = placeImageUrl;
@@ -110,6 +120,7 @@ public class Place {
     if (businessHours != null) this.businessHours = businessHours;
     if (phoneNumber != null) this.phoneNumber = phoneNumber;
     if (rating != null) this.rating = rating;
+    if (contentTypeId != null) this.contentTypeId = contentTypeId;
   }
 
   public void incrementReviewNum() {
@@ -156,6 +167,10 @@ public class Place {
     return phoneNumber;
   }
 
+  public Short getAreaCode() {
+    return areaCode;
+  }
+
   public Short getRating() {
     return rating;
   }
@@ -166,6 +181,10 @@ public class Place {
 
   public Integer getVisitNum() {
     return visitNum;
+  }
+
+  public Short getContentTypeId() {
+    return contentTypeId;
   }
 
   public PlacePetPolicy getPetPolicy() {
