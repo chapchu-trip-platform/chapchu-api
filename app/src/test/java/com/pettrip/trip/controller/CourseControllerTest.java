@@ -1,0 +1,332 @@
+package com.pettrip.trip.controller;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.document;
+import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
+import static org.springframework.restdocs.payload.PayloadDocumentation.requestFields;
+import static org.springframework.restdocs.payload.PayloadDocumentation.responseFields;
+import static org.springframework.restdocs.request.RequestDocumentation.parameterWithName;
+import static org.springframework.restdocs.request.RequestDocumentation.pathParameters;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.pettrip.config.SecurityConfig;
+import com.pettrip.place.model.Place;
+import com.pettrip.trip.model.CoursePlace;
+import com.pettrip.trip.model.TravelCourse;
+import com.pettrip.trip.service.CourseService;
+import com.pettrip.trip.service.CourseService.CourseReviewInStop;
+import com.pettrip.trip.service.CourseService.CourseReviewPhoto;
+import com.pettrip.trip.service.CourseService.CourseReviewStop;
+import com.pettrip.trip.service.CourseService.CourseReviewsDetail;
+import com.pettrip.trip.service.CourseService.TravelCourseDetail;
+import com.pettrip.user.service.UserService;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.restdocs.AutoConfigureRestDocs;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.restdocs.RestDocumentationExtension;
+import org.springframework.restdocs.payload.JsonFieldType;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+
+@ExtendWith(RestDocumentationExtension.class)
+@WebMvcTest(CourseController.class)
+@Import(SecurityConfig.class)
+@AutoConfigureRestDocs(outputDir = "app/build/generated-snippets")
+class CourseControllerTest {
+
+  private static final UUID USER_ID = UUID.fromString("0198f3a0-1234-7000-8000-000000000001");
+
+  @Autowired private MockMvc mockMvc;
+  @Autowired private ObjectMapper objectMapper;
+
+  @MockitoBean private CourseService courseService;
+  @MockitoBean private UserService userService;
+  @MockitoBean private JwtDecoder jwtDecoder;
+
+  @BeforeEach
+  void 계정은_ACTIVE_상태다() {
+    // 리졸버가 @CurrentUserId를 만들 때 계정 상태를 확인한다(docs/decisions/049).
+    when(userService.isActive(any())).thenReturn(true);
+  }
+
+  private TravelCourseDetail sampleDetail() {
+    TravelCourse course =
+        new TravelCourse(
+            USER_ID,
+            UUID.randomUUID(),
+            "강남구",
+            new BigDecimal("37.5"),
+            new BigDecimal("127.0"),
+            "종로구",
+            new BigDecimal("37.6"),
+            new BigDecimal("126.9"),
+            LocalDate.of(2026, 8, 30));
+    Place place =
+        new Place(
+            "ext-001",
+            null,
+            "한강공원",
+            null,
+            "서울시",
+            new BigDecimal("37.5"),
+            new BigDecimal("127.0"),
+            null,
+            null,
+            null);
+    CoursePlace cp = new CoursePlace(course, "ext-001", (short) 1, true);
+    return new TravelCourseDetail(course, List.of(cp), Map.of("ext-001", place), Map.of());
+  }
+
+  @Test
+  void 코스를_저장한다() throws Exception {
+    TravelCourseDetail detail = sampleDetail();
+    when(courseService.createCourse(
+            any(), any(), any(), any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(detail.course());
+    when(courseService.getCourse(any(), any())).thenReturn(detail);
+
+    CreateCourseRequest request =
+        new CreateCourseRequest(
+            UUID.randomUUID(),
+            LocalDate.of(2026, 8, 30),
+            "강남구",
+            new BigDecimal("37.5"),
+            new BigDecimal("127.0"),
+            new CreateCourseRequest.Destination(
+                "ext-001",
+                "도착장소",
+                "https://example.com/img.jpg",
+                new BigDecimal("37.6"),
+                new BigDecimal("126.9"),
+                "서울시 종로구",
+                "관광지",
+                "BOTH",
+                "ALL",
+                true,
+                false,
+                "주의사항 없음"),
+            (short) 25,
+            (short) 60,
+            "맑음");
+
+    mockMvc
+        .perform(
+            post("/courses")
+                .contentType("application/json")
+                .content(objectMapper.writeValueAsString(request))
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isCreated())
+        .andDo(
+            document(
+                "course-create",
+                requestFields(
+                    fieldWithPath("petId").description("반려동물 ID (필수)"),
+                    fieldWithPath("travelDate").description("여행 날짜"),
+                    fieldWithPath("startLocation").description("출발지 이름"),
+                    fieldWithPath("startLat").description("출발지 위도"),
+                    fieldWithPath("startLng").description("출발지 경도"),
+                    fieldWithPath("destination.externalPlaceId")
+                        .description("도착지 장소 외부 ID (후보에서 고른 값)"),
+                    fieldWithPath("destination.placeName").description("도착지 이름"),
+                    fieldWithPath("destination.placeImageUrl")
+                        .description("도착지 이미지 URL")
+                        .optional(),
+                    fieldWithPath("destination.latitude").description("도착지 위도"),
+                    fieldWithPath("destination.longitude").description("도착지 경도"),
+                    fieldWithPath("destination.address").description("도착지 주소").optional(),
+                    fieldWithPath("destination.categoryLabel").description("카테고리").optional(),
+                    fieldWithPath("destination.indoorOutdoorType")
+                        .description("실내/실외 구분")
+                        .optional(),
+                    fieldWithPath("destination.allowedPetSize")
+                        .description("입장 가능 반려동물 크기")
+                        .optional(),
+                    fieldWithPath("destination.leashRequired").description("리드줄 필수 여부").optional(),
+                    fieldWithPath("destination.carrierRequired")
+                        .description("이동장 필수 여부")
+                        .optional(),
+                    fieldWithPath("destination.placeCaution").description("주의사항").optional(),
+                    fieldWithPath("temperature").description("기온 (선택)").optional(),
+                    fieldWithPath("humidity").description("습도 (선택)").optional(),
+                    fieldWithPath("weatherStatus").description("날씨 상태 (선택)").optional()),
+                responseFields(
+                    fieldWithPath("courseId").description("코스 ID"),
+                    fieldWithPath("travelDate").description("여행 날짜"),
+                    fieldWithPath("startLocation").description("출발지 이름"),
+                    fieldWithPath("endLocation").description("도착지 이름"),
+                    fieldWithPath("places").description("방문 장소 목록").type(JsonFieldType.ARRAY),
+                    fieldWithPath("places[].coursePlaceId").description("코스 장소 ID"),
+                    fieldWithPath("places[].externalPlaceId")
+                        .description("장소 외부 ID (도착지는 임의 장소라 null)")
+                        .optional(),
+                    fieldWithPath("places[].placeName").description("장소 이름"),
+                    fieldWithPath("places[].placeImageUrl").description("장소 이미지 URL").optional(),
+                    fieldWithPath("places[].latitude").description("위도").optional(),
+                    fieldWithPath("places[].longitude").description("경도").optional(),
+                    fieldWithPath("places[].visitOrder")
+                        .description("방문 순서")
+                        .type(JsonFieldType.NUMBER),
+                    fieldWithPath("places[].finalPlace").description("마지막 방문 장소 여부"),
+                    fieldWithPath("places[].reason")
+                        .description("이 곳을 고른 이유 (AI 큐레이션, 없을 수 있음)")
+                        .optional(),
+                    fieldWithPath("places[].petAllowed")
+                        .description("반려견 가능 여부(도착지 표시용). true/false, 정보 없으면 null")
+                        .optional(),
+                    fieldWithPath("places[].petPolicy").description("반려동물 정책").optional())));
+  }
+
+  @Test
+  void 내_코스를_조회한다() throws Exception {
+    UUID courseId = UUID.fromString("0198f3a0-9999-7000-8000-000000000002");
+    TravelCourseDetail detail = sampleDetail();
+    when(courseService.getCourse(any(), any())).thenReturn(detail);
+
+    mockMvc
+        .perform(
+            get("/courses/{courseId}", courseId)
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isOk())
+        .andDo(
+            document(
+                "course-get",
+                pathParameters(parameterWithName("courseId").description("조회할 코스 ID")),
+                responseFields(
+                    fieldWithPath("courseId").description("코스 ID"),
+                    fieldWithPath("travelDate").description("여행 날짜"),
+                    fieldWithPath("startLocation").description("출발지 이름"),
+                    fieldWithPath("endLocation").description("도착지 이름"),
+                    fieldWithPath("places").description("방문 장소 목록").type(JsonFieldType.ARRAY),
+                    fieldWithPath("places[].coursePlaceId").description("코스 장소 ID"),
+                    fieldWithPath("places[].externalPlaceId")
+                        .description("장소 외부 ID (도착지는 임의 장소라 null)")
+                        .optional(),
+                    fieldWithPath("places[].placeName").description("장소 이름"),
+                    fieldWithPath("places[].placeImageUrl").description("장소 이미지 URL").optional(),
+                    fieldWithPath("places[].latitude").description("위도").optional(),
+                    fieldWithPath("places[].longitude").description("경도").optional(),
+                    fieldWithPath("places[].visitOrder")
+                        .description("방문 순서")
+                        .type(JsonFieldType.NUMBER),
+                    fieldWithPath("places[].finalPlace").description("마지막 방문 장소 여부"),
+                    fieldWithPath("places[].reason")
+                        .description("이 곳을 고른 이유 (AI 큐레이션, 없을 수 있음)")
+                        .optional(),
+                    fieldWithPath("places[].petAllowed")
+                        .description("반려견 가능 여부(도착지 표시용). true/false, 정보 없으면 null")
+                        .optional(),
+                    fieldWithPath("places[].petPolicy").description("반려동물 정책").optional())));
+  }
+
+  @Test
+  void 코스를_삭제한다() throws Exception {
+    UUID courseId = UUID.randomUUID();
+    mockMvc
+        .perform(
+            delete("/courses/{courseId}", courseId)
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isNoContent())
+        .andDo(
+            document(
+                "course-delete",
+                pathParameters(parameterWithName("courseId").description("삭제할 코스 ID"))));
+
+    verify(courseService).deleteCourse(USER_ID, courseId);
+  }
+
+  @Test
+  void 코스를_완료한다() throws Exception {
+    UUID courseId = UUID.randomUUID();
+    mockMvc
+        .perform(
+            post("/courses/{courseId}/complete", courseId)
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isOk())
+        .andDo(
+            document(
+                "course-complete",
+                pathParameters(parameterWithName("courseId").description("완료할 코스 ID"))));
+  }
+
+  @Test
+  void 코스_단위_리뷰를_조회한다() throws Exception {
+    UUID courseId = UUID.randomUUID();
+    CourseReviewsDetail detail =
+        new CourseReviewsDetail(
+            courseId,
+            List.of(
+                new CourseReviewStop(
+                    UUID.randomUUID(),
+                    "ext-1",
+                    "○○공원",
+                    (short) 1,
+                    new CourseReviewInStop(
+                        UUID.randomUUID(),
+                        (short) 5,
+                        "물놀이 최고였어요",
+                        "맑음",
+                        LocalDateTime.of(2026, 9, 10, 14, 30),
+                        List.of(
+                            new CourseReviewPhoto(
+                                UUID.randomUUID(),
+                                "https://bucket.s3.../x.jpg?sig=1",
+                                LocalDate.of(2026, 9, 10))))),
+                new CourseReviewStop(UUID.randomUUID(), "ext-2", "도착지", (short) 2, null)));
+    when(courseService.getCourseReviews(any(), any())).thenReturn(detail);
+
+    mockMvc
+        .perform(
+            get("/courses/{courseId}/reviews", courseId)
+                .with(jwt().jwt(j -> j.subject(USER_ID.toString()))))
+        .andExpect(status().isOk())
+        .andDo(
+            document(
+                "course-reviews",
+                pathParameters(parameterWithName("courseId").description("코스 ID")),
+                responseFields(
+                    fieldWithPath("courseId").description("코스 ID"),
+                    fieldWithPath("stops[]").description("코스 스탑 목록(방문 순서)"),
+                    fieldWithPath("stops[].coursePlaceId").description("코스 스탑 ID"),
+                    fieldWithPath("stops[].externalPlaceId").description("장소 외부 ID"),
+                    fieldWithPath("stops[].placeName").description("장소 이름"),
+                    fieldWithPath("stops[].visitOrder")
+                        .description("방문 순서")
+                        .type(JsonFieldType.NUMBER),
+                    fieldWithPath("stops[].review")
+                        .description("이 스탑에 대한 주인 리뷰. 아직 없으면 null")
+                        .optional(),
+                    fieldWithPath("stops[].review.reviewId").description("리뷰 ID").optional(),
+                    fieldWithPath("stops[].review.rating").description("별점").optional(),
+                    fieldWithPath("stops[].review.contents").description("후기 내용").optional(),
+                    fieldWithPath("stops[].review.weather").description("날씨").optional(),
+                    fieldWithPath("stops[].review.createdAt").description("작성일시").optional(),
+                    fieldWithPath("stops[].review.photos[]").description("리뷰 사진").optional(),
+                    fieldWithPath("stops[].review.photos[].photoId")
+                        .description("사진 ID")
+                        .optional(),
+                    fieldWithPath("stops[].review.photos[].downloadUrl")
+                        .description("presigned GET URL(10분)")
+                        .optional(),
+                    fieldWithPath("stops[].review.photos[].takenAt")
+                        .description("촬영일")
+                        .optional())));
+  }
+}

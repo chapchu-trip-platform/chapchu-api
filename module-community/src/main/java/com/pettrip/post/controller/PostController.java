@@ -1,0 +1,73 @@
+package com.pettrip.post.controller;
+
+import com.pettrip.common.service.CurrentUserId;
+import com.pettrip.post.model.PostType;
+import com.pettrip.post.service.PostService;
+import jakarta.validation.Valid;
+import java.util.UUID;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/posts")
+public class PostController {
+
+  private final PostService postService;
+
+  public PostController(PostService postService) {
+    this.postService = postService;
+  }
+
+  @GetMapping
+  public PostListResponse listPosts(
+      @CurrentUserId UUID userId,
+      @RequestParam(name = "sort", defaultValue = "latest") String sort,
+      @RequestParam(name = "type", required = false) PostType type,
+      @RequestParam(name = "cursor", required = false) String cursor,
+      @RequestParam(name = "size", defaultValue = "20") int size) {
+    return postService.listPosts(userId, sort, type, cursor, size);
+  }
+
+  @GetMapping("/{postId}")
+  public PostResponse getPost(@CurrentUserId UUID userId, @PathVariable UUID postId) {
+    return postService.getPost(userId, postId);
+  }
+
+  @PostMapping
+  @ResponseStatus(HttpStatus.CREATED)
+  public void createPost(
+      @CurrentUserId UUID userId, @RequestBody @Valid PostCreateRequest request) {
+    postService.createPost(
+        userId,
+        request.petId(),
+        request.courseId(),
+        request.postType(),
+        request.title(),
+        request.content(),
+        request.photos());
+  }
+
+  @PatchMapping("/{postId}")
+  public PostResponse updatePost(
+      @CurrentUserId UUID userId,
+      @PathVariable UUID postId,
+      @RequestBody @Valid PostUpdateRequest request) {
+    return postService.updatePost(
+        userId, postId, request.postType(), request.title(), request.content(), request.photos());
+  }
+
+  @DeleteMapping("/{postId}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  public void deletePost(@CurrentUserId UUID userId, @PathVariable UUID postId) {
+    postService.deletePost(userId, postId);
+  }
+}

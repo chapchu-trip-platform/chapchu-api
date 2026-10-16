@@ -24,7 +24,7 @@ public class Photo {
   @Column(name = "user_id")
   private UUID userId;
 
-  @Column(name = "course_place_id", nullable = false)
+  @Column(name = "course_place_id")
   private UUID coursePlaceId;
 
   @Column(name = "photo_url", length = 500)

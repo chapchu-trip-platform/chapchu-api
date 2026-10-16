@@ -1,0 +1,86 @@
+package com.pettrip.trip.controller;
+
+import com.pettrip.common.service.CurrentUserId;
+import com.pettrip.trip.service.CourseService;
+import com.pettrip.trip.service.CourseService.TravelCourseDetail;
+import com.pettrip.trip.service.DestinationInput;
+import jakarta.validation.Valid;
+import java.util.UUID;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/courses")
+public class CourseController {
+
+  private final CourseService courseService;
+
+  public CourseController(CourseService courseService) {
+    this.courseService = courseService;
+  }
+
+  @PostMapping
+  @ResponseStatus(HttpStatus.CREATED)
+  public CourseResponse createCourse(
+      @CurrentUserId UUID userId, @Valid @RequestBody CreateCourseRequest request) {
+    CreateCourseRequest.Destination d = request.destination();
+    DestinationInput destination =
+        new DestinationInput(
+            d.externalPlaceId(),
+            d.placeName(),
+            d.placeImageUrl(),
+            d.address(),
+            d.latitude(),
+            d.longitude(),
+            d.allowedPetSize(),
+            d.leashRequired(),
+            d.carrierRequired(),
+            d.indoorOutdoorType(),
+            d.placeCaution());
+    var course =
+        courseService.createCourse(
+            userId,
+            request.petId(),
+            request.travelDate(),
+            request.startLocation(),
+            request.startLat(),
+            request.startLng(),
+            destination,
+            request.temperature(),
+            request.humidity(),
+            request.weatherStatus());
+    TravelCourseDetail detail = courseService.getCourse(userId, course.getId());
+    return CourseResponse.from(detail);
+  }
+
+  @GetMapping("/{courseId}")
+  public CourseResponse getCourse(@CurrentUserId UUID userId, @PathVariable UUID courseId) {
+    return CourseResponse.from(courseService.getCourse(userId, courseId));
+  }
+
+  @GetMapping("/{courseId}/reviews")
+  public CourseReviewsResponse getCourseReviews(
+      @CurrentUserId UUID userId, @PathVariable UUID courseId) {
+    return CourseReviewsResponse.from(courseService.getCourseReviews(userId, courseId));
+  }
+
+  /** 여행 중도 포기 시 코스를 완전히 삭제한다. 완료한 코스는 삭제 대상이 아니다. */
+  @DeleteMapping("/{courseId}")
+  @ResponseStatus(HttpStatus.NO_CONTENT)
+  public void deleteCourse(@CurrentUserId UUID userId, @PathVariable UUID courseId) {
+    courseService.deleteCourse(userId, courseId);
+  }
+
+  @PostMapping("/{courseId}/complete")
+  @ResponseStatus(HttpStatus.OK)
+  public void completeCourse(@CurrentUserId UUID userId, @PathVariable UUID courseId) {
+    courseService.completeCourse(userId, courseId);
+  }
+}

@@ -7,6 +7,7 @@ plugins {
     id 'com.diffplug.spotless' version '6.25.0' apply false
     id 'org.springframework.boot' version '3.4.5' apply false
     id 'io.spring.dependency-management' version '1.1.7' apply false
+    id 'com.epages.restdocs-api-spec' version '0.19.4' apply false
     // org.asciidoctor.jvm.convert 3.3.2 — Gradle 9 미지원 (docs/failures/004 참고)
     // HTML 생성은 CI에서 asciidoctor CLI 직접 실행
 }
@@ -48,7 +49,7 @@ subprojects {
     dependencyManagement {
         imports {
             mavenBom "org.springframework.boot:spring-boot-dependencies:3.4.5"
-            // mavenBom "org.springframework.ai:spring-ai-bom:1.0.0"  // RAG 구현 시 버전 확인 후 활성화
+            mavenBom "org.springframework.ai:spring-ai-bom:1.0.0"
             mavenBom "software.amazon.awssdk:bom:2.26.0"
         }
     }
@@ -59,6 +60,7 @@ subprojects {
     }
 
     checkstyle {
+        toolVersion = '10.24.0'
         maxWarnings = 0
         configFile = rootProject.file("config/checkstyle/checkstyle-rules.xml")
     }

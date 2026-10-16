@@ -16,11 +16,10 @@
 --   comments.post_comment_id → parent_comment_id, NULL 허용 (최상위 댓글 지원)
 --   pets.Field         → 삭제 (용도 불명 컬럼)
 --   place_pet_policies.indoor_outdoor_type → VARCHAR(20) (BOOLEAN 표현력 부족)
---   course_embeddings  → 신규 (RAG 파이프라인)
---   place_embeddings   → 신규 (장소 기반 RAG)
+--   course_embeddings  → V17에서 제거 (코드 0건, 3072차원으로 인덱스 불가, decisions/042)
+--   place_embeddings   → V17에서 제거 (코드 0건, 3072차원으로 인덱스 불가, decisions/042)
 --   모든 FK 제약조건   → 인라인 선언으로 통일
 
-CREATE EXTENSION IF NOT EXISTS pg_uuidv7;
 CREATE EXTENSION IF NOT EXISTS vector;
 
 -- ============================================================
@@ -28,42 +27,42 @@ CREATE EXTENSION IF NOT EXISTS vector;
 -- ============================================================
 
 CREATE TABLE themes (
-    theme_id         UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    theme_id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     theme_name       VARCHAR(50) NOT NULL,
     created_at       TIMESTAMP DEFAULT now(),
     updated_at       TIMESTAMP DEFAULT now()
 );
 
 CREATE TABLE regions (
-    region_id        UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    region_id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     region_name      VARCHAR(100) NOT NULL,
     created_at       TIMESTAMP DEFAULT now(),
     updated_at       TIMESTAMP DEFAULT now()
 );
 
 CREATE TABLE transport_methods (
-    transport_method_id   UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    transport_method_id   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     transport_method_name VARCHAR(50) NOT NULL,
     created_at            TIMESTAMP DEFAULT now(),
     updated_at            TIMESTAMP DEFAULT now()
 );
 
 CREATE TABLE breeds (
-    breed_id    UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    breed_id    INT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     breed_name  VARCHAR(30) NOT NULL,
     created_at  TIMESTAMP DEFAULT now(),
     updated_at  TIMESTAMP DEFAULT now()
 );
 
 CREATE TABLE pet_activities (
-    activity_id   UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    activity_id   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     activity_name VARCHAR(30) NOT NULL,
     created_at    TIMESTAMP DEFAULT now(),
     updated_at    TIMESTAMP DEFAULT now()
 );
 
 CREATE TABLE stamps (
-    stamp_id    UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    stamp_id    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     stamp_name  VARCHAR(30) NOT NULL,
     created_at  TIMESTAMP DEFAULT now(),
     updated_at  TIMESTAMP DEFAULT now()
@@ -74,14 +73,15 @@ CREATE TABLE stamps (
 -- ============================================================
 
 CREATE TABLE users (
-    user_id        UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
-    google_user_id VARCHAR(255) UNIQUE,
-    email          VARCHAR(255) UNIQUE NOT NULL,
-    nickname       VARCHAR(30),
-    role           VARCHAR(20) DEFAULT 'USER',
-    account_status VARCHAR(20) DEFAULT 'ACTIVE',
-    created_at     TIMESTAMP DEFAULT now(),
-    updated_at     TIMESTAMP DEFAULT now()
+    user_id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    google_user_id    VARCHAR(255) UNIQUE,
+    email             VARCHAR(255) UNIQUE NOT NULL,
+    nickname          VARCHAR(30) UNIQUE,
+    role              VARCHAR(20) DEFAULT 'USER',
+    account_status    VARCHAR(20) DEFAULT 'ACTIVE',
+    location_consent  BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at        TIMESTAMP DEFAULT now(),
+    updated_at        TIMESTAMP DEFAULT now()
 );
 
 -- 기존 user_preferences(단일 row) → 3개 junction table로 분리
@@ -108,7 +108,7 @@ CREATE TABLE user_preference_themes (
 );
 
 CREATE TABLE user_stamps (
-    user_stamp_id UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    user_stamp_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id       UUID REFERENCES users(user_id) ON DELETE SET NULL,
     stamp_id      UUID NOT NULL REFERENCES stamps(stamp_id),
     stamp_count   INT DEFAULT 0,
@@ -121,12 +121,13 @@ CREATE TABLE user_stamps (
 -- ============================================================
 
 CREATE TABLE pets (
-    pet_id     UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    pet_id     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id    UUID REFERENCES users(user_id) ON DELETE SET NULL,
-    breed_id   UUID NOT NULL REFERENCES breeds(breed_id),
+    breed_id   INT NOT NULL REFERENCES breeds(breed_id),
     pet_name   VARCHAR(50) NOT NULL,
     size       VARCHAR(10),
-    age        SMALLINT,
+    age        INTEGER,
+    is_die     BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMP DEFAULT now(),
     updated_at TIMESTAMP DEFAULT now()
 );
@@ -171,24 +172,22 @@ CREATE TABLE place_pet_policies (
     updated_at        TIMESTAMP DEFAULT now()
 );
 
-CREATE TABLE place_embeddings (
-    external_place_id VARCHAR(255) PRIMARY KEY REFERENCES places(external_place_id),
-    embedding         vector(3072) NOT NULL,
-    created_at        TIMESTAMP DEFAULT now()
-);
+-- place_embeddings: V17에서 DROP (decisions/042 참조)
 
 -- ============================================================
 -- TRIP DOMAIN
 -- ============================================================
 
 CREATE TABLE start_course (
-    start_course_id       UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    start_course_id       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     start_course_location VARCHAR(255),
-    start_course_time     TIMESTAMP
+    start_course_time     TIMESTAMP,
+    created_at            TIMESTAMP DEFAULT now(),
+    updated_at            TIMESTAMP DEFAULT now()
 );
 
 CREATE TABLE travel_courses (
-    course_id       UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    course_id       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id         UUID REFERENCES users(user_id) ON DELETE SET NULL,
     start_course_id UUID NOT NULL REFERENCES start_course(start_course_id),
     travel_date     DATE,
@@ -198,7 +197,7 @@ CREATE TABLE travel_courses (
 );
 
 CREATE TABLE course_places (
-    course_place_id  UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    course_place_id  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     course_id        UUID NOT NULL REFERENCES travel_courses(course_id) ON DELETE CASCADE,
     external_place_id VARCHAR(255) NOT NULL REFERENCES places(external_place_id),
     visit_order      SMALLINT,
@@ -210,7 +209,7 @@ CREATE TABLE course_places (
 );
 
 CREATE TABLE course_routes (
-    route_id          UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    route_id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     course_id         UUID NOT NULL REFERENCES travel_courses(course_id) ON DELETE CASCADE,
     transport_method  VARCHAR(20),
     total_distance_m  INT,
@@ -220,7 +219,7 @@ CREATE TABLE course_routes (
 );
 
 CREATE TABLE course_route_legs (
-    route_leg_id        UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    route_leg_id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     route_id            UUID NOT NULL REFERENCES course_routes(route_id) ON DELETE CASCADE,
     from_course_place_id UUID NOT NULL REFERENCES course_places(course_place_id),
     leg_order           SMALLINT,
@@ -233,7 +232,7 @@ CREATE TABLE course_route_legs (
 );
 
 CREATE TABLE course_weather_records (
-    weather_id      UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    weather_id      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     course_id       UUID NOT NULL REFERENCES travel_courses(course_id) ON DELETE CASCADE,
     weather_date    DATE,
     temperature     SMALLINT,
@@ -245,7 +244,7 @@ CREATE TABLE course_weather_records (
 );
 
 CREATE TABLE photos (
-    photo_id        UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    photo_id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id         UUID REFERENCES users(user_id) ON DELETE SET NULL,
     course_place_id UUID NOT NULL REFERENCES course_places(course_place_id),
     photo_url       VARCHAR(500),
@@ -253,36 +252,23 @@ CREATE TABLE photos (
     created_at      TIMESTAMP DEFAULT now()
 );
 
-CREATE TABLE visit_verifications (
-    verification_id       UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
-    user_id               UUID REFERENCES users(user_id) ON DELETE SET NULL,
-    course_place_id       UUID NOT NULL REFERENCES course_places(course_place_id),
-    photo_id              UUID NOT NULL REFERENCES photos(photo_id),
-    verification_latitude  DECIMAL(10,7),
-    verification_longitude DECIMAL(10,7),
-    verification_status   VARCHAR(30),
-    verified_at           TIMESTAMP,
-    created_at            TIMESTAMP DEFAULT now(),
-    updated_at            TIMESTAMP DEFAULT now()
-);
+-- visit_verifications: V30에서 DROP (decisions/044 참조) — 장소인증 FE 전담 이관
 
-CREATE TABLE course_embeddings (
-    course_id  UUID PRIMARY KEY REFERENCES travel_courses(course_id) ON DELETE CASCADE,
-    embedding  vector(3072) NOT NULL,
-    created_at TIMESTAMP DEFAULT now()
-);
+-- course_embeddings: V17에서 DROP (decisions/042 참조)
 
 -- ============================================================
 -- REVIEW DOMAIN
 -- ============================================================
 
 CREATE TABLE reviews (
-    review_id            UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    review_id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     place_id             VARCHAR(255) NOT NULL REFERENCES places(external_place_id),
     user_id              UUID REFERENCES users(user_id) ON DELETE SET NULL,
     pet_id               UUID NOT NULL REFERENCES pets(pet_id),
     rating               SMALLINT,
     contents             TEXT,
+    weather              VARCHAR(20),
+    course_place_id      UUID NULL REFERENCES course_places(course_place_id),
     recommendation_count INT DEFAULT 0,
     created_at           TIMESTAMP DEFAULT now()
 );
@@ -294,25 +280,33 @@ CREATE TABLE review_recommendations (
     PRIMARY KEY (review_id, user_id)
 );
 
+CREATE TABLE review_embeddings (
+    review_id  UUID PRIMARY KEY REFERENCES reviews(review_id) ON DELETE CASCADE,
+    embedding  vector(1536) NOT NULL,
+    created_at TIMESTAMP DEFAULT now()
+);
+
 -- ============================================================
 -- COMMUNITY DOMAIN
 -- ============================================================
 
 CREATE TABLE posts (
-    post_id              UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    post_id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id              UUID REFERENCES users(user_id) ON DELETE SET NULL,
     pet_id               UUID NOT NULL REFERENCES pets(pet_id),
     photo_id             UUID NOT NULL REFERENCES photos(photo_id),
     course_id            UUID NOT NULL REFERENCES travel_courses(course_id),
+    post_type            VARCHAR(20) NOT NULL DEFAULT 'GENERAL',  -- GENERAL=일반, TRAVEL_REVIEW=여행후기 (V36)
     title                VARCHAR(100),
     content              TEXT,
     view_count           INT DEFAULT 0,
     recommendation_count INT DEFAULT 0,
+    comment_count        INT DEFAULT 0,
     created_at           TIMESTAMP DEFAULT now()
 );
 
 CREATE TABLE comments (
-    comment_id        UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    comment_id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     post_id           UUID NOT NULL REFERENCES posts(post_id) ON DELETE CASCADE,
     user_id           UUID REFERENCES users(user_id) ON DELETE SET NULL,
     parent_comment_id UUID REFERENCES comments(comment_id) ON DELETE CASCADE,  -- NULL = 최상위 댓글
@@ -347,28 +341,22 @@ CREATE TABLE post_reports (
     PRIMARY KEY (post_id, user_id)
 );
 
+CREATE TABLE place_wishlists (
+    user_id    UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    place_id   VARCHAR(255) NOT NULL REFERENCES places(external_place_id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT now(),
+    PRIMARY KEY (user_id, place_id)
+);
+
 -- ============================================================
 -- ALBUM DOMAIN
 -- ============================================================
 
-CREATE TABLE albums (
-    album_id   UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
-    user_id    UUID REFERENCES users(user_id) ON DELETE SET NULL,
-    album_name VARCHAR(30),
-    created_at TIMESTAMP DEFAULT now(),
-    updated_at TIMESTAMP DEFAULT now()
-);
-
-CREATE TABLE album_photos (
-    album_photo_id UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
-    album_id       UUID NOT NULL REFERENCES albums(album_id) ON DELETE CASCADE,
-    photo_id       UUID NOT NULL REFERENCES photos(photo_id) ON DELETE CASCADE,
-    created_at     TIMESTAMP DEFAULT now(),
-    updated_at     TIMESTAMP DEFAULT now()
-);
+-- albums, album_photos: V30에서 DROP (decisions/044 참조)
+-- 앨범은 review_photos 파생으로 동작(GET /users/me/album)하며 별도 테이블은 미사용.
 
 CREATE TABLE keyring_cards (
-    keyring_card_id UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+    keyring_card_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id         UUID REFERENCES users(user_id) ON DELETE SET NULL,
     pet_id          UUID NOT NULL REFERENCES pets(pet_id),
     photo_id        UUID NOT NULL REFERENCES photos(photo_id),
@@ -391,8 +379,9 @@ CREATE INDEX idx_pets_user_id ON pets(user_id);
 CREATE INDEX idx_photos_course_place_id ON photos(course_place_id);
 
 -- 벡터 ANN 탐색용 HNSW 인덱스 (코사인 유사도)
-CREATE INDEX idx_course_embeddings_hnsw ON course_embeddings USING hnsw (embedding vector_cosine_ops);
-CREATE INDEX idx_place_embeddings_hnsw ON place_embeddings USING hnsw (embedding vector_cosine_ops);
+-- review_embeddings: text-embedding-3-small 1536차원 → HNSW 적용 가능 (2000차원 이하)
+CREATE INDEX idx_review_embeddings_hnsw ON review_embeddings USING hnsw (embedding vector_cosine_ops);
+-- place_embeddings / course_embeddings: V17에서 DROP (decisions/042 참조)
 
 -- ============================================================
 -- COMMENTS
@@ -487,9 +476,7 @@ COMMENT ON COLUMN place_pet_policies.indoor_outdoor_type IS '실내외 구분. E
 COMMENT ON COLUMN place_pet_policies.parking IS '주차 가능 여부';
 COMMENT ON COLUMN place_pet_policies.place_caution IS '기타 주의사항';
 
-COMMENT ON TABLE place_embeddings IS '장소 텍스트 임베딩. RAG 장소 유사도 검색용. append-only';
-COMMENT ON COLUMN place_embeddings.external_place_id IS 'PK이자 FK → places';
-COMMENT ON COLUMN place_embeddings.embedding IS 'OpenAI text-embedding-3-large 벡터. 차원 3072';
+-- place_embeddings COMMENT: V17에서 테이블 제거됨
 
 -- TRIP DOMAIN
 COMMENT ON TABLE start_course IS '여행 코스 출발지 정보';
@@ -556,9 +543,7 @@ COMMENT ON COLUMN visit_verifications.verification_longitude IS '인증 시점 G
 COMMENT ON COLUMN visit_verifications.verification_status IS '인증 상태. ENUM(PENDING, APPROVED, REJECTED)';
 COMMENT ON COLUMN visit_verifications.verified_at IS '인증 처리 시각';
 
-COMMENT ON TABLE course_embeddings IS '여행 코스 임베딩. RAG 유사 코스 추천용. append-only';
-COMMENT ON COLUMN course_embeddings.course_id IS 'PK이자 FK → travel_courses';
-COMMENT ON COLUMN course_embeddings.embedding IS 'OpenAI text-embedding-3-large 벡터. 차원 3072';
+-- course_embeddings COMMENT: V17에서 테이블 제거됨
 
 -- REVIEW DOMAIN
 COMMENT ON TABLE reviews IS '장소 방문 후 작성하는 리뷰. 반려동물 동반 경험 중심';
@@ -568,11 +553,16 @@ COMMENT ON COLUMN reviews.user_id IS 'FK → users. 탈퇴 시 NULL 유지';
 COMMENT ON COLUMN reviews.pet_id IS '리뷰 작성 시 동반한 반려동물. FK → pets';
 COMMENT ON COLUMN reviews.rating IS '별점 (1~5)';
 COMMENT ON COLUMN reviews.contents IS '리뷰 본문';
+COMMENT ON COLUMN reviews.weather IS '방문 당시 날씨. SUNNY·CLOUDY·RAINY·SNOWY. nullable';
 COMMENT ON COLUMN reviews.recommendation_count IS '추천 수. 비정규화 카운터';
 
 COMMENT ON TABLE review_recommendations IS '리뷰 추천. N:M junction table. append-only';
 COMMENT ON COLUMN review_recommendations.review_id IS 'FK → reviews';
 COMMENT ON COLUMN review_recommendations.user_id IS 'FK → users';
+
+COMMENT ON TABLE review_embeddings IS '리뷰 텍스트 임베딩. RAG 유사 리뷰/장소 검색용. append-only';
+COMMENT ON COLUMN review_embeddings.review_id IS 'PK이자 FK → reviews';
+COMMENT ON COLUMN review_embeddings.embedding IS 'OpenAI text-embedding-3-small 벡터. 차원 1536. HNSW 인덱스 적용';
 
 -- COMMUNITY DOMAIN
 COMMENT ON TABLE posts IS '커뮤니티 게시글. 여행 코스 후기 공유';
@@ -585,6 +575,7 @@ COMMENT ON COLUMN posts.title IS '게시글 제목';
 COMMENT ON COLUMN posts.content IS '게시글 본문';
 COMMENT ON COLUMN posts.view_count IS '조회수. 비정규화 카운터';
 COMMENT ON COLUMN posts.recommendation_count IS '추천 수. 비정규화 카운터';
+COMMENT ON COLUMN posts.comment_count IS '댓글 수. 비정규화 카운터. V18에서 추가';
 
 COMMENT ON TABLE comments IS '게시글 댓글. parent_comment_id NULL이면 최상위 댓글';
 COMMENT ON COLUMN comments.comment_id IS '기본키. UUID v7';
@@ -609,6 +600,10 @@ COMMENT ON COLUMN post_reports.user_id IS '신고한 사용자. FK → users';
 COMMENT ON COLUMN post_reports.report_reason IS '신고 사유 분류';
 COMMENT ON COLUMN post_reports.report_detail IS '신고 상세 내용';
 COMMENT ON COLUMN post_reports.report_status IS '처리 상태. ENUM(PENDING, RESOLVED, DISMISSED)';
+
+COMMENT ON TABLE place_wishlists IS '장소 위시리스트. N:M junction table';
+COMMENT ON COLUMN place_wishlists.user_id IS '찜한 사용자. FK → users';
+COMMENT ON COLUMN place_wishlists.place_id IS '찜한 장소. FK → places.external_place_id';
 
 -- ALBUM DOMAIN
 COMMENT ON TABLE albums IS '사용자가 직접 만드는 사진 앨범';

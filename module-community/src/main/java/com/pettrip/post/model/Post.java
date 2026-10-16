@@ -1,0 +1,158 @@
+package com.pettrip.post.model;
+
+import com.github.f4b6a3.uuid.UuidCreator;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EntityListeners;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import java.time.LocalDateTime;
+import java.util.UUID;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+@Entity
+@Table(name = "posts")
+@EntityListeners(AuditingEntityListener.class)
+public class Post {
+
+  @Id
+  @Column(name = "post_id", columnDefinition = "UUID", updatable = false, nullable = false)
+  private UUID id = UuidCreator.getTimeOrderedEpoch();
+
+  @Column(name = "user_id")
+  private UUID userId;
+
+  @Column(name = "pet_id")
+  private UUID petId;
+
+  /** 자유게시판이라 반려동물·사진·코스가 모두 선택이다. 마이그레이션 V22, V23 참고. */
+  @Column(name = "photo_id")
+  private UUID photoId;
+
+  @Column(name = "course_id")
+  private UUID courseId;
+
+  /** 글 종류. 보내지 않으면 일반글(GENERAL). 마이그레이션 V36 참고. */
+  @Enumerated(EnumType.STRING)
+  @Column(name = "post_type", nullable = false)
+  private PostType postType = PostType.GENERAL;
+
+  @Column(name = "title", length = 100)
+  private String title;
+
+  @Column(name = "content")
+  private String content;
+
+  @Column(name = "view_count")
+  private int viewCount = 0;
+
+  @Column(name = "recommendation_count")
+  private int recommendationCount = 0;
+
+  @Column(name = "comment_count")
+  private int commentCount = 0;
+
+  @CreatedDate
+  @Column(name = "created_at", updatable = false)
+  private LocalDateTime createdAt;
+
+  protected Post() {}
+
+  public Post(
+      UUID userId,
+      UUID petId,
+      UUID photoId,
+      UUID courseId,
+      PostType postType,
+      String title,
+      String content) {
+    this.userId = userId;
+    this.petId = petId;
+    this.photoId = photoId;
+    this.courseId = courseId;
+    this.postType = postType;
+    this.title = title;
+    this.content = content;
+  }
+
+  /** null인 값은 그대로 둔다(수정하지 않음). */
+  public void update(PostType newPostType, String newTitle, String newContent) {
+    if (newPostType != null) {
+      this.postType = newPostType;
+    }
+    if (newTitle != null) {
+      this.title = newTitle;
+    }
+    if (newContent != null) {
+      this.content = newContent;
+    }
+  }
+
+  /** 사진 목록을 교체할 때 대표 사진도 첫 장으로 다시 맞춘다. 사진을 전부 빼면 null이 된다. */
+  public void replaceThumbnail(UUID photoId) {
+    this.photoId = photoId;
+  }
+
+  public void increaseViewCount() {
+    this.viewCount++;
+  }
+
+  public void incrementRecommendationCount() {
+    this.recommendationCount++;
+  }
+
+  public void decrementRecommendationCount() {
+    this.recommendationCount = Math.max(0, this.recommendationCount - 1);
+  }
+
+  public UUID getId() {
+    return id;
+  }
+
+  public UUID getUserId() {
+    return userId;
+  }
+
+  public UUID getPetId() {
+    return petId;
+  }
+
+  public UUID getPhotoId() {
+    return photoId;
+  }
+
+  public UUID getCourseId() {
+    return courseId;
+  }
+
+  public PostType getPostType() {
+    return postType;
+  }
+
+  public String getTitle() {
+    return title;
+  }
+
+  public String getContent() {
+    return content;
+  }
+
+  public int getViewCount() {
+    return viewCount;
+  }
+
+  public int getRecommendationCount() {
+    return recommendationCount;
+  }
+
+  public int getCommentCount() {
+    return commentCount;
+  }
+
+  public LocalDateTime getCreatedAt() {
+    return createdAt;
+  }
+}

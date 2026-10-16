@@ -13,6 +13,7 @@ import jakarta.persistence.ManyToMany;
 import jakarta.persistence.Table;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.UUID;
 
 @Entity
 @Table(name = "users")
@@ -25,7 +26,7 @@ public class User extends BaseEntity {
   @Column(nullable = false, unique = true)
   private String email;
 
-  @Column(length = 30)
+  @Column(length = 30, unique = true)
   private String nickname;
 
   @Enumerated(EnumType.STRING)
@@ -33,8 +34,14 @@ public class User extends BaseEntity {
   private Role role;
 
   @Enumerated(EnumType.STRING)
-  @Column(name = "account_status", length = 20)
+  @Column(name = "account_status", length = 20, nullable = false)
   private AccountStatus accountStatus;
+
+  @Column(name = "location_consent", nullable = false)
+  private boolean locationConsent = true;
+
+  @Column(name = "profile_photo_id")
+  private UUID profilePhotoId;
 
   @ManyToMany(fetch = FetchType.LAZY)
   @JoinTable(
@@ -83,6 +90,11 @@ public class User extends BaseEntity {
     }
   }
 
+  /** 회원 탈퇴. 계정을 WITHDRAWN으로 바꾼다(소프트 탈퇴). 이미 탈퇴 상태면 그대로다. */
+  public void withdraw() {
+    this.accountStatus = AccountStatus.WITHDRAWN;
+  }
+
   public String getGoogleUserId() {
     return googleUserId;
   }
@@ -101,6 +113,22 @@ public class User extends BaseEntity {
 
   public AccountStatus getAccountStatus() {
     return accountStatus;
+  }
+
+  public boolean isLocationConsent() {
+    return locationConsent;
+  }
+
+  public void updateLocationConsent(boolean locationConsent) {
+    this.locationConsent = locationConsent;
+  }
+
+  public UUID getProfilePhotoId() {
+    return profilePhotoId;
+  }
+
+  public void updateProfilePhoto(UUID profilePhotoId) {
+    this.profilePhotoId = profilePhotoId;
   }
 
   public void replacePreferredRegions(Set<Region> regions) {

@@ -3,8 +3,14 @@ package com.pettrip.user.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.pettrip.photo.model.Photo;
+import com.pettrip.photo.repository.PhotoRepository;
+import com.pettrip.photo.service.PhotoNotFoundException;
+import com.pettrip.photo.service.PhotoService;
 import com.pettrip.user.model.AccountStatus;
 import com.pettrip.user.model.Region;
 import com.pettrip.user.model.Theme;
@@ -14,6 +20,8 @@ import com.pettrip.user.repository.RegionRepository;
 import com.pettrip.user.repository.ThemeRepository;
 import com.pettrip.user.repository.TransportMethodRepository;
 import com.pettrip.user.repository.UserRepository;
+import java.net.URI;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -23,22 +31,83 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class UserServiceTest {
+
+  private static final String DEFAULT_KEY = "defaults/profile.svg";
+  private static final String DEFAULT_URL = "https://bucket/defaults/profile.svg?sig=d";
 
   @Mock private UserRepository userRepository;
   @Mock private RegionRepository regionRepository;
   @Mock private ThemeRepository themeRepository;
   @Mock private TransportMethodRepository transportMethodRepository;
+  @Mock private PhotoRepository photoRepository;
+  @Mock private PhotoService photoService;
 
   private UserService userService;
 
   @BeforeEach
-  void setUp() {
+  void setUp() throws Exception {
     userService =
         new UserService(
-            userRepository, regionRepository, themeRepository, transportMethodRepository);
+            userRepository,
+            regionRepository,
+            themeRepository,
+            transportMethodRepository,
+            photoRepository,
+            photoService,
+            DEFAULT_KEY);
+    when(photoService.issueDownloadUrl(DEFAULT_KEY)).thenReturn(URI.create(DEFAULT_URL).toURL());
+  }
+
+  @Test
+  void isActive는_ACTIVE_계정이면_true다() {
+    UUID userId = UUID.randomUUID();
+    when(userRepository.findById(userId)).thenReturn(Optional.of(new User("a@b.c", "google-1")));
+
+    assertThat(userService.isActive(userId)).isTrue();
+  }
+
+  @Test
+  void isActive는_탈퇴한_계정이면_false다() {
+    UUID userId = UUID.randomUUID();
+    User user = new User("a@b.c", "google-1");
+    user.update(null, AccountStatus.WITHDRAWN);
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+    assertThat(userService.isActive(userId)).isFalse();
+  }
+
+  @Test
+  void isActive는_account_status가_null이면_false다() throws Exception {
+    // V38로 NOT NULL을 걸기 전 행에는 NULL이 있을 수 있다. 상태를 모르면 막는다.
+    UUID userId = UUID.randomUUID();
+    User user = new User("a@b.c", "google-1");
+    java.lang.reflect.Field field = User.class.getDeclaredField("accountStatus");
+    field.setAccessible(true);
+    field.set(user, null);
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+    assertThat(userService.isActive(userId)).isFalse();
+  }
+
+  @Test
+  void isActive는_유저가_없으면_false다() {
+    UUID userId = UUID.randomUUID();
+    when(userRepository.findById(userId)).thenReturn(Optional.empty());
+
+    assertThat(userService.isActive(userId)).isFalse();
+  }
+
+  @Test
+  void isActive는_userId가_null이면_조회하지_않고_false다() {
+    // findById(null)은 IllegalArgumentException을 던지므로 조회 전에 걸러야 한다.
+    assertThat(userService.isActive(null)).isFalse();
+    verify(userRepository, never()).findById(any());
   }
 
   @Test
@@ -50,26 +119,93 @@ class UserServiceTest {
   }
 
   @Test
-  void registerNickname은_이미_등록되어_있으면_예외를_던진다() {
+  void getMe는_프사가_없으면_기본이미지_presigned_URL을_내려준다() throws Exception {
     UUID userId = UUID.randomUUID();
     User user = new User("test@example.com", "google-1");
-    user.registerNickname("기존닉네임");
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(photoService.issueDownloadUrl(DEFAULT_KEY)).thenReturn(URI.create(DEFAULT_URL).toURL());
 
-    assertThatThrownBy(() -> userService.registerNickname(userId, "새닉네임"))
-        .isInstanceOf(NicknameAlreadyRegisteredException.class);
+    MeDetail result = userService.getMe(userId);
+
+    assertThat(result.profilePhoto().photoId()).isNull();
+    assertThat(result.profilePhoto().downloadUrl()).isEqualTo(DEFAULT_URL);
   }
 
   @Test
-  void registerNickname은_닉네임이_없으면_등록한다() {
+  void getMe는_프사가_있으면_presigned_URL을_내려준다() throws Exception {
+    UUID userId = UUID.randomUUID();
+    UUID photoId = UUID.randomUUID();
+    User user = new User("test@example.com", "google-1");
+    user.updateProfilePhoto(photoId);
+    Photo photo = new Photo(userId, null, "profile/u/1.jpg", LocalDate.of(2026, 7, 1));
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(photoRepository.findById(photoId)).thenReturn(Optional.of(photo));
+    when(photoService.issueDownloadUrl("profile/u/1.jpg"))
+        .thenReturn(URI.create("https://bucket/profile/u/1.jpg?sig=x").toURL());
+
+    MeDetail result = userService.getMe(userId);
+
+    assertThat(result.profilePhoto().photoId()).isEqualTo(photo.getId());
+    assertThat(result.profilePhoto().downloadUrl()).contains("sig=x");
+  }
+
+  @Test
+  void updateProfilePhoto는_소유_사진이면_설정한다() throws Exception {
+    UUID userId = UUID.randomUUID();
+    UUID photoId = UUID.randomUUID();
+    User user = new User("test@example.com", "google-1");
+    Photo photo = new Photo(userId, null, "profile/u/1.jpg", null);
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(photoService.getOwnedPhoto(userId, photoId)).thenReturn(photo);
+    when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(photoRepository.findById(photoId)).thenReturn(Optional.of(photo));
+    when(photoService.issueDownloadUrl("profile/u/1.jpg"))
+        .thenReturn(URI.create("https://bucket/profile/u/1.jpg?sig=x").toURL());
+
+    MeDetail result = userService.updateProfilePhoto(userId, photoId);
+
+    assertThat(user.getProfilePhotoId()).isEqualTo(photoId);
+    assertThat(result.profilePhoto().photoId()).isEqualTo(photo.getId());
+  }
+
+  @Test
+  void updateProfilePhoto는_타인_사진이면_예외를_던진다() {
+    UUID userId = UUID.randomUUID();
+    UUID foreignPhoto = UUID.randomUUID();
+    User user = new User("test@example.com", "google-1");
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(photoService.getOwnedPhoto(userId, foreignPhoto)).thenThrow(new PhotoNotFoundException());
+
+    assertThatThrownBy(() -> userService.updateProfilePhoto(userId, foreignPhoto))
+        .isInstanceOf(PhotoNotFoundException.class);
+  }
+
+  @Test
+  void withdraw는_account_status를_WITHDRAWN으로_바꾼다() {
     UUID userId = UUID.randomUUID();
     User user = new User("test@example.com", "google-1");
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-    when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 
-    User result = userService.registerNickname(userId, "초코사랑");
+    userService.withdraw(userId);
 
-    assertThat(result.getNickname()).isEqualTo("초코사랑");
+    assertThat(user.getAccountStatus()).isEqualTo(AccountStatus.WITHDRAWN);
+    verify(userRepository).save(user);
+  }
+
+  @Test
+  void updateProfilePhoto는_null이면_프사를_지우고_기본이미지로_되돌린다() throws Exception {
+    UUID userId = UUID.randomUUID();
+    User user = new User("test@example.com", "google-1");
+    user.updateProfilePhoto(UUID.randomUUID());
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
+    when(photoService.issueDownloadUrl(DEFAULT_KEY)).thenReturn(URI.create(DEFAULT_URL).toURL());
+
+    MeDetail result = userService.updateProfilePhoto(userId, null);
+
+    assertThat(user.getProfilePhotoId()).isNull();
+    assertThat(result.profilePhoto().downloadUrl()).isEqualTo(DEFAULT_URL);
   }
 
   @Test
@@ -79,9 +215,9 @@ class UserServiceTest {
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-    User result = userService.updateMe(userId, null, AccountStatus.WITHDRAWN);
+    MeDetail result = userService.updateMe(userId, null, AccountStatus.WITHDRAWN);
 
-    assertThat(result.getAccountStatus()).isEqualTo(AccountStatus.WITHDRAWN);
+    assertThat(result.user().getAccountStatus()).isEqualTo(AccountStatus.WITHDRAWN);
   }
 
   @Test
@@ -104,7 +240,7 @@ class UserServiceTest {
     UUID transportMethodId = UUID.randomUUID();
     User user = new User("test@example.com", "google-1");
     Region region = new Region("서울");
-    Theme theme = new Theme("카페");
+    Theme theme = new Theme("관광지", 12);
     TransportMethod transportMethod = new TransportMethod("자가용");
     when(userRepository.findById(userId)).thenReturn(Optional.of(user));
     when(regionRepository.findAllById(List.of(regionId))).thenReturn(List.of(region));
@@ -134,5 +270,55 @@ class UserServiceTest {
     User result = userService.updatePreferences(userId, null, null, null);
 
     assertThat(result.getPreferredRegions()).containsExactly(existingRegion);
+  }
+
+  @Test
+  void isNicknameAvailable은_사용_중이면_false를_반환한다() {
+    when(userRepository.existsByNickname("초롱이")).thenReturn(true);
+
+    assertThat(userService.isNicknameAvailable("초롱이")).isFalse();
+  }
+
+  @Test
+  void isNicknameAvailable은_사용_중이_아니면_true를_반환한다() {
+    when(userRepository.existsByNickname("초롱이")).thenReturn(false);
+
+    assertThat(userService.isNicknameAvailable("초롱이")).isTrue();
+  }
+
+  @Test
+  void updateMe는_이미_사용_중인_닉네임이면_예외를_던진다() {
+    UUID userId = UUID.randomUUID();
+    User user = new User("test@example.com", "google-1");
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.existsByNickname("초롱이")).thenReturn(true);
+
+    assertThatThrownBy(() -> userService.updateMe(userId, "초롱이", null))
+        .isInstanceOf(NicknameAlreadyInUseException.class);
+  }
+
+  @Test
+  void updateMe는_다른_유저가_쓰는_닉네임이면_예외를_던진다() {
+    UUID userId = UUID.randomUUID();
+    User user = new User("test@example.com", "google-1");
+    user.registerNickname("내닉네임");
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.existsByNickname("남의닉네임")).thenReturn(true);
+
+    assertThatThrownBy(() -> userService.updateMe(userId, "남의닉네임", null))
+        .isInstanceOf(NicknameAlreadyInUseException.class);
+  }
+
+  @Test
+  void updateMe는_자기_닉네임을_그대로_보내면_예외를_던지지_않는다() {
+    UUID userId = UUID.randomUUID();
+    User user = new User("test@example.com", "google-1");
+    user.registerNickname("내닉네임");
+    when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+    when(userRepository.save(any(User.class))).thenReturn(user);
+
+    MeDetail result = userService.updateMe(userId, "내닉네임", null);
+
+    assertThat(result.user().getNickname()).isEqualTo("내닉네임");
   }
 }

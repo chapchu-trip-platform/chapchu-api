@@ -1,0 +1,7 @@
+.git
+.gradle
+**/build
+!app/build/libs
+**/.gradle
+*.md
+.env
